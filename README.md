@@ -1,0 +1,50 @@
+# MRI Lab
+
+A browser-based lab for building MRI visualizations and simulations one step at
+a time.
+
+## Run locally
+
+```bash
+nvm use
+npm install
+npm run dev
+```
+
+To expose Vite from a container, run:
+
+```bash
+npm run dev -- --host 0.0.0.0
+```
+
+Open the URL printed by Vite. Drag to orbit the scene, scroll to zoom,
+right-drag to pan, and click a sphere to select its hydrogen ensemble. Press
+`R` or use the floating viewport control to reset the camera.
+
+## Project structure
+
+- `src/components/LabScene.tsx` owns the Three.js scene, GPU-instanced 128 × 128
+  ensemble slice, smooth camera targeting, selection calculation, and render
+  loop.
+- `src/models/HydrogenEnsemble.ts` defines each ensemble's intrinsic
+  properties and computes field-dependent magnetic properties on demand.
+- `src/App.tsx` contains the React interface around the canvas.
+- `src/styles.css` contains the responsive visual system.
+
+The grid is rendered as a single `THREE.InstancedMesh` of translucent sphere
+geometry, so all 16,384 ensembles remain practical to navigate while retaining
+true 3D volumes for future internal geometry. The scene lifecycle is isolated
+in `LabScene`, leaving room to add spin state and physics models later.
+
+The initial non-uniform isocenter approximation uses normalized radial
+position `rho` and a 1 ppm outer variation:
+
+- Field variation: `delta B = B0 * 10^-6 * rho^2`
+- Local field: `B0' = B0 + delta B`
+- Off-parallel angle: `delta theta = 10^-4 degrees * rho^2`
+- Arrows remain visually parallel because this angle is below display
+  resolution.
+
+Derived ensemble properties use the shared profile implementation in
+`HydrogenEnsemble.ts`; rendered arrows intentionally remain parallel because
+the modeled angular deviation is not visually resolvable.
