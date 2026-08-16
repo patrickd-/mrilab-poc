@@ -8,7 +8,11 @@ import type {
   GradientPlaybackSpeed,
   GradientPlaybackStatus,
 } from '../hooks/useGradientEncodingPlayback'
-import type { GradientPulse } from '../simulation/gradientEncoding'
+import {
+  DEFAULT_PHASE_ENCODING_PULSES,
+  DEFAULT_READOUT_PULSES,
+  type GradientPulse,
+} from '../simulation/gradientEncoding'
 import DarkSelect from './DarkSelect'
 
 type PulseHandle = 'left' | 'right' | 'top'
@@ -32,6 +36,7 @@ interface EditableGradientGraphProps {
   onReset: () => void
   playheadTime: number | null
   pulses: ReadonlyArray<GradientPulse>
+  referenceWaveforms: ReadonlyArray<ReadonlyArray<GradientPulse>>
 }
 
 interface GradientEncodingExperimentPanelProps {
@@ -62,6 +67,24 @@ const GRAPH = {
 const MINIMUM_PULSE_DURATION = 0.025
 const KEYBOARD_TIME_STEP = 0.01
 const KEYBOARD_AMPLITUDE_STEP = 0.05
+const PHASE_ENCODING_REFERENCE_LEVELS = [
+  -1,
+  -5 / 7,
+  -3 / 7,
+  -1 / 7,
+  1 / 7,
+  3 / 7,
+  5 / 7,
+  1,
+] as const
+const PHASE_ENCODING_REFERENCE_WAVEFORMS =
+  PHASE_ENCODING_REFERENCE_LEVELS.map((level) =>
+    DEFAULT_PHASE_ENCODING_PULSES.map((pulse) => ({
+      ...pulse,
+      amplitude: pulse.amplitude * level,
+    })),
+  )
+const READOUT_REFERENCE_WAVEFORMS = [DEFAULT_READOUT_PULSES]
 const GRADIENT_PLAYBACK_SPEED_OPTIONS: ReadonlyArray<{
   id: GradientPlaybackSpeed
   label: string
@@ -163,6 +186,7 @@ function EditableGradientGraph({
   onReset,
   playheadTime,
   pulses,
+  referenceWaveforms,
 }: EditableGradientGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragState | null>(null)
@@ -280,6 +304,18 @@ function EditableGradientGraph({
       pulse.amplitude,
     )} H ${timeToX(pulse.end)} V ${baselineY}`
   }, `M ${GRAPH.left} ${baselineY}`)
+  const referenceWaveformPath = (
+    referencePulses: ReadonlyArray<GradientPulse>,
+  ) => {
+    const firstPulse = referencePulses[0]
+    if (!firstPulse) return ''
+
+    return referencePulses.reduce((path, pulse) => {
+      return `${path} H ${timeToX(pulse.start)} V ${amplitudeToY(
+        pulse.amplitude,
+      )} H ${timeToX(pulse.end)} V ${baselineY}`
+    }, `M ${timeToX(firstPulse.start)} ${baselineY}`)
+  }
 
   return (
     <div className={`gradient-input gradient-input-${label.toLowerCase()}`}>
@@ -357,6 +393,14 @@ function EditableGradientGraph({
         >
           mT/m
         </text>
+        <g className="gradient-reference-waveforms" aria-hidden="true">
+          {referenceWaveforms.map((referencePulses, index) => (
+            <path
+              key={index}
+              d={referenceWaveformPath(referencePulses)}
+            />
+          ))}
+        </g>
         {guideTime !== null && (
           <line
             className="gradient-timing-guide"
@@ -534,7 +578,8 @@ function GradientEncodingExperimentPanel({
 
       <p className="gradient-input-instructions">
         Drag a pulse top to move it or change amplitude. Drag either side to
-        adjust timing. The 20 ms window maps full scale to ±1 mT/m.
+        adjust timing. Gray lines mark the default encoding steps. The 20 ms
+        window maps full scale to ±1 mT/m.
       </p>
 
       <div className="gradient-timing-diagram">
@@ -544,6 +589,7 @@ function GradientEncodingExperimentPanel({
           label="PE"
           pulses={phaseEncodingPulses}
           playheadTime={playheadTime}
+          referenceWaveforms={PHASE_ENCODING_REFERENCE_WAVEFORMS}
           onChange={onPhaseEncodingPulsesChange}
           onGuideTimeChange={setTimingGuideTime}
           onReset={onPhaseEncodingReset}
@@ -555,6 +601,7 @@ function GradientEncodingExperimentPanel({
           linkedPulses
           pulses={readoutPulses}
           playheadTime={playheadTime}
+          referenceWaveforms={READOUT_REFERENCE_WAVEFORMS}
           onChange={onReadoutPulsesChange}
           onGuideTimeChange={setTimingGuideTime}
           onReset={onReadoutReset}

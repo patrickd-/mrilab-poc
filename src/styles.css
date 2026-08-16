@@ -1026,6 +1026,15 @@ a:focus-visible {
   letter-spacing: 0.04em;
 }
 
+.gradient-reference-waveforms {
+  fill: none;
+  stroke: rgba(244, 245, 241, 0.27);
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 1;
+  pointer-events: none;
+}
+
 .gradient-pulse-fill {
   fill: rgba(125, 215, 240, 0.08);
   pointer-events: none;
