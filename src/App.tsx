@@ -8,6 +8,7 @@ import LabScene, {
 } from './components/LabScene'
 import DarkSelect from './components/DarkSelect'
 import FidExperimentPanel from './components/FidExperimentPanel'
+import GradientEncodingExperimentPanel from './components/GradientEncodingExperimentPanel'
 import SimulationControls, {
   type SimulationTimeStep,
 } from './components/SimulationControls'
@@ -36,11 +37,12 @@ const B0_TESLA_VALUES: Readonly<
   '3': 3,
   '7': 7,
 }
-type ExperimentId = 'ping' | 'spin-echo'
+type ExperimentId = 'gradient-encoding' | 'ping' | 'spin-echo'
 
 const EXPERIMENTS: ReadonlyArray<{ id: ExperimentId; label: string }> = [
   { id: 'ping', label: 'Ping Experiment' },
   { id: 'spin-echo', label: 'Spin Echo Experiment' },
+  { id: 'gradient-encoding', label: 'Gradient Encoding Experiment' },
 ]
 const FIELD_UNIFORMITY_OPTIONS: ReadonlyArray<{
   id: FieldUniformity
@@ -214,8 +216,10 @@ function App() {
       ),
     [ensembleRevision, ensembles],
   )
+  const simulationExperimentSelected =
+    selectedExperiment === 'ping' || selectedExperiment === 'spin-echo'
   const fidSimulation = useFidSimulation({
-    active: selectedExperiment !== null,
+    active: simulationExperimentSelected,
     ensembles,
     ensembleRevision,
     fieldStrengthTesla,
@@ -318,7 +322,7 @@ function App() {
           ensembleRevision={ensembleRevision}
           fidEnsembleStates={fidSimulation.ensembleStates}
           fidSimulationActive={
-            selectedExperiment !== null && fidSimulation.status !== 'idle'
+            simulationExperimentSelected && fidSimulation.status !== 'idle'
           }
           fidPulseEvents={fidSimulation.pulseEvents}
           fidSimulationTimeMilliseconds={fidSimulation.timeMilliseconds}
@@ -436,7 +440,7 @@ function App() {
         </header>
 
         <div className="panel-content">
-          {selectedExperiment && (
+          {simulationExperimentSelected && (
             <SimulationControls
               activeEnsembleCount={fidSimulation.ensembleStates.length}
               emptyMessage="Apply a non-air sample preset to the slice before starting the experiment."
@@ -494,6 +498,10 @@ function App() {
               timeMilliseconds={fidSimulation.timeMilliseconds}
               timeStepMilliseconds={Number(simulationTimeStep)}
             />
+          )}
+
+          {selectedExperiment === 'gradient-encoding' && (
+            <GradientEncodingExperimentPanel />
           )}
 
           {!selectedExperiment &&
