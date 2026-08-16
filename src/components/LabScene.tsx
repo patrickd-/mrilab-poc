@@ -47,10 +47,14 @@ const SAMPLE_SPHERE_COLORS: Readonly<Record<SamplePresetId, THREE.Color>> = {
 }
 const CAMERA_DISTANCE =
   (GRID_OFFSET / Math.tan(THREE.MathUtils.degToRad(20))) * 1.12
-const CAMERA_POSITION = new THREE.Vector3(0, 0, CAMERA_DISTANCE)
+const CAMERA_POSITION = new THREE.Vector3(0, -0.001, CAMERA_DISTANCE)
 const CAMERA_TARGET = new THREE.Vector3(0, 0, 0)
+const CAMERA_UP = new THREE.Vector3(0, 0, 1)
 const STACKED_CAMERA_POSITION = new THREE.Vector3(0.68, 0.52, 1.08)
-const SLICE_CAMERA_AZIMUTH_LIMIT = Math.PI / 2 - 0.04
+const SLICE_CAMERA_MIN_POLAR_ANGLE = 0.0001
+const SLICE_CAMERA_MAX_POLAR_ANGLE = Math.PI / 2 - 0.04
+const STACKED_CAMERA_MIN_POLAR_ANGLE = 0.08
+const STACKED_CAMERA_MAX_POLAR_ANGLE = Math.PI - 0.08
 const STACKED_ARROW_WIDTH_SCALE = 0.24
 const STACKED_ARROW_LENGTH_SCALE = 0.82
 const B1_PULSE_VISIBILITY_MILLISECONDS = 700
@@ -274,16 +278,16 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const controls = controlsRef.current
       if (!camera || !controls) return
       focusTransitionRef.current = null
-      controls.minAzimuthAngle = stacked
-        ? Number.NEGATIVE_INFINITY
-        : -SLICE_CAMERA_AZIMUTH_LIMIT
-      controls.maxAzimuthAngle = stacked
-        ? Number.POSITIVE_INFINITY
-        : SLICE_CAMERA_AZIMUTH_LIMIT
+      controls.minPolarAngle = stacked
+        ? STACKED_CAMERA_MIN_POLAR_ANGLE
+        : SLICE_CAMERA_MIN_POLAR_ANGLE
+      controls.maxPolarAngle = stacked
+        ? STACKED_CAMERA_MAX_POLAR_ANGLE
+        : SLICE_CAMERA_MAX_POLAR_ANGLE
       camera.position.copy(
         stacked ? STACKED_CAMERA_POSITION : CAMERA_POSITION,
       )
-      camera.up.set(0, 1, 0)
+      camera.up.copy(CAMERA_UP)
       controls.target.copy(CAMERA_TARGET)
       controls.update()
     }, [renderMode])
@@ -425,7 +429,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             ? STACKED_CAMERA_POSITION
             : CAMERA_POSITION,
         )
-        camera.up.set(0, 1, 0)
+        camera.up.copy(CAMERA_UP)
         controls.target.copy(CAMERA_TARGET)
         controls.update()
       },
@@ -439,6 +443,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       scene.background = new THREE.Color('#07090c')
 
       const camera = new THREE.PerspectiveCamera(40, 1, 0.025, 800)
+      camera.up.copy(CAMERA_UP)
       camera.position.copy(
         renderModeRef.current === 'stacked'
           ? STACKED_CAMERA_POSITION
@@ -460,16 +465,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       controls.dampingFactor = 0.07
       controls.minDistance = 0.12
       controls.maxDistance = CAMERA_DISTANCE * 2.4
-      controls.minPolarAngle = 0.08
-      controls.maxPolarAngle = Math.PI - 0.08
-      controls.minAzimuthAngle =
+      controls.minPolarAngle =
         renderModeRef.current === 'stacked'
-          ? Number.NEGATIVE_INFINITY
-          : -SLICE_CAMERA_AZIMUTH_LIMIT
-      controls.maxAzimuthAngle =
+          ? STACKED_CAMERA_MIN_POLAR_ANGLE
+          : SLICE_CAMERA_MIN_POLAR_ANGLE
+      controls.maxPolarAngle =
         renderModeRef.current === 'stacked'
-          ? Number.POSITIVE_INFINITY
-          : SLICE_CAMERA_AZIMUTH_LIMIT
+          ? STACKED_CAMERA_MAX_POLAR_ANGLE
+          : SLICE_CAMERA_MAX_POLAR_ANGLE
       controls.zoomSpeed = 0.85
       controls.zoomToCursor = false
       controls.panSpeed = 0.75
@@ -1412,7 +1415,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             ? STACKED_CAMERA_POSITION
             : CAMERA_POSITION,
         )
-        camera.up.set(0, 1, 0)
+        camera.up.copy(CAMERA_UP)
         controls.target.copy(CAMERA_TARGET)
         controls.update()
       }
