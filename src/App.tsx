@@ -244,9 +244,21 @@ function App() {
     }
   }, [experimentMenuOpen])
 
+  useEffect(() => {
+    if (!selected) return
+
+    const dismissEnsembleDetails = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelected(null)
+    }
+
+    window.addEventListener('keydown', dismissEnsembleDetails)
+    return () => {
+      window.removeEventListener('keydown', dismissEnsembleDetails)
+    }
+  }, [selected])
+
   const selectEnsemble = (selection: EnsembleSelection) => {
     setSelected(selection)
-    setSelectedExperiment(null)
     setExperimentMenuOpen(false)
   }
 
@@ -440,7 +452,7 @@ function App() {
         </header>
 
         <div className="panel-content">
-          {simulationExperimentSelected && (
+          {!selected && simulationExperimentSelected && (
             <SimulationControls
               activeEnsembleCount={fidSimulation.ensembleStates.length}
               emptyMessage="Apply a non-air sample preset to the slice before starting the experiment."
@@ -472,7 +484,7 @@ function App() {
             />
           )}
 
-          {selectedExperiment === 'ping' && (
+          {!selected && selectedExperiment === 'ping' && (
             <FidExperimentPanel
               graphWindowEndMilliseconds={
                 fidSimulation.graphWindowEndMilliseconds
@@ -485,7 +497,7 @@ function App() {
             />
           )}
 
-          {selectedExperiment === 'spin-echo' && (
+          {!selected && selectedExperiment === 'spin-echo' && (
             <SpinEchoExperimentPanel
               graphWindowEndMilliseconds={
                 fidSimulation.graphWindowEndMilliseconds
@@ -500,12 +512,11 @@ function App() {
             />
           )}
 
-          {selectedExperiment === 'gradient-encoding' && (
+          {!selected && selectedExperiment === 'gradient-encoding' && (
             <GradientEncodingExperimentPanel />
           )}
 
-          {!selectedExperiment &&
-            selected &&
+          {selected &&
             selectedEnsemble &&
             magneticProperties &&
             sampleProperties && (
@@ -516,6 +527,15 @@ function App() {
                     <span className="section-index">01</span>
                     <h2>Static nuclear properties</h2>
                   </div>
+                  <button
+                    className="ensemble-details-close"
+                    type="button"
+                    title="Close ensemble details (Escape)"
+                    aria-label="Close ensemble details"
+                    onClick={() => setSelected(null)}
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
                 </div>
 
                 <div className="nucleus-card">

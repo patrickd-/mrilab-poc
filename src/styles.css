@@ -568,6 +568,29 @@ a:focus-visible {
   color: var(--muted);
 }
 
+.ensemble-details-close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 18px;
+  line-height: 1;
+  transition: border-color 160ms ease, color 160ms ease,
+    background 160ms ease;
+}
+
+.ensemble-details-close:hover {
+  border-color: rgba(255, 120, 102, 0.65);
+  color: var(--coral);
+  background: rgba(255, 120, 102, 0.07);
+}
+
 .nucleus-card {
   display: grid;
   grid-template-columns: 55px 1fr auto;
@@ -1198,7 +1221,8 @@ a:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .viewport-reset,
   .viewport-mode-select .dark-select-trigger,
-  .reference-frame-select .dark-select-trigger {
+  .reference-frame-select .dark-select-trigger,
+  .ensemble-details-close {
     transition: none;
   }
 }
