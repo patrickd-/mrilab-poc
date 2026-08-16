@@ -37,7 +37,13 @@ const STACKED_CAMERA_POSITION = new THREE.Vector3(0.68, 0.52, 1.08)
 const STACKED_ARROW_WIDTH_SCALE = 0.24
 const STACKED_ARROW_LENGTH_SCALE = 0.82
 const B1_PULSE_VISIBILITY_MILLISECONDS = 700
-const B1_SLICE_AXIS_SCREEN_SCALE = 0.45
+const FID_FIELD_VARIATION_PALETTE = [
+  new THREE.Color('#32e6ff'),
+  new THREE.Color('#4f7dff'),
+  new THREE.Color('#a855f7'),
+  new THREE.Color('#ff4fbc'),
+  new THREE.Color('#ffd166'),
+] as const
 const FOCUS_DURATION = 650
 const VISUAL_PRECESSION_RADIANS_PER_MILLISECOND = (2 * Math.PI) / 180
 
@@ -114,13 +120,16 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const renderModeRef = useRef(renderMode)
     const modeObjectsRef = useRef<{
       boundary: THREE.LineLoop
-      b1PulseAxis: THREE.Group
+      b1ArrowHeads: THREE.InstancedMesh
+      b1ArrowShafts: THREE.InstancedMesh
       ensembles: THREE.InstancedMesh
       fieldArrowHeads: THREE.InstancedMesh
       fieldArrowShafts: THREE.InstancedMesh
       fidArrowMaterial: THREE.MeshBasicMaterial
       stackedFieldArrowHead: THREE.Mesh
       stackedFieldArrowShaft: THREE.Mesh
+      stackedB1ArrowHead: THREE.Mesh
+      stackedB1ArrowShaft: THREE.Mesh
       stackedSphere: THREE.Mesh
     } | null>(null)
     const fidAnimationRef = useRef({
@@ -178,8 +187,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
       if (fidPulseEvents.length === 0) {
         b1PulseVisualizationRef.current = null
-        const b1PulseAxis = modeObjectsRef.current?.b1PulseAxis
-        if (b1PulseAxis) b1PulseAxis.visible = false
+        const modeObjects = modeObjectsRef.current
+        if (modeObjects) {
+          modeObjects.b1ArrowHeads.visible = false
+          modeObjects.b1ArrowShafts.visible = false
+          modeObjects.stackedB1ArrowHead.visible = false
+          modeObjects.stackedB1ArrowShaft.visible = false
+        }
       } else if (fidPulseEvents.length > previousPulseCount) {
         b1PulseVisualizationRef.current = {
           pulseEvent: fidPulseEvents[fidPulseEvents.length - 1],
@@ -419,15 +433,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       fidArrowShafts.frustumCulled = false
       fidArrowHeads.frustumCulled = false
 
-      const b1AxisShaftGeometry = new THREE.CylinderGeometry(
-        0.006,
-        0.006,
-        SPHERE_RADIUS * 1.55,
-        8,
-      )
-      b1AxisShaftGeometry.rotateX(Math.PI / 2)
-      const b1AxisTipGeometry = new THREE.SphereGeometry(0.013, 10, 6)
-      const b1AxisMaterial = new THREE.MeshBasicMaterial({
+      const b1ArrowMaterial = new THREE.MeshBasicMaterial({
         color: '#ff7866',
         depthTest: false,
         depthWrite: false,
@@ -435,31 +441,42 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         opacity: 0.92,
         toneMapped: false,
       })
-      const b1PulseAxis = new THREE.Group()
-      const b1AxisShaft = new THREE.Mesh(
-        b1AxisShaftGeometry,
-        b1AxisMaterial,
+      const b1ArrowShafts = new THREE.InstancedMesh(
+        arrowShaftGeometry,
+        b1ArrowMaterial,
+        GRID_SIZE * GRID_SIZE,
       )
-      const b1AxisNegativeTip = new THREE.Mesh(
-        b1AxisTipGeometry,
-        b1AxisMaterial,
+      const b1ArrowHeads = new THREE.InstancedMesh(
+        arrowHeadGeometry,
+        b1ArrowMaterial,
+        GRID_SIZE * GRID_SIZE,
       )
-      const b1AxisPositiveTip = new THREE.Mesh(
-        b1AxisTipGeometry,
-        b1AxisMaterial,
+      const stackedB1ArrowShaft = new THREE.Mesh(
+        arrowShaftGeometry,
+        b1ArrowMaterial,
       )
-      b1AxisNegativeTip.position.z = -SPHERE_RADIUS * 0.86
-      b1AxisPositiveTip.position.z = SPHERE_RADIUS * 0.86
-      b1AxisShaft.renderOrder = 20
-      b1AxisNegativeTip.renderOrder = 20
-      b1AxisPositiveTip.renderOrder = 20
-      b1PulseAxis.add(
-        b1AxisShaft,
-        b1AxisNegativeTip,
-        b1AxisPositiveTip,
+      const stackedB1ArrowHead = new THREE.Mesh(
+        arrowHeadGeometry,
+        b1ArrowMaterial,
       )
-      b1PulseAxis.visible = false
-      scene.add(b1PulseAxis)
+      b1ArrowShafts.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+      b1ArrowHeads.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+      b1ArrowShafts.frustumCulled = false
+      b1ArrowHeads.frustumCulled = false
+      b1ArrowShafts.renderOrder = 20
+      b1ArrowHeads.renderOrder = 20
+      stackedB1ArrowShaft.renderOrder = 20
+      stackedB1ArrowHead.renderOrder = 20
+      b1ArrowShafts.visible = false
+      b1ArrowHeads.visible = false
+      stackedB1ArrowShaft.visible = false
+      stackedB1ArrowHead.visible = false
+      scene.add(
+        b1ArrowShafts,
+        b1ArrowHeads,
+        stackedB1ArrowShaft,
+        stackedB1ArrowHead,
+      )
 
       const instanceMatrix = new THREE.Matrix4()
       const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0)
@@ -553,13 +570,16 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       )
       modeObjectsRef.current = {
         boundary,
-        b1PulseAxis,
+        b1ArrowHeads,
+        b1ArrowShafts,
         ensembles,
         fieldArrowHeads: arrowHeads,
         fieldArrowShafts: arrowShafts,
         fidArrowMaterial,
         stackedFieldArrowHead,
         stackedFieldArrowShaft,
+        stackedB1ArrowHead,
+        stackedB1ArrowShaft,
         stackedSphere,
       }
 
@@ -638,9 +658,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const fidArrowQuaternion = new THREE.Quaternion()
       const fidArrowAxis = new THREE.Vector3(0, 0, 1)
       const fidArrowColor = new THREE.Color()
-      const b1AxisDirection = new THREE.Vector3()
-      const b1AxisQuaternion = new THREE.Quaternion()
-      const b1AxisLocalDirection = new THREE.Vector3(0, 0, 1)
+      const fidArrowHsl = { h: 0, s: 0, l: 0 }
+      const b1ArrowMatrix = new THREE.Matrix4()
+      const b1ArrowPosition = new THREE.Vector3()
+      const b1ArrowDirection = new THREE.Vector3()
+      const b1ArrowQuaternion = new THREE.Quaternion()
+      const b1ArrowLocalDirection = new THREE.Vector3(0, 0, 1)
+      const b1ArrowScale = new THREE.Vector3(1, 1, 1)
+      let renderedB1PulseStartedAt = -1
 
       const hideFidArrow = (index: number) => {
         fidArrowShafts.setMatrixAt(index, hiddenMatrix)
@@ -651,11 +676,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         states: ReadonlyArray<FidEnsembleState>,
       ) => {
         states.forEach((state) => {
-          const fieldVariationFraction = THREE.MathUtils.clamp(
-            Math.abs(state.fieldVariationPpm) /
-              NON_UNIFORM_FIELD_MODEL.maximumVariationPpm,
-            0,
-            1,
+          const fieldVariationFraction = Math.sqrt(
+            THREE.MathUtils.clamp(
+              Math.abs(state.fieldVariationPpm) /
+                NON_UNIFORM_FIELD_MODEL.maximumVariationPpm,
+              0,
+              1,
+            ),
           )
           const tiltFraction = THREE.MathUtils.clamp(
             THREE.MathUtils.radToDeg(state.fieldTiltAngleRadians) /
@@ -664,10 +691,28 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             1,
           )
 
+          const palettePosition =
+            fieldVariationFraction *
+            (FID_FIELD_VARIATION_PALETTE.length - 1)
+          const lowerColorIndex = Math.floor(palettePosition)
+          const upperColorIndex = Math.min(
+            lowerColorIndex + 1,
+            FID_FIELD_VARIATION_PALETTE.length - 1,
+          )
+          fidArrowColor.lerpColors(
+            FID_FIELD_VARIATION_PALETTE[lowerColorIndex],
+            FID_FIELD_VARIATION_PALETTE[upperColorIndex],
+            palettePosition - lowerColorIndex,
+          )
+          fidArrowColor.getHSL(fidArrowHsl)
           fidArrowColor.setHSL(
-            THREE.MathUtils.lerp(0.53, 0.77, fieldVariationFraction),
-            0.86,
-            THREE.MathUtils.lerp(0.58, 0.72, tiltFraction),
+            fidArrowHsl.h,
+            fidArrowHsl.s,
+            THREE.MathUtils.clamp(
+              fidArrowHsl.l + tiltFraction * 0.16,
+              0,
+              0.84,
+            ),
           )
           fidArrowShafts.setColorAt(state.index, fidArrowColor)
           fidArrowHeads.setColorAt(state.index, fidArrowColor)
@@ -769,10 +814,17 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         fidArrowHeads.instanceMatrix.needsUpdate = true
       }
 
-      const updateB1PulseAxis = (time: number) => {
+      const hideB1PulseArrows = () => {
+        b1ArrowShafts.visible = false
+        b1ArrowHeads.visible = false
+        stackedB1ArrowShaft.visible = false
+        stackedB1ArrowHead.visible = false
+      }
+
+      const updateB1PulseArrows = (time: number) => {
         const visualization = b1PulseVisualizationRef.current
         if (!visualization) {
-          b1PulseAxis.visible = false
+          hideB1PulseArrows()
           return
         }
 
@@ -780,7 +832,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           (time - visualization.startedAt) /
           B1_PULSE_VISIBILITY_MILLISECONDS
         if (progress >= 1) {
-          b1PulseAxis.visible = false
+          hideB1PulseArrows()
           b1PulseVisualizationRef.current = null
           return
         }
@@ -791,36 +843,49 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         const pulseAxisPhase =
           rotatingFramePhase +
           (visualization.pulseEvent.kind === '90-y' ? Math.PI / 2 : 0)
-        b1AxisDirection.set(
+        b1ArrowDirection.set(
           Math.cos(pulseAxisPhase),
           Math.sin(pulseAxisPhase),
           0,
         )
-        b1AxisQuaternion.setFromUnitVectors(
-          b1AxisLocalDirection,
-          b1AxisDirection,
+        b1ArrowQuaternion.setFromUnitVectors(
+          b1ArrowLocalDirection,
+          b1ArrowDirection,
         )
-        b1PulseAxis.quaternion.copy(b1AxisQuaternion)
 
-        if (renderModeRef.current === 'stacked') {
-          b1PulseAxis.position.copy(CAMERA_TARGET)
-          b1PulseAxis.scale.setScalar(1)
-        } else {
-          const cameraDistance = camera.position.distanceTo(controls.target)
-          const stackedCameraDistance = STACKED_CAMERA_POSITION.length()
-          const scale = THREE.MathUtils.clamp(
-            (cameraDistance / stackedCameraDistance) *
-              B1_SLICE_AXIS_SCREEN_SCALE,
-            0.8,
-            30,
-          )
-          b1PulseAxis.position.copy(controls.target)
-          b1PulseAxis.scale.setScalar(scale)
+        if (renderedB1PulseStartedAt !== visualization.startedAt) {
+          let b1ArrowIndex = 0
+          for (let row = 0; row < GRID_SIZE; row += 1) {
+            for (let column = 0; column < GRID_SIZE; column += 1) {
+              b1ArrowPosition.set(
+                column * GRID_SPACING - GRID_OFFSET,
+                GRID_OFFSET - row * GRID_SPACING,
+                0,
+              )
+              b1ArrowMatrix.compose(
+                b1ArrowPosition,
+                b1ArrowQuaternion,
+                b1ArrowScale,
+              )
+              b1ArrowShafts.setMatrixAt(b1ArrowIndex, b1ArrowMatrix)
+              b1ArrowHeads.setMatrixAt(b1ArrowIndex, b1ArrowMatrix)
+              b1ArrowIndex += 1
+            }
+          }
+          b1ArrowShafts.instanceMatrix.needsUpdate = true
+          b1ArrowHeads.instanceMatrix.needsUpdate = true
+          stackedB1ArrowShaft.quaternion.copy(b1ArrowQuaternion)
+          stackedB1ArrowHead.quaternion.copy(b1ArrowQuaternion)
+          renderedB1PulseStartedAt = visualization.startedAt
         }
 
         const fadeProgress = Math.max(0, (progress - 0.55) / 0.45)
-        b1AxisMaterial.opacity = 0.92 * (1 - smoothStep(fadeProgress))
-        b1PulseAxis.visible = true
+        b1ArrowMaterial.opacity = 0.92 * (1 - smoothStep(fadeProgress))
+        const stacked = renderModeRef.current === 'stacked'
+        b1ArrowShafts.visible = !stacked
+        b1ArrowHeads.visible = !stacked
+        stackedB1ArrowShaft.visible = stacked
+        stackedB1ArrowHead.visible = stacked
       }
 
       const animate = (time: number) => {
@@ -848,7 +913,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
         updateFidArrows()
         controls.update()
-        updateB1PulseAxis(time)
+        updateB1PulseArrows(time)
 
         renderer.render(scene, camera)
         animationFrame = window.requestAnimationFrame(animate)
@@ -890,9 +955,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         fidArrowShaftGeometry.dispose()
         fidArrowHeadGeometry.dispose()
         fidArrowMaterial.dispose()
-        b1AxisShaftGeometry.dispose()
-        b1AxisTipGeometry.dispose()
-        b1AxisMaterial.dispose()
+        b1ArrowMaterial.dispose()
         boundaryGeometry.dispose()
         boundaryMaterial.dispose()
 
