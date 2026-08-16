@@ -1,12 +1,13 @@
 import type { FidSimulationStatus } from '../hooks/useFidSimulation'
 import DarkSelect from './DarkSelect'
 
-export type SimulationTimeStep = '0.25' | '0.5' | '1' | '2' | '5'
+export type SimulationTimeStep = '0.10' | '0.25' | '0.5' | '1' | '2' | '5'
 
 const SIMULATION_TIME_STEP_OPTIONS: ReadonlyArray<{
   id: SimulationTimeStep
   label: string
 }> = [
+  { id: '0.10', label: '0.10 ms/tick' },
   { id: '0.25', label: '0.25 ms/tick' },
   { id: '0.5', label: '0.5 ms/tick' },
   { id: '1', label: '1 ms/tick' },
