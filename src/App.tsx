@@ -3,6 +3,7 @@ import LabScene, {
   type EnsembleSelection,
   GRID_SIZE,
   type LabSceneHandle,
+  type ReferenceFrame,
   type RenderMode,
 } from './components/LabScene'
 import DarkSelect from './components/DarkSelect'
@@ -54,6 +55,13 @@ const RENDER_MODE_OPTIONS: ReadonlyArray<{
 }> = [
   { id: 'slice', label: 'Slice View' },
   { id: 'stacked', label: 'Stacked View' },
+]
+const REFERENCE_FRAME_OPTIONS: ReadonlyArray<{
+  id: ReferenceFrame
+  label: string
+}> = [
+  { id: 'laboratory-slowed', label: 'Laboratory Frame (Slowed)' },
+  { id: 'rotating', label: 'Rotating Frame' },
 ]
 
 type TissueSamplePresetId = Exclude<SamplePresetId, 'air'>
@@ -183,6 +191,8 @@ function App() {
   const [fieldUniformity, setFieldUniformity] =
     useState<FieldUniformity>('uniform')
   const [renderMode, setRenderMode] = useState<RenderMode>('slice')
+  const [referenceFrame, setReferenceFrame] =
+    useState<ReferenceFrame>('rotating')
   const [experimentMenuOpen, setExperimentMenuOpen] = useState(false)
   const [selectedExperiment, setSelectedExperiment] =
     useState<ExperimentId | null>(null)
@@ -312,6 +322,7 @@ function App() {
           }
           fidPulseEvents={fidSimulation.pulseEvents}
           fidSimulationTimeMilliseconds={fidSimulation.timeMilliseconds}
+          referenceFrame={referenceFrame}
           renderMode={renderMode}
           selected={selected}
           onSelect={selectEnsemble}
@@ -365,6 +376,13 @@ function App() {
               value={renderMode}
               options={RENDER_MODE_OPTIONS}
               onChange={changeRenderMode}
+            />
+            <DarkSelect
+              className="reference-frame-select"
+              ariaLabel="Magnetization reference frame"
+              value={referenceFrame}
+              options={REFERENCE_FRAME_OPTIONS}
+              onChange={setReferenceFrame}
             />
           </div>
           <p>Drag to orbit · Scroll to zoom · Right-drag to pan</p>

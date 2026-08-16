@@ -57,5 +57,6 @@ Derived ensemble properties use the shared profile implementation in
 the modeled angular deviation is not visually resolvable. Magnetization-arrow
 hue encodes normalized field-strength variation, while brightness encodes the
 normalized off-parallel angle. Their precession is rendered in the nominal
-`B0` rotating frame, so only each ensemble's frequency offset contributes to
-its displayed phase.
+`B0` rotating frame by default, so only each ensemble's frequency offset
+contributes to its displayed phase. A slowed laboratory-frame proxy can be
+selected for a visible shared carrier rotation.

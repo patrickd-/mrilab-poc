@@ -46,6 +46,7 @@ const FID_FIELD_VARIATION_PALETTE = [
   new THREE.Color('#ffd166'),
 ] as const
 const FOCUS_DURATION = 650
+const SLOWED_LAB_PRECESSION_RADIANS_PER_MILLISECOND = (2 * Math.PI) / 180
 
 interface FocusTransition {
   fromCamera: THREE.Vector3
@@ -71,6 +72,7 @@ export interface LabSceneHandle {
 }
 
 export type RenderMode = 'slice' | 'stacked'
+export type ReferenceFrame = 'laboratory-slowed' | 'rotating'
 
 interface LabSceneProps {
   ensembleModels: ReadonlyArray<HydrogenEnsemble>
@@ -79,6 +81,7 @@ interface LabSceneProps {
   fidPulseEvents: ReadonlyArray<RfPulseEvent>
   fidSimulationActive: boolean
   fidSimulationTimeMilliseconds: number
+  referenceFrame: ReferenceFrame
   renderMode: RenderMode
   selected: EnsembleSelection | null
   onSelect: (selection: EnsembleSelection) => void
@@ -105,6 +108,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       fidPulseEvents,
       fidSimulationActive,
       fidSimulationTimeMilliseconds,
+      referenceFrame,
       renderMode,
       selected,
       onSelect,
@@ -117,6 +121,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const ensemblesRef = useRef<THREE.InstancedMesh | null>(null)
     const fidArrowShaftsRef = useRef<THREE.InstancedMesh | null>(null)
     const fidArrowHeadsRef = useRef<THREE.InstancedMesh | null>(null)
+    const referenceFrameRef = useRef(referenceFrame)
     const renderModeRef = useRef(renderMode)
     const modeObjectsRef = useRef<{
       boundary: THREE.LineLoop
@@ -151,6 +156,11 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     useEffect(() => {
       onSelectRef.current = onSelect
     }, [onSelect])
+
+    useEffect(() => {
+      referenceFrameRef.current = referenceFrame
+      fidArrowsDirtyRef.current = true
+    }, [referenceFrame])
 
     useEffect(() => {
       renderModeRef.current = renderMode
@@ -680,6 +690,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         1,
       )
       let renderedB1PulseStartedAt = -1
+      let renderedB1ReferenceFrame: ReferenceFrame | null = null
 
       const hideFidArrow = (index: number) => {
         fidArrowShafts.setMatrixAt(index, hiddenMatrix)
@@ -772,7 +783,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               return
             }
 
-            const phase = magnetizationState.precessionPhaseRadians
+            const referenceFramePhase =
+              referenceFrameRef.current === 'laboratory-slowed'
+                ? SLOWED_LAB_PRECESSION_RADIANS_PER_MILLISECOND *
+                  timeMilliseconds
+                : 0
+            const phase =
+              referenceFramePhase +
+              magnetizationState.precessionPhaseRadians
 
             fidArrowDirection.set(
               magnetizationState.transverseFraction * Math.cos(phase),
@@ -848,8 +866,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           return
         }
 
+        const referenceFramePhase =
+          referenceFrameRef.current === 'laboratory-slowed'
+            ? SLOWED_LAB_PRECESSION_RADIANS_PER_MILLISECOND *
+              visualization.pulseEvent.timeMilliseconds
+            : 0
         const pulseAxisPhase =
-          visualization.pulseEvent.kind === '90-y' ? Math.PI / 2 : 0
+          referenceFramePhase +
+          (visualization.pulseEvent.kind === '90-y' ? Math.PI / 2 : 0)
         b1ArrowDirection.set(
           Math.cos(pulseAxisPhase),
           Math.sin(pulseAxisPhase),
@@ -860,7 +884,10 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           b1ArrowDirection,
         )
 
-        if (renderedB1PulseStartedAt !== visualization.startedAt) {
+        if (
+          renderedB1PulseStartedAt !== visualization.startedAt ||
+          renderedB1ReferenceFrame !== referenceFrameRef.current
+        ) {
           let b1ArrowIndex = 0
           for (let row = 0; row < GRID_SIZE; row += 1) {
             for (let column = 0; column < GRID_SIZE; column += 1) {
@@ -884,6 +911,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           stackedB1ArrowShaft.quaternion.copy(b1ArrowQuaternion)
           stackedB1ArrowHead.quaternion.copy(b1ArrowQuaternion)
           renderedB1PulseStartedAt = visualization.startedAt
+          renderedB1ReferenceFrame = referenceFrameRef.current
         }
 
         const fadeProgress = Math.max(0, (progress - 0.55) / 0.45)
