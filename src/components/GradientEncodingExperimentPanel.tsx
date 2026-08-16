@@ -24,9 +24,11 @@ interface DragState {
 
 interface EditableGradientGraphProps {
   description: string
+  guideTime: number | null
   label: 'PE' | 'RO'
   linkedPulses?: boolean
   onChange: (pulses: GradientPulse[]) => void
+  onGuideTimeChange: (time: number | null) => void
   onReset: () => void
   pulses: ReadonlyArray<GradientPulse>
 }
@@ -136,9 +138,11 @@ function updatePulses(
 
 function EditableGradientGraph({
   description,
+  guideTime,
   label,
   linkedPulses = false,
   onChange,
+  onGuideTimeChange,
   onReset,
   pulses,
 }: EditableGradientGraphProps) {
@@ -173,6 +177,7 @@ function EditableGradientGraph({
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     const coordinates = pointerCoordinates(event.clientX, event.clientY)
+    onGuideTimeChange(coordinates.time)
     dragRef.current = {
       handle,
       initialPulses: pulses.map((pulse) => ({ ...pulse })),
@@ -185,9 +190,10 @@ function EditableGradientGraph({
   }
 
   const continueDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const coordinates = pointerCoordinates(event.clientX, event.clientY)
+    onGuideTimeChange(coordinates.time)
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
-    const coordinates = pointerCoordinates(event.clientX, event.clientY)
     const initialPulse = drag.initialPulses[drag.pulseIndex]
     onChange(
       updatePulses(
@@ -207,6 +213,17 @@ function EditableGradientGraph({
     if (dragRef.current?.pointerId !== event.pointerId) return
     dragRef.current = null
     setActiveHandle(null)
+
+    const bounds = svgRef.current?.getBoundingClientRect()
+    if (
+      !bounds ||
+      event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY > bounds.bottom
+    ) {
+      onGuideTimeChange(null)
+    }
   }
 
   const handleKeyDown = (
@@ -271,8 +288,19 @@ function EditableGradientGraph({
         role="group"
         aria-label={`${description} editable gradient waveform`}
         onPointerMove={continueDrag}
+        onPointerEnter={(event) =>
+          onGuideTimeChange(
+            pointerCoordinates(event.clientX, event.clientY).time,
+          )
+        }
+        onPointerLeave={() => {
+          if (!dragRef.current) onGuideTimeChange(null)
+        }}
         onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onPointerCancel={(event) => {
+          endDrag(event)
+          onGuideTimeChange(null)
+        }}
       >
         <g className="gradient-input-grid" aria-hidden="true">
           {[0, 0.25, 0.5, 0.75, 1].map((time) => (
@@ -303,6 +331,16 @@ function EditableGradientGraph({
           y2={baselineY}
           aria-hidden="true"
         />
+        {guideTime !== null && (
+          <line
+            className="gradient-timing-guide"
+            x1={timeToX(guideTime)}
+            y1={GRAPH.top}
+            x2={timeToX(guideTime)}
+            y2={GRAPH.top + plotHeight}
+            aria-hidden="true"
+          />
+        )}
         <text
           className="gradient-time-label"
           x={GRAPH.left + plotWidth + 2}
@@ -428,6 +466,7 @@ function EditableGradientGraph({
 }
 
 function GradientEncodingExperimentPanel() {
+  const [timingGuideTime, setTimingGuideTime] = useState<number | null>(null)
   const [phaseEncodingPulses, setPhaseEncodingPulses] = useState<
     GradientPulse[]
   >(() => copyPulses(DEFAULT_PHASE_ENCODING_PULSES))
@@ -452,19 +491,23 @@ function GradientEncodingExperimentPanel() {
       <div className="gradient-timing-diagram">
         <EditableGradientGraph
           description="Phase encoding gradient"
+          guideTime={timingGuideTime}
           label="PE"
           pulses={phaseEncodingPulses}
           onChange={setPhaseEncodingPulses}
+          onGuideTimeChange={setTimingGuideTime}
           onReset={() =>
             setPhaseEncodingPulses(copyPulses(DEFAULT_PHASE_ENCODING_PULSES))
           }
         />
         <EditableGradientGraph
           description="Readout gradient"
+          guideTime={timingGuideTime}
           label="RO"
           linkedPulses
           pulses={readoutPulses}
           onChange={setReadoutPulses}
+          onGuideTimeChange={setTimingGuideTime}
           onReset={() =>
             setReadoutPulses(copyPulses(DEFAULT_READOUT_PULSES))
           }

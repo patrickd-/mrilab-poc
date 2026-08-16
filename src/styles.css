@@ -909,6 +909,14 @@ a:focus-visible {
   stroke-width: 1;
 }
 
+.gradient-timing-guide {
+  stroke: var(--yellow);
+  stroke-dasharray: 3 4;
+  stroke-width: 1;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
 .gradient-time-label {
   fill: var(--muted);
   font-family: Georgia, "Times New Roman", serif;
