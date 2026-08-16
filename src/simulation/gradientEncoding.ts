@@ -102,16 +102,6 @@ export function gradientEnsembleMagnetizationStateAt(
     durationMilliseconds,
     Math.max(0, timeMilliseconds),
   )
-  const precessionPhaseRadians = gradientPhaseRadiansAt(
-    state.column,
-    state.row,
-    state.gridSize,
-    state.angularFrequencyOffsetRadiansPerMillisecond,
-    boundedTimeMilliseconds,
-    phaseEncodingPulses,
-    readoutPulses,
-    durationMilliseconds,
-  )
   const transverseFraction =
     state.transverseRelaxationTimeMilliseconds === 0
       ? 0
@@ -127,17 +117,51 @@ export function gradientEnsembleMagnetizationStateAt(
           -boundedTimeMilliseconds /
             state.longitudinalRelaxationTimeMilliseconds,
         )
+  let packetXFraction = 0
+  let packetYFraction = 0
+  let totalPacketWeight = 0
+
+  state.spinPackets.forEach((spinPacket) => {
+    const packetPhaseRadians = gradientPhaseRadiansAt(
+      state.column + spinPacket.offsetXMillimeters,
+      state.row - spinPacket.offsetYMillimeters,
+      state.gridSize,
+      spinPacket.angularFrequencyOffsetRadiansPerMillisecond,
+      boundedTimeMilliseconds,
+      phaseEncodingPulses,
+      readoutPulses,
+      durationMilliseconds,
+    )
+    packetXFraction +=
+      Math.cos(packetPhaseRadians) * spinPacket.weight
+    packetYFraction +=
+      Math.sin(packetPhaseRadians) * spinPacket.weight
+    totalPacketWeight += spinPacket.weight
+  })
+
+  if (totalPacketWeight > 0 && totalPacketWeight !== 1) {
+    packetXFraction /= totalPacketWeight
+    packetYFraction /= totalPacketWeight
+  }
+
+  const xFraction = transverseFraction * packetXFraction
+  const yFraction = transverseFraction * packetYFraction
+  const coherentTransverseFraction = Math.hypot(xFraction, yFraction)
+  const precessionPhaseRadians =
+    coherentTransverseFraction < 1e-12
+      ? 0
+      : Math.atan2(yFraction, xFraction)
 
   return {
     excited: true,
-    xFraction: transverseFraction * Math.cos(precessionPhaseRadians),
-    yFraction: transverseFraction * Math.sin(precessionPhaseRadians),
+    xFraction,
+    yFraction,
     zFraction: longitudinalFraction,
-    transverseFraction,
+    transverseFraction: coherentTransverseFraction,
     longitudinalFraction,
     precessionPhaseRadians,
     flipAngleRadians: Math.atan2(
-      transverseFraction,
+      coherentTransverseFraction,
       longitudinalFraction,
     ),
   }

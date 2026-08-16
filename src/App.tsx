@@ -10,6 +10,9 @@ import LabScene, {
 import DarkSelect from './components/DarkSelect'
 import FidExperimentPanel from './components/FidExperimentPanel'
 import GradientEncodingExperimentPanel from './components/GradientEncodingExperimentPanel'
+import RealismMenu, {
+  type RealismOptionId,
+} from './components/RealismMenu'
 import SimulationControls, {
   type SimulationTimeStep,
 } from './components/SimulationControls'
@@ -53,13 +56,6 @@ const EXPERIMENTS: ReadonlyArray<{ id: ExperimentId; label: string }> = [
   { id: 'ping', label: 'Ping Experiment' },
   { id: 'spin-echo', label: 'Spin Echo Experiment' },
   { id: 'gradient-encoding', label: 'Gradient Encoding Experiment' },
-]
-const FIELD_UNIFORMITY_OPTIONS: ReadonlyArray<{
-  id: FieldUniformity
-  label: string
-}> = [
-  { id: 'uniform', label: 'uniform' },
-  { id: 'non-uniform', label: 'non-uniform' },
 ]
 const RENDER_MODE_OPTIONS: ReadonlyArray<{
   id: RenderMode
@@ -216,8 +212,9 @@ function App() {
   const [b0Tesla, setB0Tesla] = useState<B0Tesla>('1.5')
   const [simulationTimeStep, setSimulationTimeStep] =
     useState<SimulationTimeStep>('2')
-  const [fieldUniformity, setFieldUniformity] =
-    useState<FieldUniformity>('uniform')
+  const [enabledRealismOptions, setEnabledRealismOptions] = useState<
+    RealismOptionId[]
+  >([])
   const [renderMode, setRenderMode] = useState<RenderMode>('slice')
   const [sliceGraphMode, setSliceGraphMode] =
     useState<SliceGraphMode>('none')
@@ -234,6 +231,14 @@ function App() {
   )
   const selectedEnsemble = selected ? ensembles[selected.index] : null
   const fieldStrengthTesla = B0_TESLA_VALUES[b0Tesla]
+  const fieldUniformity: FieldUniformity = enabledRealismOptions.includes(
+    'b0-inhomogeneity',
+  )
+    ? 'non-uniform'
+    : 'uniform'
+  const intravoxelDephasing = enabledRealismOptions.includes(
+    'intravoxel-dephasing',
+  )
   const magneticProperties = selectedEnsemble?.magneticProperties(
     fieldStrengthTesla,
     fieldUniformity,
@@ -261,6 +266,7 @@ function App() {
             ensembles,
             fieldStrengthTesla,
             fieldUniformity,
+            intravoxelDephasing,
           )
         : [],
     [
@@ -269,6 +275,7 @@ function App() {
       fieldStrengthTesla,
       fieldUniformity,
       gradientExperimentSelected,
+      intravoxelDephasing,
     ],
   )
   const fidSimulation = useFidSimulation({
@@ -277,6 +284,7 @@ function App() {
     ensembleRevision,
     fieldStrengthTesla,
     fieldUniformity,
+    intravoxelDephasing,
     initialPulseKind: selectedExperiment === 'spin-echo' ? '90-y' : null,
     millisecondsPerTick: Number(simulationTimeStep),
   })
@@ -324,6 +332,14 @@ function App() {
     setSelected(null)
   }
 
+  const toggleRealismOption = (option: RealismOptionId) => {
+    setEnabledRealismOptions((currentOptions) =>
+      currentOptions.includes(option)
+        ? currentOptions.filter((candidate) => candidate !== option)
+        : [...currentOptions, option],
+    )
+  }
+
   const applySlicePreset = (action: SlicePresetAction) => {
     if (action === 'reset') {
       ensembles.forEach((ensemble) => {
@@ -366,15 +382,10 @@ function App() {
           />
         </div>
 
-        <div className="field-mode-control">
-          <DarkSelect
-            className="field-mode-select"
-            ariaLabel="Magnetic field uniformity"
-            value={fieldUniformity}
-            options={FIELD_UNIFORMITY_OPTIONS}
-            onChange={setFieldUniformity}
-          />
-        </div>
+        <RealismMenu
+          enabledOptions={enabledRealismOptions}
+          onToggle={toggleRealismOption}
+        />
       </header>
 
       <section

@@ -63,8 +63,13 @@ export const SAMPLE_PRESETS: ReadonlyArray<{
 interface RelaxationTimesMilliseconds {
   t1: number
   t2: number
+  t2Star: number
 }
 
+// T2* supplies the tissue-dependent, reversibly refocusable component of the
+// intravoxel frequency spread. Brain values use published 1.5/3/7 T in-vivo
+// measurements; CSF uses published 3/7 T values and a 1.5 T extrapolation.
+// Cortical bone is clamped to its shorter intrinsic T2 so T2* never exceeds T2.
 const RELAXATION_TIMES_MS: Readonly<
   Record<
     SupportedFieldStrengthTesla,
@@ -72,25 +77,25 @@ const RELAXATION_TIMES_MS: Readonly<
   >
 > = {
   1.5: {
-    air: { t1: 0, t2: 0 },
-    'cortical-bone': { t1: 110, t2: 0.4 },
-    'cerebrospinal-fluid': { t1: 4300, t2: 2100 },
-    'gray-matter': { t1: 1200, t2: 84 },
-    'white-matter': { t1: 650, t2: 80 },
+    air: { t1: 0, t2: 0, t2Star: 0 },
+    'cortical-bone': { t1: 110, t2: 0.4, t2Star: 0.4 },
+    'cerebrospinal-fluid': { t1: 4300, t2: 2100, t2Star: 550 },
+    'gray-matter': { t1: 1200, t2: 84, t2Star: 84 },
+    'white-matter': { t1: 650, t2: 80, t2Star: 66.2 },
   },
   3: {
-    air: { t1: 0, t2: 0 },
-    'cortical-bone': { t1: 150, t2: 0.4 },
-    'cerebrospinal-fluid': { t1: 4300, t2: 2000 },
-    'gray-matter': { t1: 1610, t2: 72 },
-    'white-matter': { t1: 840, t2: 71 },
+    air: { t1: 0, t2: 0, t2Star: 0 },
+    'cortical-bone': { t1: 150, t2: 0.4, t2Star: 0.4 },
+    'cerebrospinal-fluid': { t1: 4300, t2: 2000, t2Star: 333.5 },
+    'gray-matter': { t1: 1610, t2: 72, t2Star: 66 },
+    'white-matter': { t1: 840, t2: 71, t2Star: 53.2 },
   },
   7: {
-    air: { t1: 0, t2: 0 },
-    'cortical-bone': { t1: 425, t2: 0.4 },
-    'cerebrospinal-fluid': { t1: 4300, t2: 1000 },
-    'gray-matter': { t1: 1940, t2: 47 },
-    'white-matter': { t1: 1130, t2: 47 },
+    air: { t1: 0, t2: 0, t2Star: 0 },
+    'cortical-bone': { t1: 425, t2: 0.4, t2Star: 0.4 },
+    'cerebrospinal-fluid': { t1: 4300, t2: 1000, t2Star: 168 },
+    'gray-matter': { t1: 1940, t2: 47, t2Star: 33.2 },
+    'white-matter': { t1: 1130, t2: 47, t2Star: 26.8 },
   },
 }
 
@@ -215,6 +220,8 @@ export class HydrogenEnsemble {
       totalProtonCount: preset.totalProtonCount,
       longitudinalRelaxationTimeMilliseconds: relaxationTimes.t1,
       transverseRelaxationTimeMilliseconds: relaxationTimes.t2,
+      effectiveTransverseRelaxationTimeMilliseconds:
+        relaxationTimes.t2Star,
     }
   }
 

@@ -1,4 +1,5 @@
 import {
+  fieldProfileAt,
   type FieldDirection,
   type FieldUniformity,
   type HydrogenEnsemble,
@@ -7,6 +8,33 @@ import {
 
 export const FID_GRAPH_INITIAL_RANGE_MILLISECONDS = 100
 export const FID_GRAPH_MAXIMUM_WINDOW_MILLISECONDS = 5000
+const INTRAVOXEL_SAMPLE_OFFSETS_MILLIMETERS = [-1 / 3, 0, 1 / 3] as const
+// Equal-probability standard-normal quantiles for a deterministic 3 x 3
+// isochromat grid. Their static offsets approximate reversible T2* decay.
+const INTRAVOXEL_FREQUENCY_QUANTILES = [
+  -1.593,
+  -0.967,
+  -0.59,
+  -0.282,
+  0,
+  0.282,
+  0.59,
+  0.967,
+  1.593,
+] as const
+const INTRAVOXEL_QUANTILE_STANDARD_DEVIATION = Math.sqrt(
+  INTRAVOXEL_FREQUENCY_QUANTILES.reduce<number>(
+    (sum, quantile) => sum + quantile ** 2,
+    0,
+  ) / INTRAVOXEL_FREQUENCY_QUANTILES.length,
+)
+
+export interface FidSpinPacketState {
+  offsetXMillimeters: number
+  offsetYMillimeters: number
+  angularFrequencyOffsetRadiansPerMillisecond: number
+  weight: number
+}
 
 export interface FidEnsembleState {
   index: number
@@ -21,6 +49,7 @@ export interface FidEnsembleState {
   fieldVariationPpm: number
   fieldTiltAngleRadians: number
   fieldDirection: FieldDirection
+  spinPackets: ReadonlyArray<FidSpinPacketState>
 }
 
 export type RfPulseKind = '90-y' | '180-x'
@@ -55,69 +84,92 @@ export function fidEnsembleMagnetizationStateAt(
 ): FidEnsembleMagnetizationState {
   let xFraction = 0
   let yFraction = 0
-  let zFraction = 1
-  let previousTimeMilliseconds = 0
+  let zFraction = 0
+  let totalWeight = 0
   let pulseCount = 0
 
-  const evolveMagnetization = (durationMilliseconds: number) => {
-    if (durationMilliseconds <= 0) return
+  state.spinPackets.forEach((spinPacket) => {
+    let packetXFraction = 0
+    let packetYFraction = 0
+    let packetZFraction = 1
+    let previousTimeMilliseconds = 0
+    let packetPulseCount = 0
 
-    const transverseDecay =
-      state.transverseRelaxationTimeMilliseconds === 0
-        ? 0
-        : Math.exp(
-            -durationMilliseconds /
-              state.transverseRelaxationTimeMilliseconds,
-          )
-    const phase =
-      state.angularFrequencyOffsetRadiansPerMillisecond *
-      durationMilliseconds
-    const cosPhase = Math.cos(phase)
-    const sinPhase = Math.sin(phase)
-    const previousX = xFraction
-    const previousY = yFraction
+    const evolveMagnetization = (durationMilliseconds: number) => {
+      if (durationMilliseconds <= 0) return
 
-    xFraction =
-      transverseDecay *
-      (previousX * cosPhase - previousY * sinPhase)
-    yFraction =
-      transverseDecay *
-      (previousX * sinPhase + previousY * cosPhase)
-    zFraction =
-      state.longitudinalRelaxationTimeMilliseconds === 0
-        ? 1
-        : 1 +
-          (zFraction - 1) *
-            Math.exp(
+      const transverseDecay =
+        state.transverseRelaxationTimeMilliseconds === 0
+          ? 0
+          : Math.exp(
               -durationMilliseconds /
-                state.longitudinalRelaxationTimeMilliseconds,
+                state.transverseRelaxationTimeMilliseconds,
             )
-  }
+      const phase =
+        spinPacket.angularFrequencyOffsetRadiansPerMillisecond *
+        durationMilliseconds
+      const cosPhase = Math.cos(phase)
+      const sinPhase = Math.sin(phase)
+      const previousX = packetXFraction
+      const previousY = packetYFraction
 
-  pulseEvents.forEach((pulseEvent) => {
-    if (pulseEvent.timeMilliseconds > timeMilliseconds) return
+      packetXFraction =
+        transverseDecay *
+        (previousX * cosPhase - previousY * sinPhase)
+      packetYFraction =
+        transverseDecay *
+        (previousX * sinPhase + previousY * cosPhase)
+      packetZFraction =
+        state.longitudinalRelaxationTimeMilliseconds === 0
+          ? 1
+          : 1 +
+            (packetZFraction - 1) *
+              Math.exp(
+                -durationMilliseconds /
+                  state.longitudinalRelaxationTimeMilliseconds,
+              )
+    }
+
+    pulseEvents.forEach((pulseEvent) => {
+      if (pulseEvent.timeMilliseconds > timeMilliseconds) return
+
+      evolveMagnetization(
+        Math.max(
+          0,
+          pulseEvent.timeMilliseconds - previousTimeMilliseconds,
+        ),
+      )
+
+      if (pulseEvent.kind === '90-y') {
+        // An instantaneous +90° rotation about the rotating-frame y-axis.
+        const previousX = packetXFraction
+        packetXFraction = packetZFraction
+        packetZFraction = -previousX
+      } else {
+        // An instantaneous 180° rotation about the rotating-frame x-axis.
+        packetYFraction = -packetYFraction
+        packetZFraction = -packetZFraction
+      }
+      previousTimeMilliseconds = pulseEvent.timeMilliseconds
+      packetPulseCount += 1
+    })
 
     evolveMagnetization(
-      Math.max(0, pulseEvent.timeMilliseconds - previousTimeMilliseconds),
+      Math.max(0, timeMilliseconds - previousTimeMilliseconds),
     )
 
-    if (pulseEvent.kind === '90-y') {
-      // An instantaneous +90° rotation about the rotating-frame y-axis.
-      const previousX = xFraction
-      xFraction = zFraction
-      zFraction = -previousX
-    } else {
-      // An instantaneous 180° rotation about the rotating-frame x-axis.
-      yFraction = -yFraction
-      zFraction = -zFraction
-    }
-    previousTimeMilliseconds = pulseEvent.timeMilliseconds
-    pulseCount += 1
+    xFraction += packetXFraction * spinPacket.weight
+    yFraction += packetYFraction * spinPacket.weight
+    zFraction += packetZFraction * spinPacket.weight
+    totalWeight += spinPacket.weight
+    pulseCount = Math.max(pulseCount, packetPulseCount)
   })
 
-  evolveMagnetization(
-    Math.max(0, timeMilliseconds - previousTimeMilliseconds),
-  )
+  if (totalWeight > 0 && totalWeight !== 1) {
+    xFraction /= totalWeight
+    yFraction /= totalWeight
+    zFraction /= totalWeight
+  }
 
   const transverseFraction = Math.hypot(xFraction, yFraction)
   const precessionPhaseRadians =
@@ -139,6 +191,7 @@ export function createFidEnsembleStates(
   ensembles: ReadonlyArray<HydrogenEnsemble>,
   fieldStrengthTesla: SupportedFieldStrengthTesla,
   fieldUniformity: FieldUniformity,
+  intravoxelDephasing = false,
 ) {
   const states: FidEnsembleState[] = []
 
@@ -150,6 +203,69 @@ export function createFidEnsembleStates(
       fieldStrengthTesla,
       fieldUniformity,
     )
+    const intrinsicT2Milliseconds =
+      sampleProperties.transverseRelaxationTimeMilliseconds
+    const effectiveT2StarMilliseconds =
+      sampleProperties.effectiveTransverseRelaxationTimeMilliseconds
+    // Model the refocusable contribution as a Gaussian static frequency
+    // distribution. Its width is calibrated so intrinsic T2 decay multiplied
+    // by the packet coherence reaches e^-1 at the preset T2* time.
+    const susceptibilityAngularFrequencyStandardDeviation =
+      intrinsicT2Milliseconds > 0 && effectiveT2StarMilliseconds > 0
+        ? Math.sqrt(
+            2 *
+              Math.max(
+                0,
+                1 -
+                  effectiveT2StarMilliseconds /
+                    intrinsicT2Milliseconds,
+              ),
+          ) / effectiveT2StarMilliseconds
+        : 0
+    const spinPackets: FidSpinPacketState[] = intravoxelDephasing
+      ? INTRAVOXEL_SAMPLE_OFFSETS_MILLIMETERS.flatMap(
+          (offsetYMillimeters, sampleRow) =>
+            INTRAVOXEL_SAMPLE_OFFSETS_MILLIMETERS.map(
+              (offsetXMillimeters, sampleColumn) => {
+                const fieldProfile = fieldProfileAt(
+                  ensemble.column + offsetXMillimeters,
+                  ensemble.row - offsetYMillimeters,
+                  ensemble.gridSize,
+                  fieldUniformity,
+                )
+                const localFieldVariationTesla =
+                  fieldStrengthTesla * (fieldProfile.fieldScale - 1)
+                const packetIndex =
+                  sampleRow *
+                    INTRAVOXEL_SAMPLE_OFFSETS_MILLIMETERS.length +
+                  sampleColumn
+
+                return {
+                  offsetXMillimeters,
+                  offsetYMillimeters,
+                  angularFrequencyOffsetRadiansPerMillisecond:
+                    (ensemble.gyromagneticRatio *
+                      localFieldVariationTesla) /
+                      1000 +
+                    (INTRAVOXEL_FREQUENCY_QUANTILES[packetIndex] /
+                      INTRAVOXEL_QUANTILE_STANDARD_DEVIATION) *
+                      susceptibilityAngularFrequencyStandardDeviation,
+                  weight:
+                    1 /
+                    INTRAVOXEL_SAMPLE_OFFSETS_MILLIMETERS.length ** 2,
+                }
+              },
+            ),
+        )
+      : [
+          {
+            offsetXMillimeters: 0,
+            offsetYMillimeters: 0,
+            angularFrequencyOffsetRadiansPerMillisecond:
+              magneticProperties.larmorAngularFrequencyVariation / 1000,
+            weight: 1,
+          },
+        ]
 
     states.push({
       index: ensemble.index,
@@ -167,6 +283,7 @@ export function createFidEnsembleStates(
       fieldVariationPpm: magneticProperties.fieldVariationPpm,
       fieldTiltAngleRadians: magneticProperties.tiltAngleRadians,
       fieldDirection: magneticProperties.direction,
+      spinPackets,
     })
   })
 

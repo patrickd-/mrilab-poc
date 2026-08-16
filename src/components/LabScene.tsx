@@ -1193,18 +1193,26 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             } else if (graphMode === 'phase') {
               let phaseRadians = 0
               if (simulationActive && renderingGradientEncoding) {
-                phaseRadians = gradientPhaseRadiansAt(
-                  column,
-                  row,
-                  GRID_SIZE,
-                  (staticFieldFrequencyOffsetsRef.current[index] *
-                    2 *
-                    Math.PI) /
-                    1000,
-                  timeMilliseconds,
-                  gradientAnimation.phaseEncodingPulses,
-                  gradientAnimation.readoutPulses,
-                )
+                const state = sliceGraphStateLookup[index]
+                phaseRadians = state
+                  ? gradientEnsembleMagnetizationStateAt(
+                      state,
+                      timeMilliseconds,
+                      gradientAnimation.phaseEncodingPulses,
+                      gradientAnimation.readoutPulses,
+                    ).precessionPhaseRadians
+                  : gradientPhaseRadiansAt(
+                      column,
+                      row,
+                      GRID_SIZE,
+                      (staticFieldFrequencyOffsetsRef.current[index] *
+                        2 *
+                        Math.PI) /
+                        1000,
+                      timeMilliseconds,
+                      gradientAnimation.phaseEncodingPulses,
+                      gradientAnimation.readoutPulses,
+                    )
               } else if (simulationActive) {
                 const state = sliceGraphStateLookup[index]
                 if (state) {

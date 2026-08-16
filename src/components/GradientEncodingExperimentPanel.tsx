@@ -349,6 +349,14 @@ function EditableGradientGraph({
           y2={baselineY}
           aria-hidden="true"
         />
+        <text
+          className="gradient-amplitude-label"
+          textAnchor="middle"
+          transform={`translate(13 ${baselineY}) rotate(-90)`}
+          aria-hidden="true"
+        >
+          mT/m
+        </text>
         {guideTime !== null && (
           <line
             className="gradient-timing-guide"
@@ -443,7 +451,7 @@ function EditableGradientGraph({
             const handleKey = `${pulseIndex}-${handle}`
             const value =
               handle === 'top'
-                ? pulse.amplitude.toFixed(2)
+                ? `${pulse.amplitude.toFixed(2)} mT/m`
                 : `${Math.round(
                     (handle === 'left' ? pulse.start : pulse.end) * 100,
                   )}%`

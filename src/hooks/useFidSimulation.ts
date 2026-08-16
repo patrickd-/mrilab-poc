@@ -49,6 +49,7 @@ interface UseFidSimulationOptions {
   ensembleRevision: number
   fieldStrengthTesla: SupportedFieldStrengthTesla
   fieldUniformity: FieldUniformity
+  intravoxelDephasing: boolean
   initialPulseKind: RfPulseKind | null
   millisecondsPerTick: number
 }
@@ -59,6 +60,7 @@ export function useFidSimulation({
   ensembleRevision,
   fieldStrengthTesla,
   fieldUniformity,
+  intravoxelDephasing,
   initialPulseKind,
   millisecondsPerTick,
 }: UseFidSimulationOptions) {
@@ -69,6 +71,7 @@ export function useFidSimulation({
             ensembles,
             fieldStrengthTesla,
             fieldUniformity,
+            intravoxelDephasing,
           )
         : [],
     [
@@ -77,6 +80,7 @@ export function useFidSimulation({
       ensembles,
       fieldStrengthTesla,
       fieldUniformity,
+      intravoxelDephasing,
     ],
   )
   const workerRef = useRef<Worker | null>(null)
