@@ -471,7 +471,7 @@ function FidExperimentPanel({
           <div>
             <span className="section-index">01</span>
             <h2>
-              Free Induction Decay (T<sub>2</sub>)
+              Free Induction Decay (T<sub>2</sub><sup>*</sup>)
             </h2>
           </div>
         </div>
