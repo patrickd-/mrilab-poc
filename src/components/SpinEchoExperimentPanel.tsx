@@ -21,6 +21,12 @@ interface EchoPeak extends EchoTiming {
   magnitude: number
 }
 
+interface MeasuredDecayPeak {
+  peakTimeMilliseconds: number
+  magnitude: number
+  kind: 'excitation' | 'echo'
+}
+
 const GRAPH = {
   width: 440,
   height: 270,
@@ -112,15 +118,15 @@ function signalMagnitudeNear(
   return bestMagnitude < 0 ? null : bestMagnitude
 }
 
-function fitEchoDecay(echoPeaks: ReadonlyArray<EchoPeak>) {
-  if (echoPeaks.length < 2) return null
+function fitEchoDecay(decayPeaks: ReadonlyArray<MeasuredDecayPeak>) {
+  if (decayPeaks.length < 2) return null
 
-  const validPeaks = echoPeaks.filter((peak) => peak.magnitude > 1e-8)
+  const validPeaks = decayPeaks.filter((peak) => peak.magnitude > 1e-8)
   if (validPeaks.length < 2) return null
 
   const meanTime =
     validPeaks.reduce(
-      (sum, peak) => sum + peak.echoTimeMilliseconds,
+      (sum, peak) => sum + peak.peakTimeMilliseconds,
       0,
     ) / validPeaks.length
   const meanLogMagnitude =
@@ -132,7 +138,7 @@ function fitEchoDecay(echoPeaks: ReadonlyArray<EchoPeak>) {
   let timeVariance = 0
 
   validPeaks.forEach((peak) => {
-    const centeredTime = peak.echoTimeMilliseconds - meanTime
+    const centeredTime = peak.peakTimeMilliseconds - meanTime
     covariance +=
       centeredTime * (Math.log(peak.magnitude) - meanLogMagnitude)
     timeVariance += centeredTime ** 2
@@ -163,6 +169,7 @@ function SpinEchoExperimentPanel({
     () => echoTimingsFor(pulseEvents),
     [pulseEvents],
   )
+  const initialPulse = pulseEvents.find((pulse) => pulse.kind === '90-y')
   const pendingEcho = [...echoTimings]
     .reverse()
     .find((echo) => echo.echoTimeMilliseconds > timeMilliseconds)
@@ -206,7 +213,26 @@ function SpinEchoExperimentPanel({
       }),
     [echoTimings, signalPoints, timeMilliseconds, timeStepMilliseconds],
   )
-  const decayFit = useMemo(() => fitEchoDecay(echoPeaks), [echoPeaks])
+  const decayPeaks = useMemo<MeasuredDecayPeak[]>(
+    () => [
+      ...(initialPulse
+        ? [
+            {
+              peakTimeMilliseconds: initialPulse.timeMilliseconds,
+              magnitude: 1,
+              kind: 'excitation' as const,
+            },
+          ]
+        : []),
+      ...echoPeaks.map((peak) => ({
+        peakTimeMilliseconds: peak.echoTimeMilliseconds,
+        magnitude: peak.magnitude,
+        kind: 'echo' as const,
+      })),
+    ],
+    [echoPeaks, initialPulse],
+  )
+  const decayFit = useMemo(() => fitEchoDecay(decayPeaks), [decayPeaks])
   const { echoPeakPath, fitPath, signalPath } = useMemo(() => {
     const visibleSignalPoints = signalPoints.filter(
       (point) =>
@@ -222,19 +248,19 @@ function SpinEchoExperimentPanel({
         return `${index === 0 ? 'M' : 'L'} ${graphX(point.timeMilliseconds).toFixed(2)} ${graphY(magnitude).toFixed(2)}`
       })
       .join(' ')
-    const visibleEchoPeaks = echoPeaks.filter(
+    const visibleDecayPeaks = decayPeaks.filter(
       (peak) =>
-        peak.echoTimeMilliseconds >= windowStartMilliseconds &&
-        peak.echoTimeMilliseconds <= windowEndMilliseconds,
+        peak.peakTimeMilliseconds >= windowStartMilliseconds &&
+        peak.peakTimeMilliseconds <= windowEndMilliseconds,
     )
-    const nextEchoPeakPath = visibleEchoPeaks
+    const nextEchoPeakPath = visibleDecayPeaks
       .map(
         (peak, index) =>
-          `${index === 0 ? 'M' : 'L'} ${graphX(peak.echoTimeMilliseconds).toFixed(2)} ${graphY(peak.magnitude).toFixed(2)}`,
+          `${index === 0 ? 'M' : 'L'} ${graphX(peak.peakTimeMilliseconds).toFixed(2)} ${graphY(peak.magnitude).toFixed(2)}`,
       )
       .join(' ')
 
-    if (!decayFit || visibleEchoPeaks.length < 2) {
+    if (!decayFit || visibleDecayPeaks.length < 2) {
       return {
         echoPeakPath: nextEchoPeakPath,
         fitPath: '',
@@ -242,8 +268,9 @@ function SpinEchoExperimentPanel({
       }
     }
 
-    const fitStart = visibleEchoPeaks[0].echoTimeMilliseconds
-    const fitEnd = visibleEchoPeaks[visibleEchoPeaks.length - 1].echoTimeMilliseconds
+    const fitStart = visibleDecayPeaks[0].peakTimeMilliseconds
+    const fitEnd =
+      visibleDecayPeaks[visibleDecayPeaks.length - 1].peakTimeMilliseconds
     const fitSamples = Array.from({ length: 80 }, (_, index) => {
       const fitTime = fitStart + ((fitEnd - fitStart) * index) / 79
       return `${index === 0 ? 'M' : 'L'} ${graphX(fitTime).toFixed(2)} ${graphY(decayFit.magnitudeAt(fitTime)).toFixed(2)}`
@@ -256,7 +283,7 @@ function SpinEchoExperimentPanel({
     }
   }, [
     decayFit,
-    echoPeaks,
+    decayPeaks,
     graphX,
     graphY,
     signalPoints,
@@ -264,7 +291,6 @@ function SpinEchoExperimentPanel({
     windowStartMilliseconds,
   ])
 
-  const initialPulse = pulseEvents.find((pulse) => pulse.kind === '90-y')
   const visibleTimings = echoTimings.filter(
     (echo) =>
       echo.echoTimeMilliseconds >= windowStartMilliseconds &&
@@ -284,7 +310,7 @@ function SpinEchoExperimentPanel({
         <div className="fid-graph-readout">
           <div className="fid-graph-legend">
             <span className="spin-echo-signal">Transverse signal</span>
-            <span className="spin-echo-fit">Echo-peak T₂ fit</span>
+            <span className="spin-echo-fit">Peak-envelope T₂ fit</span>
           </div>
           <strong>
             T₂ ≈{' '}
@@ -415,10 +441,10 @@ function SpinEchoExperimentPanel({
           </g>
 
           <g className="spin-echo-peak-markers">
-            {echoPeaks.map((peak) => (
+            {decayPeaks.map((peak) => (
               <circle
-                key={peak.echoTimeMilliseconds}
-                cx={graphX(peak.echoTimeMilliseconds)}
+                key={`${peak.kind}-${peak.peakTimeMilliseconds}`}
+                cx={graphX(peak.peakTimeMilliseconds)}
                 cy={graphY(peak.magnitude)}
                 r={3}
               />
@@ -482,8 +508,9 @@ function SpinEchoExperimentPanel({
 
       <p className="fid-graph-note">
         Each 180° pulse reverses static-field phase dispersion. Its predicted
-        echo is placed one equal τ interval after the pulse; measured echo peaks
-        are used for the displayed effective T₂ fit.
+        echo is placed one equal τ interval after the pulse; the initial 90°
+        excitation peak and measured echo peaks are used for the displayed
+        effective T₂ fit.
       </p>
     </section>
   )
