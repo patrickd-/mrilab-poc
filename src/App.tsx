@@ -192,7 +192,7 @@ function App() {
     ensembleRevision,
     fieldStrengthTesla,
     fieldUniformity,
-    initialPulseKind: selectedExperiment === 'spin-echo' ? '90-x' : null,
+    initialPulseKind: selectedExperiment === 'spin-echo' ? '90-y' : null,
     millisecondsPerTick: Number(simulationTimeStep),
   })
 
