@@ -33,6 +33,8 @@ const CAMERA_DISTANCE =
 const CAMERA_POSITION = new THREE.Vector3(0, 0, CAMERA_DISTANCE)
 const CAMERA_TARGET = new THREE.Vector3(0, 0, 0)
 const STACKED_CAMERA_POSITION = new THREE.Vector3(0.68, 0.52, 1.08)
+const STACKED_ARROW_WIDTH_SCALE = 0.24
+const STACKED_ARROW_LENGTH_SCALE = 0.82
 const FOCUS_DURATION = 650
 const VISUAL_PRECESSION_RADIANS_PER_MILLISECOND = (2 * Math.PI) / 180
 
@@ -635,7 +637,15 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                 0,
               )
             }
-            fidArrowScale.setScalar(magnitude)
+            if (renderModeRef.current === 'stacked') {
+              fidArrowScale.set(
+                magnitude * STACKED_ARROW_WIDTH_SCALE,
+                magnitude * STACKED_ARROW_WIDTH_SCALE,
+                magnitude * STACKED_ARROW_LENGTH_SCALE,
+              )
+            } else {
+              fidArrowScale.setScalar(magnitude)
+            }
             fidArrowMatrix.compose(
               fidArrowPosition,
               fidArrowQuaternion,
