@@ -37,6 +37,7 @@ const STACKED_CAMERA_POSITION = new THREE.Vector3(0.68, 0.52, 1.08)
 const STACKED_ARROW_WIDTH_SCALE = 0.24
 const STACKED_ARROW_LENGTH_SCALE = 0.82
 const B1_PULSE_VISIBILITY_MILLISECONDS = 700
+const B1_ARROW_WIDTH_SCALE = 0.45
 const FID_FIELD_VARIATION_PALETTE = [
   new THREE.Color('#32e6ff'),
   new THREE.Color('#4f7dff'),
@@ -467,6 +468,16 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       b1ArrowHeads.renderOrder = 20
       stackedB1ArrowShaft.renderOrder = 20
       stackedB1ArrowHead.renderOrder = 20
+      stackedB1ArrowShaft.scale.set(
+        B1_ARROW_WIDTH_SCALE,
+        B1_ARROW_WIDTH_SCALE,
+        1,
+      )
+      stackedB1ArrowHead.scale.set(
+        B1_ARROW_WIDTH_SCALE,
+        B1_ARROW_WIDTH_SCALE,
+        1,
+      )
       b1ArrowShafts.visible = false
       b1ArrowHeads.visible = false
       stackedB1ArrowShaft.visible = false
@@ -664,7 +675,11 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const b1ArrowDirection = new THREE.Vector3()
       const b1ArrowQuaternion = new THREE.Quaternion()
       const b1ArrowLocalDirection = new THREE.Vector3(0, 0, 1)
-      const b1ArrowScale = new THREE.Vector3(1, 1, 1)
+      const b1ArrowScale = new THREE.Vector3(
+        B1_ARROW_WIDTH_SCALE,
+        B1_ARROW_WIDTH_SCALE,
+        1,
+      )
       let renderedB1PulseStartedAt = -1
 
       const hideFidArrow = (index: number) => {
