@@ -43,7 +43,9 @@ function formatTime(timeMilliseconds: number) {
 }
 
 function echoTimingsFor(pulseEvents: ReadonlyArray<RfPulseEvent>) {
-  const initialPulse = pulseEvents.find((pulse) => pulse.kind === '90-y')
+  const initialPulse = pulseEvents.find(
+    (pulse) => pulse.kind === '90-x' || pulse.kind === '90-y',
+  )
   if (!initialPulse) return []
 
   const knownPeakTimes = [initialPulse.timeMilliseconds]
@@ -169,7 +171,9 @@ function SpinEchoExperimentPanel({
     () => echoTimingsFor(pulseEvents),
     [pulseEvents],
   )
-  const initialPulse = pulseEvents.find((pulse) => pulse.kind === '90-y')
+  const initialPulse = pulseEvents.find(
+    (pulse) => pulse.kind === '90-x' || pulse.kind === '90-y',
+  )
   const pendingEcho = [...echoTimings]
     .reverse()
     .find((echo) => echo.echoTimeMilliseconds > timeMilliseconds)

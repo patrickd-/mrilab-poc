@@ -17,7 +17,7 @@ export interface FidEnsembleState {
   fieldDirection: FieldDirection
 }
 
-export type RfPulseKind = '90-y' | '180-x'
+export type RfPulseKind = '90-x' | '90-y' | '180-x'
 
 export interface RfPulseEvent {
   timeMilliseconds: number
@@ -100,6 +100,11 @@ export function fidEnsembleMagnetizationStateAt(
       const previousX = xFraction
       xFraction = zFraction
       zFraction = -previousX
+    } else if (pulseEvent.kind === '90-x') {
+      // An instantaneous +90° rotation about the rotating-frame x-axis.
+      const previousY = yFraction
+      yFraction = -zFraction
+      zFraction = previousY
     } else {
       // An instantaneous 180° rotation about the rotating-frame x-axis.
       yFraction = -yFraction
