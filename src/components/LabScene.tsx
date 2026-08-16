@@ -7,17 +7,27 @@ import {
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type {
+  FieldUniformity,
   HydrogenEnsemble,
   SamplePresetId,
+  SupportedFieldStrengthTesla,
 } from '../models/HydrogenEnsemble'
-import { NON_UNIFORM_FIELD_MODEL } from '../models/HydrogenEnsemble'
+import {
+  fieldProfileAt,
+  NON_UNIFORM_FIELD_MODEL,
+  PROTON_GYROMAGNETIC_RATIO,
+} from '../models/HydrogenEnsemble'
 import {
   fidEnsembleMagnetizationStateAt,
   type FidEnsembleState,
   type RfPulseEvent,
 } from '../simulation/fid'
 import {
+  GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  gradientAmplitudeAt,
   gradientEnsembleMagnetizationStateAt,
+  gradientPhaseRadiansAt,
+  MAXIMUM_GRADIENT_TESLA_PER_METER,
   type GradientPulse,
 } from '../simulation/gradientEncoding'
 
@@ -25,6 +35,13 @@ export const GRID_SIZE = 128
 const GRID_SPACING = 0.42
 const SPHERE_RADIUS = 0.198
 const GRID_OFFSET = ((GRID_SIZE - 1) * GRID_SPACING) / 2
+const GRID_HALF_EXTENT_METERS = ((GRID_SIZE - 1) / 2) * 1e-3
+const SLICE_GRAPH_BASE_HEIGHT = 0.48
+const SLICE_GRAPH_HEIGHT = 5.6
+const MAXIMUM_ROTATING_FREQUENCY_HERTZ =
+  (PROTON_GYROMAGNETIC_RATIO / (2 * Math.PI)) *
+  (MAXIMUM_GRADIENT_TESLA_PER_METER * GRID_HALF_EXTENT_METERS * 2 +
+    7e-6)
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
 const SAMPLE_SPHERE_COLORS: Readonly<Record<SamplePresetId, THREE.Color>> = {
   air: new THREE.Color('#526c78'),
@@ -77,21 +94,31 @@ export interface LabSceneHandle {
 
 export type RenderMode = 'slice' | 'stacked'
 export type ReferenceFrame = 'laboratory-slowed' | 'rotating'
+export type SliceGraphMode =
+  | 'none'
+  | 'frequency-laboratory'
+  | 'frequency-rotating'
+  | 'phase'
+  | 'amplitude'
 
 interface LabSceneProps {
   ensembleModels: ReadonlyArray<HydrogenEnsemble>
   ensembleRevision: number
+  fieldStrengthTesla: SupportedFieldStrengthTesla
+  fieldUniformity: FieldUniformity
   fidEnsembleStates: ReadonlyArray<FidEnsembleState>
   fidPulseEvents: ReadonlyArray<RfPulseEvent>
   fidSimulationActive: boolean
   fidSimulationTimeMilliseconds: number
   gradientEncodingActive: boolean
+  gradientEncodingSelected: boolean
   gradientEncodingEnsembleStates: ReadonlyArray<FidEnsembleState>
   gradientEncodingTimeMilliseconds: number
   gradientPhaseEncodingPulses: ReadonlyArray<GradientPulse>
   gradientReadoutPulses: ReadonlyArray<GradientPulse>
   referenceFrame: ReferenceFrame
   renderMode: RenderMode
+  sliceGraphMode: SliceGraphMode
   selected: EnsembleSelection | null
   onSelect: (selection: EnsembleSelection) => void
 }
@@ -113,17 +140,21 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     {
       ensembleModels,
       ensembleRevision,
+      fieldStrengthTesla,
+      fieldUniformity,
       fidEnsembleStates,
       fidPulseEvents,
       fidSimulationActive,
       fidSimulationTimeMilliseconds,
       gradientEncodingActive,
+      gradientEncodingSelected,
       gradientEncodingEnsembleStates,
       gradientEncodingTimeMilliseconds,
       gradientPhaseEncodingPulses,
       gradientReadoutPulses,
       referenceFrame,
       renderMode,
+      sliceGraphMode,
       selected,
       onSelect,
     },
@@ -137,6 +168,11 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const fidArrowHeadsRef = useRef<THREE.InstancedMesh | null>(null)
     const referenceFrameRef = useRef(referenceFrame)
     const renderModeRef = useRef(renderMode)
+    const sliceGraphModeRef = useRef(sliceGraphMode)
+    const fieldStrengthTeslaRef = useRef(fieldStrengthTesla)
+    const staticFieldFrequencyOffsetsRef = useRef(
+      new Float64Array(GRID_SIZE * GRID_SIZE),
+    )
     const modeObjectsRef = useRef<{
       boundary: THREE.LineLoop
       b1ArrowHeads: THREE.InstancedMesh
@@ -145,6 +181,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       fieldArrowHeads: THREE.InstancedMesh
       fieldArrowShafts: THREE.InstancedMesh
       fidArrowMaterial: THREE.MeshBasicMaterial
+      sliceGraphSurface: THREE.Mesh
       stackedFieldArrowHead: THREE.Mesh
       stackedFieldArrowShaft: THREE.Mesh
       stackedB1ArrowHead: THREE.Mesh
@@ -159,12 +196,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     })
     const gradientAnimationRef = useRef({
       active: gradientEncodingActive,
+      selected: gradientEncodingSelected,
       phaseEncodingPulses: gradientPhaseEncodingPulses,
       readoutPulses: gradientReadoutPulses,
       states: gradientEncodingEnsembleStates,
       timeMilliseconds: gradientEncodingTimeMilliseconds,
     })
     const fidArrowsDirtyRef = useRef(true)
+    const sliceGraphDirtyRef = useRef(true)
     const renderedFidStatesRef = useRef<ReadonlyArray<FidEnsembleState>>([])
     const previousSelectionRef = useRef<number | null>(selected?.index ?? null)
     const selectedIndexRef = useRef<number | null>(selected?.index ?? null)
@@ -184,6 +223,38 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     }, [referenceFrame])
 
     useEffect(() => {
+      fieldStrengthTeslaRef.current = fieldStrengthTesla
+      const offsets = staticFieldFrequencyOffsetsRef.current
+
+      for (let row = 0; row < GRID_SIZE; row += 1) {
+        for (let column = 0; column < GRID_SIZE; column += 1) {
+          const fieldProfile = fieldProfileAt(
+            column,
+            row,
+            GRID_SIZE,
+            fieldUniformity,
+          )
+          const fieldVariationTesla =
+            fieldStrengthTesla * (fieldProfile.fieldScale - 1)
+          offsets[row * GRID_SIZE + column] =
+            (PROTON_GYROMAGNETIC_RATIO * fieldVariationTesla) /
+            (2 * Math.PI)
+        }
+      }
+      sliceGraphDirtyRef.current = true
+    }, [fieldStrengthTesla, fieldUniformity])
+
+    useEffect(() => {
+      sliceGraphModeRef.current = sliceGraphMode
+      sliceGraphDirtyRef.current = true
+      const modeObjects = modeObjectsRef.current
+      if (modeObjects) {
+        modeObjects.sliceGraphSurface.visible =
+          renderModeRef.current === 'slice' && sliceGraphMode !== 'none'
+      }
+    }, [sliceGraphMode])
+
+    useEffect(() => {
       renderModeRef.current = renderMode
       const modeObjects = modeObjectsRef.current
       if (!modeObjects) return
@@ -196,9 +267,12 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       modeObjects.stackedSphere.visible = stacked
       modeObjects.stackedFieldArrowShaft.visible = stacked
       modeObjects.stackedFieldArrowHead.visible = stacked
+      modeObjects.sliceGraphSurface.visible =
+        !stacked && sliceGraphModeRef.current !== 'none'
       modeObjects.fidArrowMaterial.opacity = stacked ? 0.025 : 1
       modeObjects.fidArrowMaterial.needsUpdate = true
       fidArrowsDirtyRef.current = true
+      sliceGraphDirtyRef.current = true
 
       const camera = cameraRef.current
       const controls = controlsRef.current
@@ -239,6 +313,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         timeMilliseconds: fidSimulationTimeMilliseconds,
       }
       fidArrowsDirtyRef.current = true
+      sliceGraphDirtyRef.current = true
     }, [
       fidEnsembleStates,
       fidPulseEvents,
@@ -249,14 +324,17 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     useEffect(() => {
       gradientAnimationRef.current = {
         active: gradientEncodingActive,
+        selected: gradientEncodingSelected,
         phaseEncodingPulses: gradientPhaseEncodingPulses,
         readoutPulses: gradientReadoutPulses,
         states: gradientEncodingEnsembleStates,
         timeMilliseconds: gradientEncodingTimeMilliseconds,
       }
       fidArrowsDirtyRef.current = true
+      sliceGraphDirtyRef.current = true
     }, [
       gradientEncodingActive,
+      gradientEncodingSelected,
       gradientEncodingEnsembleStates,
       gradientEncodingTimeMilliseconds,
       gradientPhaseEncodingPulses,
@@ -597,6 +675,43 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const boundary = new THREE.LineLoop(boundaryGeometry, boundaryMaterial)
       scene.add(boundary)
 
+      const sliceGraphGeometry = new THREE.PlaneGeometry(
+        GRID_OFFSET * 2,
+        GRID_OFFSET * 2,
+        GRID_SIZE - 1,
+        GRID_SIZE - 1,
+      )
+      const sliceGraphPositions = sliceGraphGeometry.getAttribute(
+        'position',
+      ) as THREE.BufferAttribute
+      sliceGraphPositions.setUsage(THREE.DynamicDrawUsage)
+      const sliceGraphColors = new THREE.Float32BufferAttribute(
+        new Float32Array(GRID_SIZE * GRID_SIZE * 3),
+        3,
+      )
+      sliceGraphColors.setUsage(THREE.DynamicDrawUsage)
+      sliceGraphGeometry.setAttribute('color', sliceGraphColors)
+      const sliceGraphMaterial = new THREE.MeshPhongMaterial({
+        color: '#ffffff',
+        emissive: '#07131b',
+        shininess: 52,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.24,
+        depthWrite: false,
+        vertexColors: true,
+      })
+      const sliceGraphSurface = new THREE.Mesh(
+        sliceGraphGeometry,
+        sliceGraphMaterial,
+      )
+      sliceGraphSurface.frustumCulled = false
+      sliceGraphSurface.renderOrder = 4
+      sliceGraphSurface.visible =
+        renderModeRef.current === 'slice' &&
+        sliceGraphModeRef.current !== 'none'
+      scene.add(sliceGraphSurface)
+
       const stackedSphereMaterial = sphereMaterial.clone()
       stackedSphereMaterial.color.set('#91a8b5')
       stackedSphereMaterial.emissive.set('#101a20')
@@ -634,6 +749,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         fieldArrowHeads: arrowHeads,
         fieldArrowShafts: arrowShafts,
         fidArrowMaterial,
+        sliceGraphSurface,
         stackedFieldArrowHead,
         stackedFieldArrowShaft,
         stackedB1ArrowHead,
@@ -892,6 +1008,258 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         fidArrowHeads.instanceMatrix.needsUpdate = true
       }
 
+      const sliceGraphRawHeights = new Float32Array(
+        GRID_SIZE * GRID_SIZE,
+      )
+      const sliceGraphSmoothedHeights = new Float32Array(
+        GRID_SIZE * GRID_SIZE,
+      )
+      const sliceGraphStateLookup: Array<FidEnsembleState | undefined> =
+        new Array(GRID_SIZE * GRID_SIZE)
+      const sliceGraphLowColor = new THREE.Color('#32e6ff')
+      const sliceGraphMiddleColor = new THREE.Color('#9b70ff')
+      const sliceGraphHighColor = new THREE.Color('#ffcf66')
+      const sliceGraphColor = new THREE.Color()
+
+      const smoothSliceGraphHeights = () => {
+        for (let row = 0; row < GRID_SIZE; row += 1) {
+          for (let column = 0; column < GRID_SIZE; column += 1) {
+            let weightedHeight = 0
+            let totalWeight = 0
+
+            for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
+              const sampleRow = row + rowOffset
+              if (sampleRow < 0 || sampleRow >= GRID_SIZE) continue
+
+              for (
+                let columnOffset = -1;
+                columnOffset <= 1;
+                columnOffset += 1
+              ) {
+                const sampleColumn = column + columnOffset
+                if (sampleColumn < 0 || sampleColumn >= GRID_SIZE) continue
+                const weight =
+                  (rowOffset === 0 ? 2 : 1) *
+                  (columnOffset === 0 ? 2 : 1)
+                weightedHeight +=
+                  sliceGraphRawHeights[
+                    sampleRow * GRID_SIZE + sampleColumn
+                  ] * weight
+                totalWeight += weight
+              }
+            }
+
+            sliceGraphSmoothedHeights[row * GRID_SIZE + column] =
+              weightedHeight / totalWeight
+          }
+        }
+      }
+
+      const updateSliceGraph = () => {
+        if (!sliceGraphDirtyRef.current) return
+        sliceGraphDirtyRef.current = false
+
+        const graphMode = sliceGraphModeRef.current
+        const graphVisible =
+          renderModeRef.current === 'slice' && graphMode !== 'none'
+        sliceGraphSurface.visible = graphVisible
+        if (!graphVisible) return
+
+        const gradientAnimation = gradientAnimationRef.current
+        const fidAnimation = fidAnimationRef.current
+        const renderingGradientEncoding = gradientAnimation.selected
+        const simulationActive = renderingGradientEncoding
+          ? gradientAnimation.active
+          : fidAnimation.active
+        const states = renderingGradientEncoding
+          ? gradientAnimation.states
+          : fidAnimation.states
+        const timeMilliseconds = renderingGradientEncoding
+          ? gradientAnimation.timeMilliseconds
+          : fidAnimation.timeMilliseconds
+
+        sliceGraphStateLookup.fill(undefined)
+        let maximumEquilibriumMagnetization = 0
+        states.forEach((state) => {
+          sliceGraphStateLookup[state.index] = state
+          maximumEquilibriumMagnetization = Math.max(
+            maximumEquilibriumMagnetization,
+            state.equilibriumMagnetization,
+          )
+        })
+
+        const normalizedGradientTime = Math.min(
+          1,
+          Math.max(
+            0,
+            timeMilliseconds /
+              GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+          ),
+        )
+        const phaseEncodingAmplitude =
+          renderingGradientEncoding && simulationActive
+            ? gradientAmplitudeAt(
+                gradientAnimation.phaseEncodingPulses,
+                normalizedGradientTime,
+              )
+            : 0
+        const readoutAmplitude =
+          renderingGradientEncoding && simulationActive
+            ? gradientAmplitudeAt(
+                gradientAnimation.readoutPulses,
+                normalizedGradientTime,
+              )
+            : 0
+
+        for (let row = 0; row < GRID_SIZE; row += 1) {
+          for (let column = 0; column < GRID_SIZE; column += 1) {
+            const index = row * GRID_SIZE + column
+            const positionXMeters =
+              (column - (GRID_SIZE - 1) / 2) * 1e-3
+            const positionYMeters =
+              ((GRID_SIZE - 1) / 2 - row) * 1e-3
+            const gradientFieldTesla =
+              MAXIMUM_GRADIENT_TESLA_PER_METER *
+              (positionXMeters * readoutAmplitude +
+                positionYMeters * phaseEncodingAmplitude)
+            const gradientFrequencyHertz =
+              (PROTON_GYROMAGNETIC_RATIO * gradientFieldTesla) /
+              (2 * Math.PI)
+            const frequencyOffsetHertz =
+              staticFieldFrequencyOffsetsRef.current[index] +
+              gradientFrequencyHertz
+            let normalizedHeight = 0.5
+
+            if (graphMode === 'frequency-laboratory') {
+              // B0 determines the dominant laboratory-frame height. A
+              // reserved local range keeps ppm and gradient structure visible.
+              const nominalHeight =
+                0.18 + 0.56 * (fieldStrengthTeslaRef.current / 7)
+              normalizedHeight = THREE.MathUtils.clamp(
+                nominalHeight +
+                  0.18 *
+                    THREE.MathUtils.clamp(
+                      frequencyOffsetHertz /
+                        MAXIMUM_ROTATING_FREQUENCY_HERTZ,
+                      -1,
+                      1,
+                    ),
+                0.04,
+                0.96,
+              )
+            } else if (graphMode === 'frequency-rotating') {
+              normalizedHeight = THREE.MathUtils.clamp(
+                0.5 +
+                  0.46 *
+                    (frequencyOffsetHertz /
+                      MAXIMUM_ROTATING_FREQUENCY_HERTZ),
+                0.04,
+                0.96,
+              )
+            } else if (graphMode === 'phase') {
+              let phaseRadians = 0
+              if (simulationActive && renderingGradientEncoding) {
+                phaseRadians = gradientPhaseRadiansAt(
+                  column,
+                  row,
+                  GRID_SIZE,
+                  (staticFieldFrequencyOffsetsRef.current[index] *
+                    2 *
+                    Math.PI) /
+                    1000,
+                  timeMilliseconds,
+                  gradientAnimation.phaseEncodingPulses,
+                  gradientAnimation.readoutPulses,
+                )
+              } else if (simulationActive) {
+                const state = sliceGraphStateLookup[index]
+                if (state) {
+                  phaseRadians = fidEnsembleMagnetizationStateAt(
+                    state,
+                    timeMilliseconds,
+                    fidAnimation.pulseEvents,
+                  ).precessionPhaseRadians
+                }
+              }
+
+              // A monotonic soft limit preserves continuous phase ramps
+              // without introducing cliffs each time phase crosses ±pi.
+              normalizedHeight =
+                0.5 + Math.atan(phaseRadians / (4 * Math.PI)) / Math.PI
+            } else if (graphMode === 'amplitude') {
+              const state = sliceGraphStateLookup[index]
+              if (
+                simulationActive &&
+                state &&
+                maximumEquilibriumMagnetization > 0
+              ) {
+                const magnetizationState = renderingGradientEncoding
+                  ? gradientEnsembleMagnetizationStateAt(
+                      state,
+                      timeMilliseconds,
+                      gradientAnimation.phaseEncodingPulses,
+                      gradientAnimation.readoutPulses,
+                    )
+                  : fidEnsembleMagnetizationStateAt(
+                      state,
+                      timeMilliseconds,
+                      fidAnimation.pulseEvents,
+                    )
+                normalizedHeight = THREE.MathUtils.clamp(
+                  (state.equilibriumMagnetization /
+                    maximumEquilibriumMagnetization) *
+                    magnetizationState.transverseFraction,
+                  0,
+                  1,
+                )
+              } else {
+                normalizedHeight = 0
+              }
+            }
+
+            sliceGraphRawHeights[index] = normalizedHeight
+          }
+        }
+
+        smoothSliceGraphHeights()
+
+        for (
+          let index = 0;
+          index < sliceGraphSmoothedHeights.length;
+          index += 1
+        ) {
+          const normalizedHeight = sliceGraphSmoothedHeights[index]
+          sliceGraphPositions.setZ(
+            index,
+            SLICE_GRAPH_BASE_HEIGHT +
+              normalizedHeight * SLICE_GRAPH_HEIGHT,
+          )
+          if (normalizedHeight < 0.5) {
+            sliceGraphColor.lerpColors(
+              sliceGraphLowColor,
+              sliceGraphMiddleColor,
+              normalizedHeight * 2,
+            )
+          } else {
+            sliceGraphColor.lerpColors(
+              sliceGraphMiddleColor,
+              sliceGraphHighColor,
+              (normalizedHeight - 0.5) * 2,
+            )
+          }
+          sliceGraphColors.setXYZ(
+            index,
+            sliceGraphColor.r,
+            sliceGraphColor.g,
+            sliceGraphColor.b,
+          )
+        }
+
+        sliceGraphPositions.needsUpdate = true
+        sliceGraphColors.needsUpdate = true
+        sliceGraphGeometry.computeVertexNormals()
+      }
+
       const hideB1PulseArrows = () => {
         b1ArrowShafts.visible = false
         b1ArrowHeads.visible = false
@@ -996,6 +1364,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         }
 
         updateFidArrows()
+        updateSliceGraph()
         controls.update()
         updateB1PulseArrows(time)
 
@@ -1042,6 +1411,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         b1ArrowMaterial.dispose()
         boundaryGeometry.dispose()
         boundaryMaterial.dispose()
+        sliceGraphGeometry.dispose()
+        sliceGraphMaterial.dispose()
 
         renderer.dispose()
         renderer.forceContextLoss()

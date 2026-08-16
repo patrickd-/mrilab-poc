@@ -5,6 +5,7 @@ import LabScene, {
   type LabSceneHandle,
   type ReferenceFrame,
   type RenderMode,
+  type SliceGraphMode,
 } from './components/LabScene'
 import DarkSelect from './components/DarkSelect'
 import FidExperimentPanel from './components/FidExperimentPanel'
@@ -73,6 +74,22 @@ const REFERENCE_FRAME_OPTIONS: ReadonlyArray<{
 }> = [
   { id: 'laboratory-slowed', label: 'Laboratory Frame (Slowed)' },
   { id: 'rotating', label: 'Rotating Frame' },
+]
+const SLICE_GRAPH_OPTIONS: ReadonlyArray<{
+  id: SliceGraphMode
+  label: string
+}> = [
+  { id: 'none', label: 'No 3D Graph' },
+  {
+    id: 'frequency-laboratory',
+    label: '3D Frequency (Laboratory Frame)',
+  },
+  {
+    id: 'frequency-rotating',
+    label: '3D Frequency (Rotating Frame)',
+  },
+  { id: 'phase', label: '3D Phase' },
+  { id: 'amplitude', label: '3D Amplitude' },
 ]
 
 type TissueSamplePresetId = Exclude<SamplePresetId, 'air'>
@@ -202,6 +219,8 @@ function App() {
   const [fieldUniformity, setFieldUniformity] =
     useState<FieldUniformity>('uniform')
   const [renderMode, setRenderMode] = useState<RenderMode>('slice')
+  const [sliceGraphMode, setSliceGraphMode] =
+    useState<SliceGraphMode>('none')
   const [referenceFrame, setReferenceFrame] =
     useState<ReferenceFrame>('laboratory-slowed')
   const [experimentMenuOpen, setExperimentMenuOpen] = useState(false)
@@ -370,6 +389,8 @@ function App() {
           ref={sceneRef}
           ensembleModels={ensembles}
           ensembleRevision={ensembleRevision}
+          fieldStrengthTesla={fieldStrengthTesla}
+          fieldUniformity={fieldUniformity}
           fidEnsembleStates={fidSimulation.ensembleStates}
           fidSimulationActive={
             simulationExperimentSelected && fidSimulation.status !== 'idle'
@@ -379,6 +400,7 @@ function App() {
           gradientEncodingActive={
             gradientExperimentSelected && gradientPlayback.status !== 'idle'
           }
+          gradientEncodingSelected={gradientExperimentSelected}
           gradientEncodingEnsembleStates={gradientEnsembleStates}
           gradientEncodingTimeMilliseconds={
             gradientPlayback.timeMilliseconds
@@ -387,6 +409,7 @@ function App() {
           gradientReadoutPulses={readoutPulses}
           referenceFrame={referenceFrame}
           renderMode={renderMode}
+          sliceGraphMode={sliceGraphMode}
           selected={selected}
           onSelect={selectEnsemble}
         />
@@ -440,6 +463,15 @@ function App() {
               options={RENDER_MODE_OPTIONS}
               onChange={changeRenderMode}
             />
+            {renderMode === 'slice' && (
+              <DarkSelect
+                className="slice-graph-select"
+                ariaLabel="Slice 3D graph"
+                value={sliceGraphMode}
+                options={SLICE_GRAPH_OPTIONS}
+                onChange={setSliceGraphMode}
+              />
+            )}
             <DarkSelect
               className="reference-frame-select"
               ariaLabel="Magnetization reference frame"

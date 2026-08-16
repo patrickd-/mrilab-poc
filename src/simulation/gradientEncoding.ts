@@ -54,13 +54,16 @@ export function gradientAmplitudeAt(
   )
 }
 
-export function gradientEnsembleMagnetizationStateAt(
-  state: FidEnsembleState,
+export function gradientPhaseRadiansAt(
+  column: number,
+  row: number,
+  gridSize: number,
+  angularFrequencyOffsetRadiansPerMillisecond: number,
   timeMilliseconds: number,
   phaseEncodingPulses: ReadonlyArray<GradientPulse>,
   readoutPulses: ReadonlyArray<GradientPulse>,
   durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
-): FidEnsembleMagnetizationState {
+) {
   const boundedTimeMilliseconds = Math.min(
     durationMilliseconds,
     Math.max(0, timeMilliseconds),
@@ -72,18 +75,43 @@ export function gradientEnsembleMagnetizationStateAt(
   const readoutAreaSeconds =
     normalizedPulseAreaAt(readoutPulses, normalizedTime) *
     (durationMilliseconds / 1000)
-  const gridCenter = (state.gridSize - 1) / 2
-  const positionXMeters = (state.column - gridCenter) * 1e-3
-  const positionYMeters = (gridCenter - state.row) * 1e-3
+  const gridCenter = (gridSize - 1) / 2
+  const positionXMeters = (column - gridCenter) * 1e-3
+  const positionYMeters = (gridCenter - row) * 1e-3
   const gradientPhaseRadians =
     PROTON_GYROMAGNETIC_RATIO *
     MAXIMUM_GRADIENT_TESLA_PER_METER *
     (positionXMeters * readoutAreaSeconds +
       positionYMeters * phaseEncodingAreaSeconds)
-  const precessionPhaseRadians =
-    state.angularFrequencyOffsetRadiansPerMillisecond *
+
+  return (
+    angularFrequencyOffsetRadiansPerMillisecond *
       boundedTimeMilliseconds +
     gradientPhaseRadians
+  )
+}
+
+export function gradientEnsembleMagnetizationStateAt(
+  state: FidEnsembleState,
+  timeMilliseconds: number,
+  phaseEncodingPulses: ReadonlyArray<GradientPulse>,
+  readoutPulses: ReadonlyArray<GradientPulse>,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+): FidEnsembleMagnetizationState {
+  const boundedTimeMilliseconds = Math.min(
+    durationMilliseconds,
+    Math.max(0, timeMilliseconds),
+  )
+  const precessionPhaseRadians = gradientPhaseRadiansAt(
+    state.column,
+    state.row,
+    state.gridSize,
+    state.angularFrequencyOffsetRadiansPerMillisecond,
+    boundedTimeMilliseconds,
+    phaseEncodingPulses,
+    readoutPulses,
+    durationMilliseconds,
+  )
   const transverseFraction =
     state.transverseRelaxationTimeMilliseconds === 0
       ? 0

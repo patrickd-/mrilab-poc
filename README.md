@@ -35,6 +35,8 @@ right-drag to pan, and click a sphere to select its hydrogen ensemble. Press
 - `src/simulation/gradientEncoding.ts` applies orthogonal phase-encoding and
   readout gradient areas to each ensemble's transverse phase; its sequence is
   paced for inspection by `src/hooks/useGradientEncodingPlayback.ts`.
+- Slice View can overlay a translucent, spatially smoothed 3D surface for
+  laboratory/rotating-frame frequency, phase, or transverse amplitude.
 - `src/components/FidExperimentPanel.tsx`,
   `src/components/SpinEchoExperimentPanel.tsx`, and
   `src/components/GradientEncodingExperimentPanel.tsx` contain the experiment
