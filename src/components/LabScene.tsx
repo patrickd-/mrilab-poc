@@ -35,13 +35,8 @@ export const GRID_SIZE = 128
 const GRID_SPACING = 0.42
 const SPHERE_RADIUS = 0.198
 const GRID_OFFSET = ((GRID_SIZE - 1) * GRID_SPACING) / 2
-const GRID_HALF_EXTENT_METERS = ((GRID_SIZE - 1) / 2) * 1e-3
 const SLICE_GRAPH_BASE_HEIGHT = 4.8
 const SLICE_GRAPH_HEIGHT = 5.6
-const MAXIMUM_ROTATING_FREQUENCY_HERTZ =
-  (PROTON_GYROMAGNETIC_RATIO / (2 * Math.PI)) *
-  (MAXIMUM_GRADIENT_TESLA_PER_METER * GRID_HALF_EXTENT_METERS * 2 +
-    7e-6)
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
 const SAMPLE_SPHERE_COLORS: Readonly<Record<SamplePresetId, THREE.Color>> = {
   air: new THREE.Color('#526c78'),
@@ -1014,6 +1009,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const sliceGraphSmoothedHeights = new Float32Array(
         GRID_SIZE * GRID_SIZE,
       )
+      const sliceGraphFrequencyOffsets = new Float64Array(
+        GRID_SIZE * GRID_SIZE,
+      )
       const sliceGraphStateLookup: Array<FidEnsembleState | undefined> =
         new Array(GRID_SIZE * GRID_SIZE)
       const sliceGraphLowColor = new THREE.Color('#32e6ff')
@@ -1111,51 +1109,69 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               )
             : 0
 
+        let maximumAbsoluteFrequencyOffsetHertz = 0
+        if (
+          graphMode === 'frequency-laboratory' ||
+          graphMode === 'frequency-rotating'
+        ) {
+          for (let row = 0; row < GRID_SIZE; row += 1) {
+            for (let column = 0; column < GRID_SIZE; column += 1) {
+              const index = row * GRID_SIZE + column
+              const positionXMeters =
+                (column - (GRID_SIZE - 1) / 2) * 1e-3
+              const positionYMeters =
+                ((GRID_SIZE - 1) / 2 - row) * 1e-3
+              const gradientFieldTesla =
+                MAXIMUM_GRADIENT_TESLA_PER_METER *
+                (positionXMeters * readoutAmplitude +
+                  positionYMeters * phaseEncodingAmplitude)
+              const gradientFrequencyHertz =
+                (PROTON_GYROMAGNETIC_RATIO * gradientFieldTesla) /
+                (2 * Math.PI)
+              const frequencyOffsetHertz =
+                staticFieldFrequencyOffsetsRef.current[index] +
+                gradientFrequencyHertz
+              sliceGraphFrequencyOffsets[index] = frequencyOffsetHertz
+              maximumAbsoluteFrequencyOffsetHertz = Math.max(
+                maximumAbsoluteFrequencyOffsetHertz,
+                Math.abs(frequencyOffsetHertz),
+              )
+            }
+          }
+        }
+
         for (let row = 0; row < GRID_SIZE; row += 1) {
           for (let column = 0; column < GRID_SIZE; column += 1) {
             const index = row * GRID_SIZE + column
-            const positionXMeters =
-              (column - (GRID_SIZE - 1) / 2) * 1e-3
-            const positionYMeters =
-              ((GRID_SIZE - 1) / 2 - row) * 1e-3
-            const gradientFieldTesla =
-              MAXIMUM_GRADIENT_TESLA_PER_METER *
-              (positionXMeters * readoutAmplitude +
-                positionYMeters * phaseEncodingAmplitude)
-            const gradientFrequencyHertz =
-              (PROTON_GYROMAGNETIC_RATIO * gradientFieldTesla) /
-              (2 * Math.PI)
             const frequencyOffsetHertz =
-              staticFieldFrequencyOffsetsRef.current[index] +
-              gradientFrequencyHertz
+              sliceGraphFrequencyOffsets[index]
             let normalizedHeight = 0.5
 
             if (graphMode === 'frequency-laboratory') {
               // B0 determines the dominant laboratory-frame height. A
-              // reserved local range keeps ppm and gradient structure visible.
+              // locally auto-ranged offset keeps ppm structure visible.
               const nominalHeight =
                 0.18 + 0.56 * (fieldStrengthTeslaRef.current / 7)
-              normalizedHeight = THREE.MathUtils.clamp(
-                nominalHeight +
-                  0.18 *
-                    THREE.MathUtils.clamp(
-                      frequencyOffsetHertz /
-                        MAXIMUM_ROTATING_FREQUENCY_HERTZ,
-                      -1,
-                      1,
-                    ),
-                0.04,
-                0.96,
+              const localHeightRange = Math.min(
+                0.34,
+                nominalHeight - 0.04,
+                0.96 - nominalHeight,
               )
+              normalizedHeight =
+                maximumAbsoluteFrequencyOffsetHertz > 1e-9
+                  ? nominalHeight +
+                    localHeightRange *
+                      (frequencyOffsetHertz /
+                        maximumAbsoluteFrequencyOffsetHertz)
+                  : nominalHeight
             } else if (graphMode === 'frequency-rotating') {
-              normalizedHeight = THREE.MathUtils.clamp(
-                0.5 +
-                  0.46 *
-                    (frequencyOffsetHertz /
-                      MAXIMUM_ROTATING_FREQUENCY_HERTZ),
-                0.04,
-                0.96,
-              )
+              normalizedHeight =
+                maximumAbsoluteFrequencyOffsetHertz > 1e-9
+                  ? 0.5 +
+                    0.46 *
+                      (frequencyOffsetHertz /
+                        maximumAbsoluteFrequencyOffsetHertz)
+                  : 0.5
             } else if (graphMode === 'phase') {
               let phaseRadians = 0
               if (simulationActive && renderingGradientEncoding) {
