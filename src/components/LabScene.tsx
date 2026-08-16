@@ -46,7 +46,6 @@ const FID_FIELD_VARIATION_PALETTE = [
   new THREE.Color('#ffd166'),
 ] as const
 const FOCUS_DURATION = 650
-const VISUAL_PRECESSION_RADIANS_PER_MILLISECOND = (2 * Math.PI) / 180
 
 interface FocusTransition {
   fromCamera: THREE.Vector3
@@ -773,10 +772,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               return
             }
 
-            const phase =
-              VISUAL_PRECESSION_RADIANS_PER_MILLISECOND *
-                timeMilliseconds +
-              magnetizationState.precessionPhaseRadians
+            const phase = magnetizationState.precessionPhaseRadians
 
             fidArrowDirection.set(
               magnetizationState.transverseFraction * Math.cos(phase),
@@ -852,12 +848,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           return
         }
 
-        const rotatingFramePhase =
-          VISUAL_PRECESSION_RADIANS_PER_MILLISECOND *
-          visualization.pulseEvent.timeMilliseconds
         const pulseAxisPhase =
-          rotatingFramePhase +
-          (visualization.pulseEvent.kind === '90-y' ? Math.PI / 2 : 0)
+          visualization.pulseEvent.kind === '90-y' ? Math.PI / 2 : 0
         b1ArrowDirection.set(
           Math.cos(pulseAxisPhase),
           Math.sin(pulseAxisPhase),

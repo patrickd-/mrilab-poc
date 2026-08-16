@@ -56,4 +56,6 @@ Derived ensemble properties use the shared profile implementation in
 `HydrogenEnsemble.ts`; rendered arrows intentionally remain parallel because
 the modeled angular deviation is not visually resolvable. Magnetization-arrow
 hue encodes normalized field-strength variation, while brightness encodes the
-normalized off-parallel angle.
+normalized off-parallel angle. Their precession is rendered in the nominal
+`B0` rotating frame, so only each ensemble's frequency offset contributes to
+its displayed phase.
