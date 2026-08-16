@@ -19,7 +19,8 @@ npm run dev -- --host 0.0.0.0
 
 Open the URL printed by Vite. Drag to orbit the scene, scroll to zoom,
 right-drag to pan, and click a sphere to select its hydrogen ensemble. Press
-`R` or use the floating viewport control to reset the camera.
+`R` or use the floating viewport control to reset the camera. Slice View uses
+an upright upper-hemisphere orbit, while Stacked View remains unrestricted.
 
 ## Project structure
 

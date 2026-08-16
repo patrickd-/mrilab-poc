@@ -50,6 +50,7 @@ const CAMERA_DISTANCE =
 const CAMERA_POSITION = new THREE.Vector3(0, 0, CAMERA_DISTANCE)
 const CAMERA_TARGET = new THREE.Vector3(0, 0, 0)
 const STACKED_CAMERA_POSITION = new THREE.Vector3(0.68, 0.52, 1.08)
+const SLICE_CAMERA_AZIMUTH_LIMIT = Math.PI / 2 - 0.04
 const STACKED_ARROW_WIDTH_SCALE = 0.24
 const STACKED_ARROW_LENGTH_SCALE = 0.82
 const B1_PULSE_VISIBILITY_MILLISECONDS = 700
@@ -273,6 +274,12 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const controls = controlsRef.current
       if (!camera || !controls) return
       focusTransitionRef.current = null
+      controls.minAzimuthAngle = stacked
+        ? Number.NEGATIVE_INFINITY
+        : -SLICE_CAMERA_AZIMUTH_LIMIT
+      controls.maxAzimuthAngle = stacked
+        ? Number.POSITIVE_INFINITY
+        : SLICE_CAMERA_AZIMUTH_LIMIT
       camera.position.copy(
         stacked ? STACKED_CAMERA_POSITION : CAMERA_POSITION,
       )
@@ -455,6 +462,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       controls.maxDistance = CAMERA_DISTANCE * 2.4
       controls.minPolarAngle = 0.08
       controls.maxPolarAngle = Math.PI - 0.08
+      controls.minAzimuthAngle =
+        renderModeRef.current === 'stacked'
+          ? Number.NEGATIVE_INFINITY
+          : -SLICE_CAMERA_AZIMUTH_LIMIT
+      controls.maxAzimuthAngle =
+        renderModeRef.current === 'stacked'
+          ? Number.POSITIVE_INFINITY
+          : SLICE_CAMERA_AZIMUTH_LIMIT
       controls.zoomSpeed = 0.85
       controls.zoomToCursor = false
       controls.panSpeed = 0.75
