@@ -302,7 +302,7 @@ function SpinEchoExperimentPanel({
       <div className="section-heading">
         <div>
           <span className="section-index">01</span>
-          <h2>Spin Echo Phaser Diagram</h2>
+          <h2>Spin Echo Phasor Diagram</h2>
         </div>
       </div>
 
