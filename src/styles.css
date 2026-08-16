@@ -338,6 +338,13 @@ a:focus-visible {
   margin: 0;
 }
 
+.viewport-controls {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  pointer-events: auto;
+}
+
 .viewport-reset {
   display: flex;
   height: 30px;
@@ -376,6 +383,32 @@ a:focus-visible {
   border: 1px solid var(--line);
   color: var(--muted);
   font: inherit;
+}
+
+.viewport-mode-select {
+  width: 126px;
+  text-transform: uppercase;
+}
+
+.viewport-mode-select .dark-select-trigger {
+  height: 30px;
+  padding: 0 9px;
+  background: rgba(7, 9, 12, 0.72);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(8px);
+}
+
+.viewport-mode-select .dark-select-options {
+  top: auto;
+  right: auto;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: 150px;
+}
+
+.viewport-mode-select .dark-select-options button {
+  text-transform: uppercase;
 }
 
 .control-panel {
@@ -1142,7 +1175,8 @@ a:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .viewport-reset {
+  .viewport-reset,
+  .viewport-mode-select .dark-select-trigger {
     transition: none;
   }
 }

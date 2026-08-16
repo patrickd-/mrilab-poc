@@ -3,6 +3,7 @@ import LabScene, {
   type EnsembleSelection,
   GRID_SIZE,
   type LabSceneHandle,
+  type RenderMode,
 } from './components/LabScene'
 import DarkSelect from './components/DarkSelect'
 import FidExperimentPanel from './components/FidExperimentPanel'
@@ -46,6 +47,13 @@ const FIELD_UNIFORMITY_OPTIONS: ReadonlyArray<{
 }> = [
   { id: 'uniform', label: 'uniform' },
   { id: 'non-uniform', label: 'non-uniform' },
+]
+const RENDER_MODE_OPTIONS: ReadonlyArray<{
+  id: RenderMode
+  label: string
+}> = [
+  { id: 'slice', label: 'Slice View' },
+  { id: 'stacked', label: 'Stacked View' },
 ]
 
 type TissueSamplePresetId = Exclude<SamplePresetId, 'air'>
@@ -174,6 +182,7 @@ function App() {
     useState<SimulationTimeStep>('2')
   const [fieldUniformity, setFieldUniformity] =
     useState<FieldUniformity>('uniform')
+  const [renderMode, setRenderMode] = useState<RenderMode>('slice')
   const [experimentMenuOpen, setExperimentMenuOpen] = useState(false)
   const [selectedExperiment, setSelectedExperiment] =
     useState<ExperimentId | null>(null)
@@ -185,6 +194,15 @@ function App() {
   )
   const sampleProperties = selectedEnsemble?.sampleProperties(
     fieldStrengthTesla,
+  )
+  const stackedEnsembleCount = useMemo(
+    () =>
+      ensembles.reduce(
+        (count, ensemble) =>
+          count + (ensemble.samplePreset === 'air' ? 0 : 1),
+        0,
+      ),
+    [ensembleRevision, ensembles],
   )
   const fidSimulation = useFidSimulation({
     active: selectedExperiment !== null,
@@ -216,6 +234,11 @@ function App() {
     setSelected(selection)
     setSelectedExperiment(null)
     setExperimentMenuOpen(false)
+  }
+
+  const changeRenderMode = (mode: RenderMode) => {
+    setRenderMode(mode)
+    setSelected(null)
   }
 
   const applySlicePreset = (action: SlicePresetAction) => {
@@ -271,7 +294,14 @@ function App() {
         </div>
       </header>
 
-      <section className="viewport-panel" aria-label="Hydrogen ensemble grid">
+      <section
+        className="viewport-panel"
+        aria-label={
+          renderMode === 'stacked'
+            ? 'Stacked hydrogen ensemble magnetization'
+            : 'Hydrogen ensemble grid'
+        }
+      >
         <LabScene
           ref={sceneRef}
           ensembleModels={ensembles}
@@ -282,35 +312,67 @@ function App() {
           }
           fidPulseEvents={fidSimulation.pulseEvents}
           fidSimulationTimeMilliseconds={fidSimulation.timeMilliseconds}
+          renderMode={renderMode}
           selected={selected}
           onSelect={selectEnsemble}
         />
 
         <header className="viewport-header">
           <div>
-            <span className="overline">Spatial domain</span>
-            <strong>ENSEMBLE SLICE</strong>
+            <span className="overline">
+              {renderMode === 'stacked' ? 'Phase domain' : 'Spatial domain'}
+            </span>
+            <strong>
+              {renderMode === 'stacked'
+                ? 'STACKED ENSEMBLES'
+                : 'ENSEMBLE SLICE'}
+            </strong>
           </div>
           <div className="slice-size">
-            <span>{GRID_SIZE} × {GRID_SIZE}</span>
-            <small>{(GRID_SIZE * GRID_SIZE).toLocaleString()} ensembles</small>
-            <small>1 ensemble = 1 mm³</small>
+            {renderMode === 'stacked' ? (
+              <>
+                <span>{stackedEnsembleCount.toLocaleString()} vectors</span>
+                <small>Spatial positions collapsed</small>
+                <small>Ensemble selection disabled</small>
+              </>
+            ) : (
+              <>
+                <span>{GRID_SIZE} × {GRID_SIZE}</span>
+                <small>
+                  {(GRID_SIZE * GRID_SIZE).toLocaleString()} ensembles
+                </small>
+                <small>1 ensemble = 1 mm³</small>
+              </>
+            )}
           </div>
         </header>
 
         <div className="viewport-footer">
-          <button
-            className="viewport-reset"
-            type="button"
-            title="Reset camera (R)"
-            aria-label="Reset camera"
-            onClick={() => sceneRef.current?.resetCamera()}
-          >
-            <ResetIcon />
-            <span>Reset camera</span>
-            <kbd>R</kbd>
-          </button>
-          <p>Drag to orbit · Scroll to zoom · Right-drag to pan</p>
+          <div className="viewport-controls">
+            <button
+              className="viewport-reset"
+              type="button"
+              title="Reset camera (R)"
+              aria-label="Reset camera"
+              onClick={() => sceneRef.current?.resetCamera()}
+            >
+              <ResetIcon />
+              <span>Reset camera</span>
+              <kbd>R</kbd>
+            </button>
+            <DarkSelect
+              className="viewport-mode-select"
+              ariaLabel="Viewport rendering mode"
+              value={renderMode}
+              options={RENDER_MODE_OPTIONS}
+              onChange={changeRenderMode}
+            />
+          </div>
+          <p>
+            {renderMode === 'stacked'
+              ? 'Drag to orbit · Scroll to zoom · Right-drag to pan · Selection disabled'
+              : 'Drag to orbit · Scroll to zoom · Right-drag to pan'}
+          </p>
         </div>
       </section>
 

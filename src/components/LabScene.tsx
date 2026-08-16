@@ -32,6 +32,7 @@ const CAMERA_DISTANCE =
   (GRID_OFFSET / Math.tan(THREE.MathUtils.degToRad(20))) * 1.12
 const CAMERA_POSITION = new THREE.Vector3(0, 0, CAMERA_DISTANCE)
 const CAMERA_TARGET = new THREE.Vector3(0, 0, 0)
+const STACKED_CAMERA_POSITION = new THREE.Vector3(0.68, 0.52, 1.08)
 const FOCUS_DURATION = 650
 const VISUAL_PRECESSION_RADIANS_PER_MILLISECOND = (2 * Math.PI) / 180
 
@@ -53,6 +54,8 @@ export interface LabSceneHandle {
   resetCamera: () => void
 }
 
+export type RenderMode = 'slice' | 'stacked'
+
 interface LabSceneProps {
   ensembleModels: ReadonlyArray<HydrogenEnsemble>
   ensembleRevision: number
@@ -60,6 +63,7 @@ interface LabSceneProps {
   fidPulseEvents: ReadonlyArray<RfPulseEvent>
   fidSimulationActive: boolean
   fidSimulationTimeMilliseconds: number
+  renderMode: RenderMode
   selected: EnsembleSelection | null
   onSelect: (selection: EnsembleSelection) => void
 }
@@ -85,6 +89,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       fidPulseEvents,
       fidSimulationActive,
       fidSimulationTimeMilliseconds,
+      renderMode,
       selected,
       onSelect,
     },
@@ -96,6 +101,17 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const ensemblesRef = useRef<THREE.InstancedMesh | null>(null)
     const fidArrowShaftsRef = useRef<THREE.InstancedMesh | null>(null)
     const fidArrowHeadsRef = useRef<THREE.InstancedMesh | null>(null)
+    const renderModeRef = useRef(renderMode)
+    const modeObjectsRef = useRef<{
+      boundary: THREE.LineLoop
+      ensembles: THREE.InstancedMesh
+      fieldArrowHeads: THREE.InstancedMesh
+      fieldArrowShafts: THREE.InstancedMesh
+      fidArrowMaterial: THREE.MeshBasicMaterial
+      stackedFieldArrowHead: THREE.Mesh
+      stackedFieldArrowShaft: THREE.Mesh
+      stackedSphere: THREE.Mesh
+    } | null>(null)
     const fidAnimationRef = useRef({
       active: fidSimulationActive,
       pulseEvents: fidPulseEvents,
@@ -112,6 +128,35 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     useEffect(() => {
       onSelectRef.current = onSelect
     }, [onSelect])
+
+    useEffect(() => {
+      renderModeRef.current = renderMode
+      const modeObjects = modeObjectsRef.current
+      if (!modeObjects) return
+
+      const stacked = renderMode === 'stacked'
+      modeObjects.ensembles.visible = !stacked
+      modeObjects.boundary.visible = !stacked
+      modeObjects.fieldArrowShafts.visible = !stacked
+      modeObjects.fieldArrowHeads.visible = !stacked
+      modeObjects.stackedSphere.visible = stacked
+      modeObjects.stackedFieldArrowShaft.visible = stacked
+      modeObjects.stackedFieldArrowHead.visible = stacked
+      modeObjects.fidArrowMaterial.opacity = stacked ? 0.025 : 1
+      modeObjects.fidArrowMaterial.needsUpdate = true
+      fidArrowsDirtyRef.current = true
+
+      const camera = cameraRef.current
+      const controls = controlsRef.current
+      if (!camera || !controls) return
+      focusTransitionRef.current = null
+      camera.position.copy(
+        stacked ? STACKED_CAMERA_POSITION : CAMERA_POSITION,
+      )
+      camera.up.set(0, 1, 0)
+      controls.target.copy(CAMERA_TARGET)
+      controls.update()
+    }, [renderMode])
 
     useEffect(() => {
       fidAnimationRef.current = {
@@ -131,7 +176,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     useEffect(() => {
       const ensembles = ensemblesRef.current
 
-      if (!selected) {
+      if (!selected || renderMode === 'stacked') {
         if (ensembles && previousSelectionRef.current !== null) {
           ensembles.setColorAt(
             previousSelectionRef.current,
@@ -179,7 +224,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         toTarget: selectedPosition,
         startedAt: performance.now(),
       }
-    }, [ensembleModels, selected])
+    }, [ensembleModels, renderMode, selected])
 
     useEffect(() => {
       const ensembles = ensemblesRef.current
@@ -205,7 +250,11 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         if (!camera || !controls) return
 
         focusTransitionRef.current = null
-        camera.position.copy(CAMERA_POSITION)
+        camera.position.copy(
+          renderModeRef.current === 'stacked'
+            ? STACKED_CAMERA_POSITION
+            : CAMERA_POSITION,
+        )
         camera.up.set(0, 1, 0)
         controls.target.copy(CAMERA_TARGET)
         controls.update()
@@ -220,7 +269,11 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       scene.background = new THREE.Color('#07090c')
 
       const camera = new THREE.PerspectiveCamera(40, 1, 0.025, 800)
-      camera.position.copy(CAMERA_POSITION)
+      camera.position.copy(
+        renderModeRef.current === 'stacked'
+          ? STACKED_CAMERA_POSITION
+          : CAMERA_POSITION,
+      )
       cameraRef.current = camera
 
       const renderer = new THREE.WebGLRenderer({
@@ -318,6 +371,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
       const fidArrowMaterial = new THREE.MeshBasicMaterial({
         color: '#ff5d5d',
+        depthWrite: false,
+        transparent: true,
+        opacity: renderModeRef.current === 'stacked' ? 0.025 : 1,
         toneMapped: false,
       })
       const fidArrowShafts = new THREE.InstancedMesh(
@@ -395,6 +451,46 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const boundary = new THREE.LineLoop(boundaryGeometry, boundaryMaterial)
       scene.add(boundary)
 
+      const stackedSphereMaterial = sphereMaterial.clone()
+      stackedSphereMaterial.color.set('#91a8b5')
+      stackedSphereMaterial.emissive.set('#101a20')
+      stackedSphereMaterial.opacity = 0.18
+      const stackedSphere = new THREE.Mesh(
+        sphereGeometry,
+        stackedSphereMaterial,
+      )
+      const stackedFieldArrowShaft = new THREE.Mesh(
+        arrowShaftGeometry,
+        arrowMaterial,
+      )
+      const stackedFieldArrowHead = new THREE.Mesh(
+        arrowHeadGeometry,
+        arrowMaterial,
+      )
+      const stacked = renderModeRef.current === 'stacked'
+      ensembles.visible = !stacked
+      boundary.visible = !stacked
+      arrowShafts.visible = !stacked
+      arrowHeads.visible = !stacked
+      stackedSphere.visible = stacked
+      stackedFieldArrowShaft.visible = stacked
+      stackedFieldArrowHead.visible = stacked
+      scene.add(
+        stackedSphere,
+        stackedFieldArrowShaft,
+        stackedFieldArrowHead,
+      )
+      modeObjectsRef.current = {
+        boundary,
+        ensembles,
+        fieldArrowHeads: arrowHeads,
+        fieldArrowShafts: arrowShafts,
+        fidArrowMaterial,
+        stackedFieldArrowHead,
+        stackedFieldArrowShaft,
+        stackedSphere,
+      }
+
       const slicePlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0)
       const raycaster = new THREE.Raycaster()
       const pointer = new THREE.Vector2()
@@ -406,6 +502,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       }
 
       const handlePointerUp = (event: PointerEvent) => {
+        if (renderModeRef.current === 'stacked') return
         if (event.button !== 0) return
         const movement = pointerStart.distanceTo(
           new THREE.Vector2(event.clientX, event.clientY),
@@ -527,13 +624,17 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               fidArrowAxis,
               fidArrowDirection,
             )
-            const row = Math.floor(state.index / GRID_SIZE)
-            const column = state.index % GRID_SIZE
-            fidArrowPosition.set(
-              column * GRID_SPACING - GRID_OFFSET,
-              GRID_OFFSET - row * GRID_SPACING,
-              0,
-            )
+            if (renderModeRef.current === 'stacked') {
+              fidArrowPosition.set(0, 0, 0)
+            } else {
+              const row = Math.floor(state.index / GRID_SIZE)
+              const column = state.index % GRID_SIZE
+              fidArrowPosition.set(
+                column * GRID_SPACING - GRID_OFFSET,
+                GRID_OFFSET - row * GRID_SPACING,
+                0,
+              )
+            }
             fidArrowScale.setScalar(magnitude)
             fidArrowMatrix.compose(
               fidArrowPosition,
@@ -583,7 +684,11 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key.toLowerCase() !== 'r') return
         focusTransitionRef.current = null
-        camera.position.copy(CAMERA_POSITION)
+        camera.position.copy(
+          renderModeRef.current === 'stacked'
+            ? STACKED_CAMERA_POSITION
+            : CAMERA_POSITION,
+        )
         camera.up.set(0, 1, 0)
         controls.target.copy(CAMERA_TARGET)
         controls.update()
@@ -604,6 +709,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
         sphereGeometry.dispose()
         sphereMaterial.dispose()
+        stackedSphereMaterial.dispose()
         arrowShaftGeometry.dispose()
         arrowHeadGeometry.dispose()
         arrowMaterial.dispose()
@@ -621,6 +727,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         ensemblesRef.current = null
         fidArrowShaftsRef.current = null
         fidArrowHeadsRef.current = null
+        modeObjectsRef.current = null
         focusTransitionRef.current = null
       }
     }, [])
