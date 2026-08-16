@@ -27,6 +27,7 @@ interface EditableGradientGraphProps {
   label: 'PE' | 'RO'
   linkedPulses?: boolean
   onChange: (pulses: GradientPulse[]) => void
+  onReset: () => void
   pulses: ReadonlyArray<GradientPulse>
 }
 
@@ -41,6 +42,17 @@ const GRAPH = {
 const MINIMUM_PULSE_DURATION = 0.025
 const KEYBOARD_TIME_STEP = 0.01
 const KEYBOARD_AMPLITUDE_STEP = 0.05
+const DEFAULT_PHASE_ENCODING_PULSES: ReadonlyArray<GradientPulse> = [
+  { start: 0.12, end: 0.32, amplitude: 0.52 },
+]
+const DEFAULT_READOUT_PULSES: ReadonlyArray<GradientPulse> = [
+  { start: 0.12, end: 0.32, amplitude: -0.42 },
+  { start: 0.32, end: 0.72, amplitude: 0.52 },
+]
+
+function copyPulses(pulses: ReadonlyArray<GradientPulse>) {
+  return pulses.map((pulse) => ({ ...pulse }))
+}
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
@@ -127,6 +139,7 @@ function EditableGradientGraph({
   label,
   linkedPulses = false,
   onChange,
+  onReset,
   pulses,
 }: EditableGradientGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -240,6 +253,15 @@ function EditableGradientGraph({
           G<sub>{label}</sub>
         </strong>
         <span>{description}</span>
+        <button
+          className="gradient-input-reset"
+          type="button"
+          title={`Reset ${description.toLowerCase()}`}
+          aria-label={`Reset ${description.toLowerCase()}`}
+          onClick={onReset}
+        >
+          Reset
+        </button>
       </header>
 
       <svg
@@ -408,11 +430,10 @@ function EditableGradientGraph({
 function GradientEncodingExperimentPanel() {
   const [phaseEncodingPulses, setPhaseEncodingPulses] = useState<
     GradientPulse[]
-  >([{ start: 0.12, end: 0.32, amplitude: 0.52 }])
-  const [readoutPulses, setReadoutPulses] = useState<GradientPulse[]>([
-    { start: 0.12, end: 0.32, amplitude: -0.42 },
-    { start: 0.32, end: 0.72, amplitude: 0.52 },
-  ])
+  >(() => copyPulses(DEFAULT_PHASE_ENCODING_PULSES))
+  const [readoutPulses, setReadoutPulses] = useState<GradientPulse[]>(() =>
+    copyPulses(DEFAULT_READOUT_PULSES),
+  )
 
   return (
     <section className="gradient-encoding-section">
@@ -434,6 +455,9 @@ function GradientEncodingExperimentPanel() {
           label="PE"
           pulses={phaseEncodingPulses}
           onChange={setPhaseEncodingPulses}
+          onReset={() =>
+            setPhaseEncodingPulses(copyPulses(DEFAULT_PHASE_ENCODING_PULSES))
+          }
         />
         <EditableGradientGraph
           description="Readout gradient"
@@ -441,6 +465,9 @@ function GradientEncodingExperimentPanel() {
           linkedPulses
           pulses={readoutPulses}
           onChange={setReadoutPulses}
+          onReset={() =>
+            setReadoutPulses(copyPulses(DEFAULT_READOUT_PULSES))
+          }
         />
       </div>
     </section>

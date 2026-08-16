@@ -845,11 +845,45 @@ a:focus-visible {
 }
 
 .gradient-input-heading span {
+  min-width: 0;
   color: var(--muted);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 8px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.gradient-input-reset {
+  display: flex;
+  height: 23px;
+  flex: 0 0 auto;
+  gap: 5px;
+  align-items: center;
+  margin: -2px 0 -1px auto;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: border-color 140ms ease, color 140ms ease,
+    background 140ms ease;
+}
+
+.gradient-input-reset::before {
+  content: '↺';
+  color: var(--cyan);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.gradient-input-reset:hover {
+  border-color: rgba(125, 215, 240, 0.5);
+  color: var(--white);
+  background: rgba(125, 215, 240, 0.055);
 }
 
 .gradient-input-ro .gradient-input-heading strong {
@@ -1364,6 +1398,7 @@ a:focus-visible {
   .viewport-mode-select .dark-select-trigger,
   .reference-frame-select .dark-select-trigger,
   .ensemble-details-close,
+  .gradient-input-reset,
   .gradient-handle-stroke {
     transition: none;
   }
