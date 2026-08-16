@@ -1,34 +1,11 @@
 import { useMemo } from 'react'
-import type { FidSimulationStatus } from '../hooks/useFidSimulation'
 import type { FidSignalPoint } from '../simulation/fid'
-import DarkSelect from './DarkSelect'
-
-export type FidTimeStep = '0.25' | '0.5' | '1' | '2' | '5'
-
-const FID_TIME_STEP_OPTIONS: ReadonlyArray<{
-  id: FidTimeStep
-  label: string
-}> = [
-  { id: '0.25', label: '0.25 ms/tick' },
-  { id: '0.5', label: '0.5 ms/tick' },
-  { id: '1', label: '1 ms/tick' },
-  { id: '2', label: '2 ms/tick' },
-  { id: '5', label: '5 ms/tick' },
-]
 
 interface FidExperimentPanelProps {
-  activeEnsembleCount: number
   graphWindowEndMilliseconds: number
   graphWindowStartMilliseconds: number
   signalPoints: ReadonlyArray<FidSignalPoint>
-  status: FidSimulationStatus
-  timeStep: FidTimeStep
-  timeMilliseconds: number
-  onFlip: () => void
-  onPause: () => void
-  onReset: () => void
-  onStart: () => void
-  onTimeStepChange: (timeStep: FidTimeStep) => void
+  timeStepMilliseconds: number
 }
 
 const GRAPH = {
@@ -386,86 +363,13 @@ function T1RelaxationGraph({
 }
 
 function FidExperimentPanel({
-  activeEnsembleCount,
   graphWindowEndMilliseconds,
   graphWindowStartMilliseconds,
   signalPoints,
-  status,
-  timeStep,
-  timeMilliseconds,
-  onFlip,
-  onPause,
-  onReset,
-  onStart,
-  onTimeStepChange,
+  timeStepMilliseconds,
 }: FidExperimentPanelProps) {
   return (
     <>
-      <div className="fid-simulation-controls">
-        <div className="fid-controls">
-          <button
-            className="fid-control-button primary transport"
-            type="button"
-            title={status === 'running' ? 'Pause simulation' : 'Play simulation'}
-            aria-label={
-              status === 'running'
-                ? 'Pause simulation'
-                : status === 'paused'
-                  ? 'Resume simulation'
-                  : 'Start simulation'
-            }
-            disabled={activeEnsembleCount === 0}
-            onClick={status === 'running' ? onPause : onStart}
-          >
-            <span aria-hidden="true">
-              {status === 'running' ? '❚❚' : '▶'}
-            </span>
-          </button>
-          <button
-            className="fid-control-button flip-pulse"
-            type="button"
-            title="Apply a 90° flip pulse"
-            aria-label="Apply a 90 degree flip pulse"
-            disabled={
-              status !== 'running' ||
-              activeEnsembleCount === 0
-            }
-            onClick={onFlip}
-          >
-            ⌁⊥
-          </button>
-          <DarkSelect
-            className="fid-time-step-select"
-            ariaLabel="Simulation milliseconds per tick"
-            value={timeStep}
-            options={FID_TIME_STEP_OPTIONS}
-            onChange={onTimeStepChange}
-          />
-          <button
-            className="fid-control-button"
-            type="button"
-            disabled={status === 'idle'}
-            onClick={onReset}
-          >
-            Reset
-          </button>
-        </div>
-
-        <div className="fid-simulation-meta">
-          <span className={`fid-status ${status}`}>{status}</span>
-          <span>{activeEnsembleCount.toLocaleString()} active ensembles</span>
-          <strong>
-            {timeMilliseconds.toFixed(Number(timeStep) < 1 ? 2 : 0)} ms
-          </strong>
-        </div>
-
-        {activeEnsembleCount === 0 && (
-          <p className="fid-empty-state">
-            Apply a non-air sample preset to the slice before starting the FID.
-          </p>
-        )}
-      </div>
-
       <section className="fid-experiment-section">
         <div className="section-heading">
           <div>
@@ -486,7 +390,7 @@ function FidExperimentPanel({
           The rotating-frame trace is shown directly; the unresolved laboratory
           carrier is shown by its exact ± envelope. Signals are normalized because
           coil sensitivity and geometry are not yet modeled. Simulation sampling
-          interval Δt = {timeStep} ms/tick.
+          interval Δt = {timeStepMilliseconds} ms/tick.
         </p>
       </section>
 

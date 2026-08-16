@@ -13,6 +13,7 @@ import type {
 import {
   fidEnsembleMagnetizationStateAt,
   type FidEnsembleState,
+  type RfPulseEvent,
 } from '../simulation/fid'
 
 export const GRID_SIZE = 128
@@ -56,7 +57,7 @@ interface LabSceneProps {
   ensembleModels: ReadonlyArray<HydrogenEnsemble>
   ensembleRevision: number
   fidEnsembleStates: ReadonlyArray<FidEnsembleState>
-  fidPulseTimesMilliseconds: ReadonlyArray<number>
+  fidPulseEvents: ReadonlyArray<RfPulseEvent>
   fidSimulationActive: boolean
   fidSimulationTimeMilliseconds: number
   selected: EnsembleSelection | null
@@ -81,7 +82,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       ensembleModels,
       ensembleRevision,
       fidEnsembleStates,
-      fidPulseTimesMilliseconds,
+      fidPulseEvents,
       fidSimulationActive,
       fidSimulationTimeMilliseconds,
       selected,
@@ -97,7 +98,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const fidArrowHeadsRef = useRef<THREE.InstancedMesh | null>(null)
     const fidAnimationRef = useRef({
       active: fidSimulationActive,
-      pulseTimesMilliseconds: fidPulseTimesMilliseconds,
+      pulseEvents: fidPulseEvents,
       states: fidEnsembleStates,
       timeMilliseconds: fidSimulationTimeMilliseconds,
     })
@@ -115,14 +116,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     useEffect(() => {
       fidAnimationRef.current = {
         active: fidSimulationActive,
-        pulseTimesMilliseconds: fidPulseTimesMilliseconds,
+        pulseEvents: fidPulseEvents,
         states: fidEnsembleStates,
         timeMilliseconds: fidSimulationTimeMilliseconds,
       }
       fidArrowsDirtyRef.current = true
     }, [
       fidEnsembleStates,
-      fidPulseTimesMilliseconds,
+      fidPulseEvents,
       fidSimulationActive,
       fidSimulationTimeMilliseconds,
     ])
@@ -479,7 +480,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
         const {
           active,
-          pulseTimesMilliseconds,
+          pulseEvents,
           states,
           timeMilliseconds,
         } = fidAnimationRef.current
@@ -496,7 +497,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             const magnetizationState = fidEnsembleMagnetizationStateAt(
               state,
               timeMilliseconds,
-              pulseTimesMilliseconds,
+              pulseEvents,
             )
 
             if (!magnetizationState.excited) {

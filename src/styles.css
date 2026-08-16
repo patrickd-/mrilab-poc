@@ -725,7 +725,8 @@ a:focus-visible {
 }
 
 .fid-experiment-section,
-.t1-relaxation-section {
+.t1-relaxation-section,
+.spin-echo-section {
   padding: 30px;
 }
 
@@ -905,6 +906,14 @@ a:focus-visible {
   color: var(--green);
 }
 
+.fid-graph-legend .spin-echo-signal {
+  color: var(--cyan);
+}
+
+.fid-graph-legend .spin-echo-fit {
+  color: var(--yellow);
+}
+
 .fid-graph {
   display: block;
   width: 100%;
@@ -957,6 +966,89 @@ a:focus-visible {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.spin-echo-graph-shell .fid-graph-readout strong {
+  color: var(--yellow);
+}
+
+.spin-echo-signal-path,
+.spin-echo-peak-path,
+.spin-echo-fit-path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.spin-echo-signal-path {
+  stroke: var(--cyan);
+  stroke-width: 1.5;
+}
+
+.spin-echo-peak-path {
+  stroke: rgba(255, 209, 102, 0.45);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.spin-echo-fit-path {
+  stroke: var(--yellow);
+  stroke-width: 1.8;
+  stroke-dasharray: 5 3;
+}
+
+.spin-echo-events text,
+.tau-label {
+  fill: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.03em;
+}
+
+.rf-pulse-marker,
+.echo-marker,
+.tau-bracket {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.rf-pulse-marker {
+  stroke-width: 1.2;
+}
+
+.rf-pulse-marker.initial {
+  stroke: var(--green);
+}
+
+.rf-pulse-marker.refocusing {
+  stroke: var(--coral);
+}
+
+.echo-marker {
+  stroke: rgba(145, 230, 179, 0.52);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.spin-echo-events .echo-label {
+  fill: var(--green);
+}
+
+.tau-bracket {
+  stroke: rgba(255, 209, 102, 0.62);
+  stroke-width: 0.8;
+}
+
+.spin-echo-events .tau-label {
+  fill: var(--yellow);
+}
+
+.spin-echo-peak-markers circle {
+  fill: #0a0d11;
+  stroke: var(--yellow);
+  stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
 }
 
@@ -1034,7 +1126,8 @@ a:focus-visible {
   .sample-section,
   .fid-simulation-controls,
   .fid-experiment-section,
-  .t1-relaxation-section {
+  .t1-relaxation-section,
+  .spin-echo-section {
     padding-right: 20px;
     padding-left: 20px;
   }

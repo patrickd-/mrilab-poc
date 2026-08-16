@@ -1,4 +1,9 @@
-import type { FidEnsembleState, FidSignalPoint } from './fid'
+import type {
+  FidEnsembleState,
+  FidSignalPoint,
+  RfPulseEvent,
+  RfPulseKind,
+} from './fid'
 
 export type FidSimulationStatus = 'idle' | 'running' | 'paused'
 
@@ -9,16 +14,16 @@ export type FidWorkerRequest =
       millisecondsPerTick: number
     }
   | { type: 'set-time-step'; millisecondsPerTick: number }
-  | { type: 'start' }
+  | { type: 'start'; initialPulseKind: RfPulseKind | null }
   | { type: 'pause' }
-  | { type: 'pulse' }
+  | { type: 'pulse'; pulseKind: RfPulseKind }
   | { type: 'reset' }
 
 export interface FidWorkerSnapshot {
   type: 'snapshot'
   status: FidSimulationStatus
   timeMilliseconds: number
-  pulseTimesMilliseconds: number[]
+  pulseEvents: RfPulseEvent[]
   signalPoints: FidSignalPoint[]
   replaceSignalPoints: boolean
 }

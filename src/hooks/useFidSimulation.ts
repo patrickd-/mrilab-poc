@@ -9,6 +9,8 @@ import {
   FID_GRAPH_INITIAL_RANGE_MILLISECONDS,
   FID_GRAPH_MAXIMUM_WINDOW_MILLISECONDS,
   type FidSignalPoint,
+  type RfPulseEvent,
+  type RfPulseKind,
 } from '../simulation/fid'
 import type {
   FidSimulationStatus,
@@ -37,7 +39,7 @@ function retainSignalWindow(
 interface FidSimulationState {
   status: FidSimulationStatus
   timeMilliseconds: number
-  pulseTimesMilliseconds: number[]
+  pulseEvents: RfPulseEvent[]
   signalPoints: FidSignalPoint[]
 }
 
@@ -47,6 +49,7 @@ interface UseFidSimulationOptions {
   ensembleRevision: number
   fieldStrengthTesla: SupportedFieldStrengthTesla
   fieldUniformity: FieldUniformity
+  initialPulseKind: RfPulseKind | null
   millisecondsPerTick: number
 }
 
@@ -56,6 +59,7 @@ export function useFidSimulation({
   ensembleRevision,
   fieldStrengthTesla,
   fieldUniformity,
+  initialPulseKind,
   millisecondsPerTick,
 }: UseFidSimulationOptions) {
   const ensembleStates = useMemo(
@@ -79,7 +83,7 @@ export function useFidSimulation({
   const [simulation, setSimulation] = useState<FidSimulationState>({
     status: 'idle',
     timeMilliseconds: 0,
-    pulseTimesMilliseconds: [],
+    pulseEvents: [],
     signalPoints: [],
   })
 
@@ -97,7 +101,7 @@ export function useFidSimulation({
       setSimulation((currentSimulation) => ({
         status: snapshot.status,
         timeMilliseconds: snapshot.timeMilliseconds,
-        pulseTimesMilliseconds: snapshot.pulseTimesMilliseconds,
+        pulseEvents: snapshot.pulseEvents,
         signalPoints: retainSignalWindow(
           snapshot.replaceSignalPoints
             ? snapshot.signalPoints
@@ -125,7 +129,7 @@ export function useFidSimulation({
         }
       : { type: 'reset' }
     worker.postMessage(message)
-  }, [active, ensembleStates])
+  }, [active, ensembleStates, initialPulseKind])
 
   useEffect(() => {
     const message: FidWorkerRequest = {
@@ -145,11 +149,11 @@ export function useFidSimulation({
 
   const start = useCallback(() => {
     if (!active) return
-    postToWorker({ type: 'start' })
-  }, [active, postToWorker])
+    postToWorker({ type: 'start', initialPulseKind })
+  }, [active, initialPulseKind, postToWorker])
 
-  const applyFlip = useCallback(() => {
-    postToWorker({ type: 'pulse' })
+  const applyPulse = useCallback((pulseKind: RfPulseKind) => {
+    postToWorker({ type: 'pulse', pulseKind })
   }, [postToWorker])
 
   const pause = useCallback(() => {
@@ -167,9 +171,9 @@ export function useFidSimulation({
   )
 
   return {
-    applyFlip,
+    applyPulse,
     ensembleStates,
-    pulseTimesMilliseconds: simulation.pulseTimesMilliseconds,
+    pulseEvents: simulation.pulseEvents,
     graphWindowEndMilliseconds,
     graphWindowStartMilliseconds,
     reset,

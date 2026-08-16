@@ -1,6 +1,11 @@
 /// <reference lib="webworker" />
 
-import { fidSignalPointAt, type FidEnsembleState, type FidSignalPoint } from '../simulation/fid'
+import {
+  fidSignalPointAt,
+  type FidEnsembleState,
+  type FidSignalPoint,
+  type RfPulseEvent,
+} from '../simulation/fid'
 import type {
   FidSimulationStatus,
   FidWorkerRequest,
@@ -14,7 +19,7 @@ let ensembleStates: FidEnsembleState[] = []
 let millisecondsPerTick = 2
 let status: FidSimulationStatus = 'idle'
 let timeMilliseconds = 0
-let pulseTimesMilliseconds: number[] = []
+let pulseEvents: RfPulseEvent[] = []
 let pendingSignalPoints: FidSignalPoint[] = []
 let loopTimer: ReturnType<typeof setTimeout> | null = null
 let lastSnapshotAt = performance.now()
@@ -23,7 +28,7 @@ function signalPointAt(sampleTimeMilliseconds: number) {
   return fidSignalPointAt(
     ensembleStates,
     sampleTimeMilliseconds,
-    pulseTimesMilliseconds,
+    pulseEvents,
   )
 }
 
@@ -32,7 +37,7 @@ function publishSnapshot(replaceSignalPoints = false) {
     type: 'snapshot',
     status,
     timeMilliseconds,
-    pulseTimesMilliseconds: [...pulseTimesMilliseconds],
+    pulseEvents: [...pulseEvents],
     signalPoints: pendingSignalPoints,
     replaceSignalPoints,
   }
@@ -78,7 +83,7 @@ function resetSimulation() {
   cancelLoop()
   status = 'idle'
   timeMilliseconds = 0
-  pulseTimesMilliseconds = []
+  pulseEvents = []
   pendingSignalPoints = []
   publishSnapshot(true)
 }
@@ -98,7 +103,9 @@ self.onmessage = (event: MessageEvent<FidWorkerRequest>) => {
     case 'start':
       if (status === 'idle') {
         timeMilliseconds = 0
-        pulseTimesMilliseconds = []
+        pulseEvents = message.initialPulseKind
+          ? [{ timeMilliseconds: 0, kind: message.initialPulseKind }]
+          : []
         pendingSignalPoints = [signalPointAt(0)]
       }
       status = 'running'
@@ -113,9 +120,12 @@ self.onmessage = (event: MessageEvent<FidWorkerRequest>) => {
       break
     case 'pulse':
       if (status !== 'running' || ensembleStates.length === 0) break
-      pulseTimesMilliseconds = [
-        ...pulseTimesMilliseconds,
-        timeMilliseconds,
+      pulseEvents = [
+        ...pulseEvents,
+        {
+          timeMilliseconds,
+          kind: message.pulseKind,
+        },
       ]
       pendingSignalPoints.push(signalPointAt(timeMilliseconds))
       publishSnapshot()

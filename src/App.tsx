@@ -5,9 +5,11 @@ import LabScene, {
   type LabSceneHandle,
 } from './components/LabScene'
 import DarkSelect from './components/DarkSelect'
-import FidExperimentPanel, {
-  type FidTimeStep,
-} from './components/FidExperimentPanel'
+import FidExperimentPanel from './components/FidExperimentPanel'
+import SimulationControls, {
+  type SimulationTimeStep,
+} from './components/SimulationControls'
+import SpinEchoExperimentPanel from './components/SpinEchoExperimentPanel'
 import { useFidSimulation } from './hooks/useFidSimulation'
 import {
   createHydrogenEnsembles,
@@ -32,10 +34,11 @@ const B0_TESLA_VALUES: Readonly<
   '3': 3,
   '7': 7,
 }
-type ExperimentId = 'fid'
+type ExperimentId = 'ping' | 'spin-echo'
 
 const EXPERIMENTS: ReadonlyArray<{ id: ExperimentId; label: string }> = [
-  { id: 'fid', label: 'Ping Experiment' },
+  { id: 'ping', label: 'Ping Experiment' },
+  { id: 'spin-echo', label: 'Spin Echo Experiment' },
 ]
 const FIELD_UNIFORMITY_OPTIONS: ReadonlyArray<{
   id: FieldUniformity
@@ -167,7 +170,8 @@ function App() {
   const [selected, setSelected] = useState<EnsembleSelection | null>(null)
   const [ensembleRevision, setEnsembleRevision] = useState(0)
   const [b0Tesla, setB0Tesla] = useState<B0Tesla>('1.5')
-  const [fidTimeStep, setFidTimeStep] = useState<FidTimeStep>('2')
+  const [simulationTimeStep, setSimulationTimeStep] =
+    useState<SimulationTimeStep>('2')
   const [fieldUniformity, setFieldUniformity] =
     useState<FieldUniformity>('uniform')
   const [experimentMenuOpen, setExperimentMenuOpen] = useState(false)
@@ -183,12 +187,13 @@ function App() {
     fieldStrengthTesla,
   )
   const fidSimulation = useFidSimulation({
-    active: selectedExperiment === 'fid',
+    active: selectedExperiment !== null,
     ensembles,
     ensembleRevision,
     fieldStrengthTesla,
     fieldUniformity,
-    millisecondsPerTick: Number(fidTimeStep),
+    initialPulseKind: selectedExperiment === 'spin-echo' ? '90-y' : null,
+    millisecondsPerTick: Number(simulationTimeStep),
   })
 
   useEffect(() => {
@@ -273,9 +278,9 @@ function App() {
           ensembleRevision={ensembleRevision}
           fidEnsembleStates={fidSimulation.ensembleStates}
           fidSimulationActive={
-            selectedExperiment === 'fid' && fidSimulation.status !== 'idle'
+            selectedExperiment !== null && fidSimulation.status !== 'idle'
           }
-          fidPulseTimesMilliseconds={fidSimulation.pulseTimesMilliseconds}
+          fidPulseEvents={fidSimulation.pulseEvents}
           fidSimulationTimeMilliseconds={fidSimulation.timeMilliseconds}
           selected={selected}
           onSelect={selectEnsemble}
@@ -356,9 +361,40 @@ function App() {
         </header>
 
         <div className="panel-content">
-          {selectedExperiment === 'fid' && (
-            <FidExperimentPanel
+          {selectedExperiment && (
+            <SimulationControls
               activeEnsembleCount={fidSimulation.ensembleStates.length}
+              emptyMessage="Apply a non-air sample preset to the slice before starting the experiment."
+              pulseAriaLabel={
+                selectedExperiment === 'spin-echo'
+                  ? 'Apply a 180 degree refocusing pulse'
+                  : 'Apply a 90 degree flip pulse'
+              }
+              pulseSymbol={
+                selectedExperiment === 'spin-echo' ? '∿↔' : '∿⊥'
+              }
+              pulseTitle={
+                selectedExperiment === 'spin-echo'
+                  ? 'Apply a 180° refocusing pulse'
+                  : 'Apply a 90° flip pulse'
+              }
+              status={fidSimulation.status}
+              timeStep={simulationTimeStep}
+              timeMilliseconds={fidSimulation.timeMilliseconds}
+              onPause={fidSimulation.pause}
+              onPulse={() =>
+                fidSimulation.applyPulse(
+                  selectedExperiment === 'spin-echo' ? '180-x' : '90-y',
+                )
+              }
+              onReset={fidSimulation.reset}
+              onStart={fidSimulation.start}
+              onTimeStepChange={setSimulationTimeStep}
+            />
+          )}
+
+          {selectedExperiment === 'ping' && (
+            <FidExperimentPanel
               graphWindowEndMilliseconds={
                 fidSimulation.graphWindowEndMilliseconds
               }
@@ -366,14 +402,22 @@ function App() {
                 fidSimulation.graphWindowStartMilliseconds
               }
               signalPoints={fidSimulation.signalPoints}
-              status={fidSimulation.status}
-              timeStep={fidTimeStep}
+              timeStepMilliseconds={Number(simulationTimeStep)}
+            />
+          )}
+
+          {selectedExperiment === 'spin-echo' && (
+            <SpinEchoExperimentPanel
+              graphWindowEndMilliseconds={
+                fidSimulation.graphWindowEndMilliseconds
+              }
+              graphWindowStartMilliseconds={
+                fidSimulation.graphWindowStartMilliseconds
+              }
+              pulseEvents={fidSimulation.pulseEvents}
+              signalPoints={fidSimulation.signalPoints}
               timeMilliseconds={fidSimulation.timeMilliseconds}
-              onFlip={fidSimulation.applyFlip}
-              onPause={fidSimulation.pause}
-              onReset={fidSimulation.reset}
-              onStart={fidSimulation.start}
-              onTimeStepChange={setFidTimeStep}
+              timeStepMilliseconds={Number(simulationTimeStep)}
             />
           )}
 

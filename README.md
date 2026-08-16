@@ -28,13 +28,20 @@ right-drag to pan, and click a sphere to select its hydrogen ensemble. Press
   loop.
 - `src/models/HydrogenEnsemble.ts` defines each ensemble's intrinsic
   properties and computes field-dependent magnetic properties on demand.
+- `src/simulation/fid.ts` applies exact free evolution and coherent 90°/180°
+  RF rotations to each ensemble's magnetization state.
+- `src/workers/fidSimulation.worker.ts` advances simulated time and samples the
+  aggregate signal away from the rendering thread.
+- `src/components/FidExperimentPanel.tsx` and
+  `src/components/SpinEchoExperimentPanel.tsx` visualize the Ping and Spin Echo
+  experiments.
 - `src/App.tsx` contains the React interface around the canvas.
 - `src/styles.css` contains the responsive visual system.
 
 The grid is rendered as a single `THREE.InstancedMesh` of translucent sphere
 geometry, so all 16,384 ensembles remain practical to navigate while retaining
 true 3D volumes for future internal geometry. The scene lifecycle is isolated
-in `LabScene`, leaving room to add spin state and physics models later.
+in `LabScene`, while the worker owns simulation timing and signal sampling.
 
 The initial non-uniform isocenter approximation uses normalized radial
 position `rho` and a 1 ppm outer variation:

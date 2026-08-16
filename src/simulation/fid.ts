@@ -17,6 +17,13 @@ export interface FidEnsembleState {
   fieldDirection: FieldDirection
 }
 
+export type RfPulseKind = '90-y' | '180-x'
+
+export interface RfPulseEvent {
+  timeMilliseconds: number
+  kind: RfPulseKind
+}
+
 export interface FidEnsembleMagnetizationState {
   excited: boolean
   xFraction: number
@@ -38,7 +45,7 @@ export interface FidSignalPoint {
 export function fidEnsembleMagnetizationStateAt(
   state: FidEnsembleState,
   timeMilliseconds: number,
-  pulseTimesMilliseconds: ReadonlyArray<number>,
+  pulseEvents: ReadonlyArray<RfPulseEvent>,
 ): FidEnsembleMagnetizationState {
   let xFraction = 0
   let yFraction = 0
@@ -81,18 +88,24 @@ export function fidEnsembleMagnetizationStateAt(
             )
   }
 
-  pulseTimesMilliseconds.forEach((pulseTimeMilliseconds) => {
-    if (pulseTimeMilliseconds > timeMilliseconds) return
+  pulseEvents.forEach((pulseEvent) => {
+    if (pulseEvent.timeMilliseconds > timeMilliseconds) return
 
     evolveMagnetization(
-      Math.max(0, pulseTimeMilliseconds - previousTimeMilliseconds),
+      Math.max(0, pulseEvent.timeMilliseconds - previousTimeMilliseconds),
     )
 
-    // An instantaneous +90° rotation about the rotating-frame y-axis.
-    const previousX = xFraction
-    xFraction = zFraction
-    zFraction = -previousX
-    previousTimeMilliseconds = pulseTimeMilliseconds
+    if (pulseEvent.kind === '90-y') {
+      // An instantaneous +90° rotation about the rotating-frame y-axis.
+      const previousX = xFraction
+      xFraction = zFraction
+      zFraction = -previousX
+    } else {
+      // An instantaneous 180° rotation about the rotating-frame x-axis.
+      yFraction = -yFraction
+      zFraction = -zFraction
+    }
+    previousTimeMilliseconds = pulseEvent.timeMilliseconds
     pulseCount += 1
   })
 
@@ -151,7 +164,7 @@ export function createFidEnsembleStates(
 export function normalizedFidSignal(
   states: ReadonlyArray<FidEnsembleState>,
   timeMilliseconds: number,
-  pulseTimesMilliseconds: ReadonlyArray<number>,
+  pulseEvents: ReadonlyArray<RfPulseEvent>,
 ) {
   let initialSignal = 0
   let inPhaseSignal = 0
@@ -163,7 +176,7 @@ export function normalizedFidSignal(
     const magnetizationState = fidEnsembleMagnetizationStateAt(
       state,
       timeMilliseconds,
-      pulseTimesMilliseconds,
+      pulseEvents,
     )
     const { x: fieldX, y: fieldY, z: fieldZ } = state.fieldDirection
     const transverseBasisLength = Math.sqrt(
@@ -213,7 +226,7 @@ export function normalizedFidSignal(
 export function normalizedLongitudinalMagnetization(
   states: ReadonlyArray<FidEnsembleState>,
   timeMilliseconds: number,
-  pulseTimesMilliseconds: ReadonlyArray<number>,
+  pulseEvents: ReadonlyArray<RfPulseEvent>,
 ) {
   let equilibriumMagnetization = 0
   let longitudinalMagnetization = 0
@@ -222,7 +235,7 @@ export function normalizedLongitudinalMagnetization(
     const magnetizationState = fidEnsembleMagnetizationStateAt(
       state,
       timeMilliseconds,
-      pulseTimesMilliseconds,
+      pulseEvents,
     )
     equilibriumMagnetization += state.equilibriumMagnetization
     longitudinalMagnetization +=
@@ -238,12 +251,12 @@ export function normalizedLongitudinalMagnetization(
 export function fidSignalPointAt(
   states: ReadonlyArray<FidEnsembleState>,
   timeMilliseconds: number,
-  pulseTimesMilliseconds: ReadonlyArray<number>,
+  pulseEvents: ReadonlyArray<RfPulseEvent>,
 ): FidSignalPoint {
   const signal = normalizedFidSignal(
     states,
     timeMilliseconds,
-    pulseTimesMilliseconds,
+    pulseEvents,
   )
   return {
     timeMilliseconds,
