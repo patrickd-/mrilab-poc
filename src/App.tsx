@@ -333,7 +333,6 @@ function App() {
               <>
                 <span>{stackedEnsembleCount.toLocaleString()} vectors</span>
                 <small>Spatial positions collapsed</small>
-                <small>Ensemble selection disabled</small>
               </>
             ) : (
               <>
@@ -368,11 +367,7 @@ function App() {
               onChange={changeRenderMode}
             />
           </div>
-          <p>
-            {renderMode === 'stacked'
-              ? 'Drag to orbit · Scroll to zoom · Right-drag to pan · Selection disabled'
-              : 'Drag to orbit · Scroll to zoom · Right-drag to pan'}
-          </p>
+          <p>Drag to orbit · Scroll to zoom · Right-drag to pan</p>
         </div>
       </section>
 
