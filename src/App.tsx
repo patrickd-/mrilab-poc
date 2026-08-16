@@ -192,7 +192,7 @@ function App() {
     useState<FieldUniformity>('uniform')
   const [renderMode, setRenderMode] = useState<RenderMode>('slice')
   const [referenceFrame, setReferenceFrame] =
-    useState<ReferenceFrame>('rotating')
+    useState<ReferenceFrame>('laboratory-slowed')
   const [experimentMenuOpen, setExperimentMenuOpen] = useState(false)
   const [selectedExperiment, setSelectedExperiment] =
     useState<ExperimentId | null>(null)
