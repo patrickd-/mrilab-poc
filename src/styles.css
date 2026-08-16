@@ -801,6 +801,147 @@ a:focus-visible {
   padding: 30px;
 }
 
+.gradient-input-instructions {
+  margin: -5px 0 18px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+
+.gradient-timing-diagram {
+  display: grid;
+  gap: 14px;
+}
+
+.gradient-input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: rgba(7, 9, 12, 0.52);
+}
+
+.gradient-input-heading {
+  display: flex;
+  min-height: 42px;
+  gap: 11px;
+  align-items: baseline;
+  padding: 11px 13px 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.gradient-input-heading strong {
+  color: var(--cyan);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.gradient-input-heading sub {
+  font-size: 0.56em;
+  font-style: normal;
+}
+
+.gradient-input-heading span {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.gradient-input-ro .gradient-input-heading strong {
+  color: var(--pink);
+}
+
+.gradient-input-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: none;
+  user-select: none;
+}
+
+.gradient-input-grid line {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+}
+
+.gradient-zero-axis {
+  stroke: rgba(244, 245, 241, 0.32);
+  stroke-width: 1;
+}
+
+.gradient-time-label {
+  fill: var(--muted);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 11px;
+  font-style: italic;
+}
+
+.gradient-pulse-fill {
+  fill: rgba(125, 215, 240, 0.08);
+  pointer-events: none;
+}
+
+.gradient-input-ro .gradient-pulse-fill {
+  fill: rgba(244, 148, 190, 0.075);
+}
+
+.gradient-waveform {
+  fill: none;
+  stroke: var(--white);
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 1.4;
+  pointer-events: none;
+}
+
+.gradient-handle-stroke {
+  stroke: var(--cyan);
+  stroke-linecap: square;
+  stroke-width: 1.5;
+  opacity: 0.72;
+  pointer-events: none;
+  transition: opacity 120ms ease, stroke 120ms ease,
+    stroke-width 120ms ease;
+}
+
+.gradient-input-ro .gradient-handle-stroke {
+  stroke: var(--pink);
+}
+
+.gradient-handle-hit {
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+}
+
+.gradient-handle-left .gradient-handle-hit,
+.gradient-handle-right .gradient-handle-hit {
+  cursor: ew-resize;
+}
+
+.gradient-handle-top .gradient-handle-hit {
+  cursor: move;
+}
+
+.gradient-handle:hover .gradient-handle-stroke,
+.gradient-handle:has(.gradient-handle-hit.active) .gradient-handle-stroke,
+.gradient-handle:has(.gradient-handle-hit:focus-visible)
+  .gradient-handle-stroke {
+  stroke: var(--white);
+  stroke-width: 2.2;
+  opacity: 1;
+}
+
+.gradient-handle-hit:focus {
+  outline: none;
+}
+
 .fid-experiment-section {
   border-bottom: 1px solid var(--line);
 }
@@ -1222,7 +1363,8 @@ a:focus-visible {
   .viewport-reset,
   .viewport-mode-select .dark-select-trigger,
   .reference-frame-select .dark-select-trigger,
-  .ensemble-details-close {
+  .ensemble-details-close,
+  .gradient-handle-stroke {
     transition: none;
   }
 }

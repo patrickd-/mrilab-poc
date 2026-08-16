@@ -452,69 +452,71 @@ function App() {
         </header>
 
         <div className="panel-content">
-          {!selected && simulationExperimentSelected && (
-            <SimulationControls
-              activeEnsembleCount={fidSimulation.ensembleStates.length}
-              emptyMessage="Apply a non-air sample preset to the slice before starting the experiment."
-              pulseAriaLabel={
-                selectedExperiment === 'spin-echo'
-                  ? 'Apply a 180 degree refocusing pulse'
-                  : 'Apply a 90 degree flip pulse'
-              }
-              pulseSymbol={
-                selectedExperiment === 'spin-echo' ? '∿↔' : '∿⊥'
-              }
-              pulseTitle={
-                selectedExperiment === 'spin-echo'
-                  ? 'Apply a 180° refocusing pulse'
-                  : 'Apply a 90° flip pulse'
-              }
-              status={fidSimulation.status}
-              timeStep={simulationTimeStep}
-              timeMilliseconds={fidSimulation.timeMilliseconds}
-              onPause={fidSimulation.pause}
-              onPulse={() =>
-                fidSimulation.applyPulse(
-                  selectedExperiment === 'spin-echo' ? '180-x' : '90-y',
-                )
-              }
-              onReset={fidSimulation.reset}
-              onStart={fidSimulation.start}
-              onTimeStepChange={setSimulationTimeStep}
-            />
-          )}
+          <div className="active-experiment-view" hidden={selected !== null}>
+            {simulationExperimentSelected && (
+              <SimulationControls
+                activeEnsembleCount={fidSimulation.ensembleStates.length}
+                emptyMessage="Apply a non-air sample preset to the slice before starting the experiment."
+                pulseAriaLabel={
+                  selectedExperiment === 'spin-echo'
+                    ? 'Apply a 180 degree refocusing pulse'
+                    : 'Apply a 90 degree flip pulse'
+                }
+                pulseSymbol={
+                  selectedExperiment === 'spin-echo' ? '∿↔' : '∿⊥'
+                }
+                pulseTitle={
+                  selectedExperiment === 'spin-echo'
+                    ? 'Apply a 180° refocusing pulse'
+                    : 'Apply a 90° flip pulse'
+                }
+                status={fidSimulation.status}
+                timeStep={simulationTimeStep}
+                timeMilliseconds={fidSimulation.timeMilliseconds}
+                onPause={fidSimulation.pause}
+                onPulse={() =>
+                  fidSimulation.applyPulse(
+                    selectedExperiment === 'spin-echo' ? '180-x' : '90-y',
+                  )
+                }
+                onReset={fidSimulation.reset}
+                onStart={fidSimulation.start}
+                onTimeStepChange={setSimulationTimeStep}
+              />
+            )}
 
-          {!selected && selectedExperiment === 'ping' && (
-            <FidExperimentPanel
-              graphWindowEndMilliseconds={
-                fidSimulation.graphWindowEndMilliseconds
-              }
-              graphWindowStartMilliseconds={
-                fidSimulation.graphWindowStartMilliseconds
-              }
-              signalPoints={fidSimulation.signalPoints}
-              timeStepMilliseconds={Number(simulationTimeStep)}
-            />
-          )}
+            {selectedExperiment === 'ping' && (
+              <FidExperimentPanel
+                graphWindowEndMilliseconds={
+                  fidSimulation.graphWindowEndMilliseconds
+                }
+                graphWindowStartMilliseconds={
+                  fidSimulation.graphWindowStartMilliseconds
+                }
+                signalPoints={fidSimulation.signalPoints}
+                timeStepMilliseconds={Number(simulationTimeStep)}
+              />
+            )}
 
-          {!selected && selectedExperiment === 'spin-echo' && (
-            <SpinEchoExperimentPanel
-              graphWindowEndMilliseconds={
-                fidSimulation.graphWindowEndMilliseconds
-              }
-              graphWindowStartMilliseconds={
-                fidSimulation.graphWindowStartMilliseconds
-              }
-              pulseEvents={fidSimulation.pulseEvents}
-              signalPoints={fidSimulation.signalPoints}
-              timeMilliseconds={fidSimulation.timeMilliseconds}
-              timeStepMilliseconds={Number(simulationTimeStep)}
-            />
-          )}
+            {selectedExperiment === 'spin-echo' && (
+              <SpinEchoExperimentPanel
+                graphWindowEndMilliseconds={
+                  fidSimulation.graphWindowEndMilliseconds
+                }
+                graphWindowStartMilliseconds={
+                  fidSimulation.graphWindowStartMilliseconds
+                }
+                pulseEvents={fidSimulation.pulseEvents}
+                signalPoints={fidSimulation.signalPoints}
+                timeMilliseconds={fidSimulation.timeMilliseconds}
+                timeStepMilliseconds={Number(simulationTimeStep)}
+              />
+            )}
 
-          {!selected && selectedExperiment === 'gradient-encoding' && (
-            <GradientEncodingExperimentPanel />
-          )}
+            {selectedExperiment === 'gradient-encoding' && (
+              <GradientEncodingExperimentPanel />
+            )}
+          </div>
 
           {selected &&
             selectedEnsemble &&
