@@ -4,12 +4,12 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-
-interface GradientPulse {
-  start: number
-  end: number
-  amplitude: number
-}
+import type {
+  GradientPlaybackSpeed,
+  GradientPlaybackStatus,
+} from '../hooks/useGradientEncodingPlayback'
+import type { GradientPulse } from '../simulation/gradientEncoding'
+import DarkSelect from './DarkSelect'
 
 type PulseHandle = 'left' | 'right' | 'top'
 
@@ -30,7 +30,25 @@ interface EditableGradientGraphProps {
   onChange: (pulses: GradientPulse[]) => void
   onGuideTimeChange: (time: number | null) => void
   onReset: () => void
+  playheadTime: number | null
   pulses: ReadonlyArray<GradientPulse>
+}
+
+interface GradientEncodingExperimentPanelProps {
+  durationMilliseconds: number
+  onPause: () => void
+  onPhaseEncodingPulsesChange: (pulses: GradientPulse[]) => void
+  onPhaseEncodingReset: () => void
+  onReadoutPulsesChange: (pulses: GradientPulse[]) => void
+  onReadoutReset: () => void
+  onSimulationReset: () => void
+  onSpeedChange: (speed: GradientPlaybackSpeed) => void
+  onStart: () => void
+  phaseEncodingPulses: ReadonlyArray<GradientPulse>
+  readoutPulses: ReadonlyArray<GradientPulse>
+  speed: GradientPlaybackSpeed
+  status: GradientPlaybackStatus
+  timeMilliseconds: number
 }
 
 const GRAPH = {
@@ -44,17 +62,16 @@ const GRAPH = {
 const MINIMUM_PULSE_DURATION = 0.025
 const KEYBOARD_TIME_STEP = 0.01
 const KEYBOARD_AMPLITUDE_STEP = 0.05
-const DEFAULT_PHASE_ENCODING_PULSES: ReadonlyArray<GradientPulse> = [
-  { start: 0.12, end: 0.32, amplitude: 0.52 },
+const GRADIENT_PLAYBACK_SPEED_OPTIONS: ReadonlyArray<{
+  id: GradientPlaybackSpeed
+  label: string
+}> = [
+  { id: '0.25', label: '0.25×' },
+  { id: '0.5', label: '0.5×' },
+  { id: '1', label: '1×' },
+  { id: '2', label: '2×' },
+  { id: '4', label: '4×' },
 ]
-const DEFAULT_READOUT_PULSES: ReadonlyArray<GradientPulse> = [
-  { start: 0.12, end: 0.32, amplitude: -0.42 },
-  { start: 0.32, end: 0.72, amplitude: 0.52 },
-]
-
-function copyPulses(pulses: ReadonlyArray<GradientPulse>) {
-  return pulses.map((pulse) => ({ ...pulse }))
-}
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
@@ -144,6 +161,7 @@ function EditableGradientGraph({
   onChange,
   onGuideTimeChange,
   onReset,
+  playheadTime,
   pulses,
 }: EditableGradientGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -341,6 +359,16 @@ function EditableGradientGraph({
             aria-hidden="true"
           />
         )}
+        {playheadTime !== null && (
+          <line
+            className="gradient-playhead"
+            x1={timeToX(playheadTime)}
+            y1={GRAPH.top}
+            x2={timeToX(playheadTime)}
+            y2={GRAPH.top + plotHeight}
+            aria-hidden="true"
+          />
+        )}
         <text
           className="gradient-time-label"
           x={GRAPH.left + plotWidth + 2}
@@ -465,14 +493,27 @@ function EditableGradientGraph({
   )
 }
 
-function GradientEncodingExperimentPanel() {
+function GradientEncodingExperimentPanel({
+  durationMilliseconds,
+  onPause,
+  onPhaseEncodingPulsesChange,
+  onPhaseEncodingReset,
+  onReadoutPulsesChange,
+  onReadoutReset,
+  onSimulationReset,
+  onSpeedChange,
+  onStart,
+  phaseEncodingPulses,
+  readoutPulses,
+  speed,
+  status,
+  timeMilliseconds,
+}: GradientEncodingExperimentPanelProps) {
   const [timingGuideTime, setTimingGuideTime] = useState<number | null>(null)
-  const [phaseEncodingPulses, setPhaseEncodingPulses] = useState<
-    GradientPulse[]
-  >(() => copyPulses(DEFAULT_PHASE_ENCODING_PULSES))
-  const [readoutPulses, setReadoutPulses] = useState<GradientPulse[]>(() =>
-    copyPulses(DEFAULT_READOUT_PULSES),
-  )
+  const playheadTime =
+    status === 'idle'
+      ? null
+      : clamp(timeMilliseconds / durationMilliseconds, 0, 1)
 
   return (
     <section className="gradient-encoding-section">
@@ -485,7 +526,7 @@ function GradientEncodingExperimentPanel() {
 
       <p className="gradient-input-instructions">
         Drag a pulse top to move it or change amplitude. Drag either side to
-        adjust timing.
+        adjust timing. The 20 ms window maps full scale to ±1 mT/m.
       </p>
 
       <div className="gradient-timing-diagram">
@@ -494,11 +535,10 @@ function GradientEncodingExperimentPanel() {
           guideTime={timingGuideTime}
           label="PE"
           pulses={phaseEncodingPulses}
-          onChange={setPhaseEncodingPulses}
+          playheadTime={playheadTime}
+          onChange={onPhaseEncodingPulsesChange}
           onGuideTimeChange={setTimingGuideTime}
-          onReset={() =>
-            setPhaseEncodingPulses(copyPulses(DEFAULT_PHASE_ENCODING_PULSES))
-          }
+          onReset={onPhaseEncodingReset}
         />
         <EditableGradientGraph
           description="Readout gradient"
@@ -506,12 +546,58 @@ function GradientEncodingExperimentPanel() {
           label="RO"
           linkedPulses
           pulses={readoutPulses}
-          onChange={setReadoutPulses}
+          playheadTime={playheadTime}
+          onChange={onReadoutPulsesChange}
           onGuideTimeChange={setTimingGuideTime}
-          onReset={() =>
-            setReadoutPulses(copyPulses(DEFAULT_READOUT_PULSES))
-          }
+          onReset={onReadoutReset}
         />
+      </div>
+
+      <div className="gradient-playback-controls">
+        <div className="gradient-playback-actions">
+          <button
+            className="fid-control-button primary transport"
+            type="button"
+            title={status === 'running' ? 'Pause sequence' : 'Play sequence'}
+            aria-label={
+              status === 'running'
+                ? 'Pause gradient sequence'
+                : status === 'paused'
+                  ? 'Resume gradient sequence'
+                  : status === 'complete'
+                    ? 'Replay gradient sequence'
+                    : 'Play gradient sequence'
+            }
+            onClick={status === 'running' ? onPause : onStart}
+          >
+            <span aria-hidden="true">
+              {status === 'running' ? '❚❚' : '▶'}
+            </span>
+          </button>
+          <DarkSelect
+            className="gradient-playback-speed-select"
+            ariaLabel="Gradient sequence playback speed"
+            value={speed}
+            options={GRADIENT_PLAYBACK_SPEED_OPTIONS}
+            onChange={onSpeedChange}
+          />
+          <button
+            className="fid-control-button"
+            type="button"
+            disabled={status === 'idle'}
+            onClick={onSimulationReset}
+          >
+            Reset
+          </button>
+        </div>
+
+        <div className="gradient-playback-meta">
+          <span className={`fid-status ${status}`}>{status}</span>
+          <span>G<sub>PE</sub> ⟂ G<sub>RO</sub></span>
+          <strong>
+            {timeMilliseconds.toFixed(2)} / {durationMilliseconds} ms
+          </strong>
+        </div>
       </div>
     </section>
   )

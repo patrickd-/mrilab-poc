@@ -10,6 +10,9 @@ export const FID_GRAPH_MAXIMUM_WINDOW_MILLISECONDS = 5000
 
 export interface FidEnsembleState {
   index: number
+  column: number
+  row: number
+  gridSize: number
   equilibriumMagnetization: number
   longitudinalRelaxationTimeMilliseconds: number
   transverseRelaxationTimeMilliseconds: number
@@ -150,6 +153,9 @@ export function createFidEnsembleStates(
 
     states.push({
       index: ensemble.index,
+      column: ensemble.column,
+      row: ensemble.row,
+      gridSize: ensemble.gridSize,
       equilibriumMagnetization: magneticProperties.boltzmannMagnetization,
       longitudinalRelaxationTimeMilliseconds:
         sampleProperties.longitudinalRelaxationTimeMilliseconds,

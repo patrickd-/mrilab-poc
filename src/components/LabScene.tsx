@@ -16,6 +16,10 @@ import {
   type FidEnsembleState,
   type RfPulseEvent,
 } from '../simulation/fid'
+import {
+  gradientEnsembleMagnetizationStateAt,
+  type GradientPulse,
+} from '../simulation/gradientEncoding'
 
 export const GRID_SIZE = 128
 const GRID_SPACING = 0.42
@@ -81,6 +85,11 @@ interface LabSceneProps {
   fidPulseEvents: ReadonlyArray<RfPulseEvent>
   fidSimulationActive: boolean
   fidSimulationTimeMilliseconds: number
+  gradientEncodingActive: boolean
+  gradientEncodingEnsembleStates: ReadonlyArray<FidEnsembleState>
+  gradientEncodingTimeMilliseconds: number
+  gradientPhaseEncodingPulses: ReadonlyArray<GradientPulse>
+  gradientReadoutPulses: ReadonlyArray<GradientPulse>
   referenceFrame: ReferenceFrame
   renderMode: RenderMode
   selected: EnsembleSelection | null
@@ -108,6 +117,11 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       fidPulseEvents,
       fidSimulationActive,
       fidSimulationTimeMilliseconds,
+      gradientEncodingActive,
+      gradientEncodingEnsembleStates,
+      gradientEncodingTimeMilliseconds,
+      gradientPhaseEncodingPulses,
+      gradientReadoutPulses,
       referenceFrame,
       renderMode,
       selected,
@@ -142,6 +156,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       pulseEvents: fidPulseEvents,
       states: fidEnsembleStates,
       timeMilliseconds: fidSimulationTimeMilliseconds,
+    })
+    const gradientAnimationRef = useRef({
+      active: gradientEncodingActive,
+      phaseEncodingPulses: gradientPhaseEncodingPulses,
+      readoutPulses: gradientReadoutPulses,
+      states: gradientEncodingEnsembleStates,
+      timeMilliseconds: gradientEncodingTimeMilliseconds,
     })
     const fidArrowsDirtyRef = useRef(true)
     const renderedFidStatesRef = useRef<ReadonlyArray<FidEnsembleState>>([])
@@ -223,6 +244,23 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       fidPulseEvents,
       fidSimulationActive,
       fidSimulationTimeMilliseconds,
+    ])
+
+    useEffect(() => {
+      gradientAnimationRef.current = {
+        active: gradientEncodingActive,
+        phaseEncodingPulses: gradientPhaseEncodingPulses,
+        readoutPulses: gradientReadoutPulses,
+        states: gradientEncodingEnsembleStates,
+        timeMilliseconds: gradientEncodingTimeMilliseconds,
+      }
+      fidArrowsDirtyRef.current = true
+    }, [
+      gradientEncodingActive,
+      gradientEncodingEnsembleStates,
+      gradientEncodingTimeMilliseconds,
+      gradientPhaseEncodingPulses,
+      gradientReadoutPulses,
     ])
 
     useEffect(() => {
@@ -755,12 +793,16 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         if (!fidArrowsDirtyRef.current) return
         fidArrowsDirtyRef.current = false
 
-        const {
-          active,
-          pulseEvents,
-          states,
-          timeMilliseconds,
-        } = fidAnimationRef.current
+        const fidAnimation = fidAnimationRef.current
+        const gradientAnimation = gradientAnimationRef.current
+        const renderingGradientEncoding = gradientAnimation.active
+        const active = renderingGradientEncoding || fidAnimation.active
+        const states = renderingGradientEncoding
+          ? gradientAnimation.states
+          : fidAnimation.states
+        const timeMilliseconds = renderingGradientEncoding
+          ? gradientAnimation.timeMilliseconds
+          : fidAnimation.timeMilliseconds
 
         if (!active || states !== renderedFidStatesRef.current) {
           renderedFidStatesRef.current.forEach((state) => {
@@ -772,11 +814,18 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
         if (active) {
           states.forEach((state) => {
-            const magnetizationState = fidEnsembleMagnetizationStateAt(
-              state,
-              timeMilliseconds,
-              pulseEvents,
-            )
+            const magnetizationState = renderingGradientEncoding
+              ? gradientEnsembleMagnetizationStateAt(
+                  state,
+                  timeMilliseconds,
+                  gradientAnimation.phaseEncodingPulses,
+                  gradientAnimation.readoutPulses,
+                )
+              : fidEnsembleMagnetizationStateAt(
+                  state,
+                  timeMilliseconds,
+                  fidAnimation.pulseEvents,
+                )
 
             if (!magnetizationState.excited) {
               hideFidArrow(state.index)

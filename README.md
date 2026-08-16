@@ -32,6 +32,9 @@ right-drag to pan, and click a sphere to select its hydrogen ensemble. Press
   RF rotations to each ensemble's magnetization state.
 - `src/workers/fidSimulation.worker.ts` advances simulated time and samples the
   aggregate signal away from the rendering thread.
+- `src/simulation/gradientEncoding.ts` applies orthogonal phase-encoding and
+  readout gradient areas to each ensemble's transverse phase; its sequence is
+  paced for inspection by `src/hooks/useGradientEncodingPlayback.ts`.
 - `src/components/FidExperimentPanel.tsx`,
   `src/components/SpinEchoExperimentPanel.tsx`, and
   `src/components/GradientEncodingExperimentPanel.tsx` contain the experiment

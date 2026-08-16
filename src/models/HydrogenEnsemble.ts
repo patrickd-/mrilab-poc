@@ -11,7 +11,7 @@ export const NON_UNIFORM_FIELD_MODEL = Object.freeze({
   angularExponent: 2,
 })
 
-const PROTON_GYROMAGNETIC_RATIO = 2.675_221_870_8e8
+export const PROTON_GYROMAGNETIC_RATIO = 2.675_221_870_8e8
 
 export type FieldUniformity = 'uniform' | 'non-uniform'
 export type SupportedFieldStrengthTesla = 1.5 | 3 | 7

@@ -917,6 +917,13 @@ a:focus-visible {
   pointer-events: none;
 }
 
+.gradient-playhead {
+  stroke: #ff5d5d;
+  stroke-width: 1.7;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
 .gradient-time-label {
   fill: var(--muted);
   font-family: Georgia, "Times New Roman", serif;
@@ -982,6 +989,51 @@ a:focus-visible {
 
 .gradient-handle-hit:focus {
   outline: none;
+}
+
+.gradient-playback-controls {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.gradient-playback-actions {
+  display: grid;
+  grid-template-columns: auto minmax(96px, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.gradient-playback-speed-select .dark-select-trigger {
+  height: 34px;
+}
+
+.gradient-playback-speed-select .dark-select-options {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.gradient-playback-meta {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 9px;
+  align-items: center;
+  margin-top: 14px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gradient-playback-meta strong {
+  color: var(--cyan);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.gradient-playback-meta sub {
+  font-size: 0.7em;
 }
 
 .fid-experiment-section {
@@ -1091,6 +1143,11 @@ a:focus-visible {
 .fid-status.paused {
   border-color: rgba(255, 209, 102, 0.32);
   color: var(--yellow);
+}
+
+.fid-status.complete {
+  border-color: rgba(125, 215, 240, 0.32);
+  color: var(--cyan);
 }
 
 .fid-empty-state {

@@ -14,6 +14,7 @@ import SimulationControls, {
 } from './components/SimulationControls'
 import SpinEchoExperimentPanel from './components/SpinEchoExperimentPanel'
 import { useFidSimulation } from './hooks/useFidSimulation'
+import { useGradientEncodingPlayback } from './hooks/useGradientEncodingPlayback'
 import {
   createHydrogenEnsembles,
   type FieldUniformity,
@@ -22,6 +23,14 @@ import {
   type SamplePresetId,
   type SupportedFieldStrengthTesla,
 } from './models/HydrogenEnsemble'
+import { createFidEnsembleStates } from './simulation/fid'
+import {
+  copyGradientPulses,
+  DEFAULT_PHASE_ENCODING_PULSES,
+  DEFAULT_READOUT_PULSES,
+  GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  type GradientPulse,
+} from './simulation/gradientEncoding'
 
 type B0Tesla = '1.5' | '3' | '7'
 
@@ -198,6 +207,12 @@ function App() {
   const [experimentMenuOpen, setExperimentMenuOpen] = useState(false)
   const [selectedExperiment, setSelectedExperiment] =
     useState<ExperimentId | null>(null)
+  const [phaseEncodingPulses, setPhaseEncodingPulses] = useState<
+    GradientPulse[]
+  >(() => copyGradientPulses(DEFAULT_PHASE_ENCODING_PULSES))
+  const [readoutPulses, setReadoutPulses] = useState<GradientPulse[]>(() =>
+    copyGradientPulses(DEFAULT_READOUT_PULSES),
+  )
   const selectedEnsemble = selected ? ensembles[selected.index] : null
   const fieldStrengthTesla = B0_TESLA_VALUES[b0Tesla]
   const magneticProperties = selectedEnsemble?.magneticProperties(
@@ -218,6 +233,25 @@ function App() {
   )
   const simulationExperimentSelected =
     selectedExperiment === 'ping' || selectedExperiment === 'spin-echo'
+  const gradientExperimentSelected =
+    selectedExperiment === 'gradient-encoding'
+  const gradientEnsembleStates = useMemo(
+    () =>
+      gradientExperimentSelected
+        ? createFidEnsembleStates(
+            ensembles,
+            fieldStrengthTesla,
+            fieldUniformity,
+          )
+        : [],
+    [
+      ensembleRevision,
+      ensembles,
+      fieldStrengthTesla,
+      fieldUniformity,
+      gradientExperimentSelected,
+    ],
+  )
   const fidSimulation = useFidSimulation({
     active: simulationExperimentSelected,
     ensembles,
@@ -226,6 +260,10 @@ function App() {
     fieldUniformity,
     initialPulseKind: selectedExperiment === 'spin-echo' ? '90-y' : null,
     millisecondsPerTick: Number(simulationTimeStep),
+  })
+  const gradientPlayback = useGradientEncodingPlayback({
+    active: gradientExperimentSelected,
+    durationMilliseconds: GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
   })
 
   useEffect(() => {
@@ -338,6 +376,15 @@ function App() {
           }
           fidPulseEvents={fidSimulation.pulseEvents}
           fidSimulationTimeMilliseconds={fidSimulation.timeMilliseconds}
+          gradientEncodingActive={
+            gradientExperimentSelected && gradientPlayback.status !== 'idle'
+          }
+          gradientEncodingEnsembleStates={gradientEnsembleStates}
+          gradientEncodingTimeMilliseconds={
+            gradientPlayback.timeMilliseconds
+          }
+          gradientPhaseEncodingPulses={phaseEncodingPulses}
+          gradientReadoutPulses={readoutPulses}
           referenceFrame={referenceFrame}
           renderMode={renderMode}
           selected={selected}
@@ -514,7 +561,32 @@ function App() {
             )}
 
             {selectedExperiment === 'gradient-encoding' && (
-              <GradientEncodingExperimentPanel />
+              <GradientEncodingExperimentPanel
+                durationMilliseconds={
+                  GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+                }
+                phaseEncodingPulses={phaseEncodingPulses}
+                readoutPulses={readoutPulses}
+                speed={gradientPlayback.speed}
+                status={gradientPlayback.status}
+                timeMilliseconds={gradientPlayback.timeMilliseconds}
+                onPause={gradientPlayback.pause}
+                onPhaseEncodingPulsesChange={setPhaseEncodingPulses}
+                onPhaseEncodingReset={() =>
+                  setPhaseEncodingPulses(
+                    copyGradientPulses(DEFAULT_PHASE_ENCODING_PULSES),
+                  )
+                }
+                onReadoutPulsesChange={setReadoutPulses}
+                onReadoutReset={() =>
+                  setReadoutPulses(
+                    copyGradientPulses(DEFAULT_READOUT_PULSES),
+                  )
+                }
+                onSimulationReset={gradientPlayback.reset}
+                onSpeedChange={gradientPlayback.setSpeed}
+                onStart={gradientPlayback.start}
+              />
             )}
           </div>
 
