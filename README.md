@@ -54,4 +54,6 @@ position `rho` and a 1 ppm outer variation:
 
 Derived ensemble properties use the shared profile implementation in
 `HydrogenEnsemble.ts`; rendered arrows intentionally remain parallel because
-the modeled angular deviation is not visually resolvable.
+the modeled angular deviation is not visually resolvable. Magnetization-arrow
+hue encodes normalized field-strength variation, while brightness encodes the
+normalized off-parallel angle.

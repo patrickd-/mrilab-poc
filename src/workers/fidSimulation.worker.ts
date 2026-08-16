@@ -119,7 +119,7 @@ self.onmessage = (event: MessageEvent<FidWorkerRequest>) => {
       publishSnapshot()
       break
     case 'pulse':
-      if (status !== 'running' || ensembleStates.length === 0) break
+      if (status === 'idle' || ensembleStates.length === 0) break
       pulseEvents = [
         ...pulseEvents,
         {

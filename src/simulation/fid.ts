@@ -14,6 +14,9 @@ export interface FidEnsembleState {
   longitudinalRelaxationTimeMilliseconds: number
   transverseRelaxationTimeMilliseconds: number
   angularFrequencyOffsetRadiansPerMillisecond: number
+  fieldVariationTesla: number
+  fieldVariationPpm: number
+  fieldTiltAngleRadians: number
   fieldDirection: FieldDirection
 }
 
@@ -154,6 +157,9 @@ export function createFidEnsembleStates(
         sampleProperties.transverseRelaxationTimeMilliseconds,
       angularFrequencyOffsetRadiansPerMillisecond:
         magneticProperties.larmorAngularFrequencyVariation / 1000,
+      fieldVariationTesla: magneticProperties.fieldVariationTesla,
+      fieldVariationPpm: magneticProperties.fieldVariationPpm,
+      fieldTiltAngleRadians: magneticProperties.tiltAngleRadians,
       fieldDirection: magneticProperties.direction,
     })
   })

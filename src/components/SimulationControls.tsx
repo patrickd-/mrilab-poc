@@ -71,7 +71,7 @@ function SimulationControls({
           type="button"
           title={pulseTitle}
           aria-label={pulseAriaLabel}
-          disabled={status !== 'running' || activeEnsembleCount === 0}
+          disabled={status === 'idle' || activeEnsembleCount === 0}
           onClick={onPulse}
         >
           {pulseSymbol}

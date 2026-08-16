@@ -10,6 +10,7 @@ import type {
   HydrogenEnsemble,
   SamplePresetId,
 } from '../models/HydrogenEnsemble'
+import { NON_UNIFORM_FIELD_MODEL } from '../models/HydrogenEnsemble'
 import {
   fidEnsembleMagnetizationStateAt,
   type FidEnsembleState,
@@ -35,6 +36,8 @@ const CAMERA_TARGET = new THREE.Vector3(0, 0, 0)
 const STACKED_CAMERA_POSITION = new THREE.Vector3(0.68, 0.52, 1.08)
 const STACKED_ARROW_WIDTH_SCALE = 0.24
 const STACKED_ARROW_LENGTH_SCALE = 0.82
+const B1_PULSE_VISIBILITY_MILLISECONDS = 700
+const B1_SLICE_AXIS_SCREEN_SCALE = 0.45
 const FOCUS_DURATION = 650
 const VISUAL_PRECESSION_RADIANS_PER_MILLISECOND = (2 * Math.PI) / 180
 
@@ -43,6 +46,11 @@ interface FocusTransition {
   toCamera: THREE.Vector3
   fromTarget: THREE.Vector3
   toTarget: THREE.Vector3
+  startedAt: number
+}
+
+interface B1PulseVisualization {
+  pulseEvent: RfPulseEvent
   startedAt: number
 }
 
@@ -106,6 +114,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const renderModeRef = useRef(renderMode)
     const modeObjectsRef = useRef<{
       boundary: THREE.LineLoop
+      b1PulseAxis: THREE.Group
       ensembles: THREE.InstancedMesh
       fieldArrowHeads: THREE.InstancedMesh
       fieldArrowShafts: THREE.InstancedMesh
@@ -125,6 +134,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const previousSelectionRef = useRef<number | null>(selected?.index ?? null)
     const selectedIndexRef = useRef<number | null>(selected?.index ?? null)
     const focusTransitionRef = useRef<FocusTransition | null>(null)
+    const b1PulseVisualizationRef =
+      useRef<B1PulseVisualization | null>(null)
+    const observedPulseCountRef = useRef(fidPulseEvents.length)
     const onSelectRef = useRef(onSelect)
 
     useEffect(() => {
@@ -161,6 +173,20 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     }, [renderMode])
 
     useEffect(() => {
+      const previousPulseCount = observedPulseCountRef.current
+      observedPulseCountRef.current = fidPulseEvents.length
+
+      if (fidPulseEvents.length === 0) {
+        b1PulseVisualizationRef.current = null
+        const b1PulseAxis = modeObjectsRef.current?.b1PulseAxis
+        if (b1PulseAxis) b1PulseAxis.visible = false
+      } else if (fidPulseEvents.length > previousPulseCount) {
+        b1PulseVisualizationRef.current = {
+          pulseEvent: fidPulseEvents[fidPulseEvents.length - 1],
+          startedAt: performance.now(),
+        }
+      }
+
       fidAnimationRef.current = {
         active: fidSimulationActive,
         pulseEvents: fidPulseEvents,
@@ -372,7 +398,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       fidArrowHeadGeometry.translate(0, 0, 0.15)
 
       const fidArrowMaterial = new THREE.MeshBasicMaterial({
-        color: '#ff5d5d',
+        color: '#ffffff',
         depthWrite: false,
         transparent: true,
         opacity: renderModeRef.current === 'stacked' ? 0.025 : 1,
@@ -392,6 +418,49 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       fidArrowHeads.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
       fidArrowShafts.frustumCulled = false
       fidArrowHeads.frustumCulled = false
+
+      const b1AxisShaftGeometry = new THREE.CylinderGeometry(
+        0.006,
+        0.006,
+        SPHERE_RADIUS * 1.55,
+        8,
+      )
+      b1AxisShaftGeometry.rotateX(Math.PI / 2)
+      const b1AxisTipGeometry = new THREE.SphereGeometry(0.013, 10, 6)
+      const b1AxisMaterial = new THREE.MeshBasicMaterial({
+        color: '#ff7866',
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0.92,
+        toneMapped: false,
+      })
+      const b1PulseAxis = new THREE.Group()
+      const b1AxisShaft = new THREE.Mesh(
+        b1AxisShaftGeometry,
+        b1AxisMaterial,
+      )
+      const b1AxisNegativeTip = new THREE.Mesh(
+        b1AxisTipGeometry,
+        b1AxisMaterial,
+      )
+      const b1AxisPositiveTip = new THREE.Mesh(
+        b1AxisTipGeometry,
+        b1AxisMaterial,
+      )
+      b1AxisNegativeTip.position.z = -SPHERE_RADIUS * 0.86
+      b1AxisPositiveTip.position.z = SPHERE_RADIUS * 0.86
+      b1AxisShaft.renderOrder = 20
+      b1AxisNegativeTip.renderOrder = 20
+      b1AxisPositiveTip.renderOrder = 20
+      b1PulseAxis.add(
+        b1AxisShaft,
+        b1AxisNegativeTip,
+        b1AxisPositiveTip,
+      )
+      b1PulseAxis.visible = false
+      scene.add(b1PulseAxis)
+
       const instanceMatrix = new THREE.Matrix4()
       const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0)
       let instanceIndex = 0
@@ -484,6 +553,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       )
       modeObjectsRef.current = {
         boundary,
+        b1PulseAxis,
         ensembles,
         fieldArrowHeads: arrowHeads,
         fieldArrowShafts: arrowShafts,
@@ -567,10 +637,48 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const fidArrowScale = new THREE.Vector3()
       const fidArrowQuaternion = new THREE.Quaternion()
       const fidArrowAxis = new THREE.Vector3(0, 0, 1)
+      const fidArrowColor = new THREE.Color()
+      const b1AxisDirection = new THREE.Vector3()
+      const b1AxisQuaternion = new THREE.Quaternion()
+      const b1AxisLocalDirection = new THREE.Vector3(0, 0, 1)
 
       const hideFidArrow = (index: number) => {
         fidArrowShafts.setMatrixAt(index, hiddenMatrix)
         fidArrowHeads.setMatrixAt(index, hiddenMatrix)
+      }
+
+      const updateFidArrowColors = (
+        states: ReadonlyArray<FidEnsembleState>,
+      ) => {
+        states.forEach((state) => {
+          const fieldVariationFraction = THREE.MathUtils.clamp(
+            Math.abs(state.fieldVariationPpm) /
+              NON_UNIFORM_FIELD_MODEL.maximumVariationPpm,
+            0,
+            1,
+          )
+          const tiltFraction = THREE.MathUtils.clamp(
+            THREE.MathUtils.radToDeg(state.fieldTiltAngleRadians) /
+              NON_UNIFORM_FIELD_MODEL.maximumOffParallelDegrees,
+            0,
+            1,
+          )
+
+          fidArrowColor.setHSL(
+            THREE.MathUtils.lerp(0.53, 0.77, fieldVariationFraction),
+            0.86,
+            THREE.MathUtils.lerp(0.58, 0.72, tiltFraction),
+          )
+          fidArrowShafts.setColorAt(state.index, fidArrowColor)
+          fidArrowHeads.setColorAt(state.index, fidArrowColor)
+        })
+
+        if (fidArrowShafts.instanceColor) {
+          fidArrowShafts.instanceColor.needsUpdate = true
+        }
+        if (fidArrowHeads.instanceColor) {
+          fidArrowHeads.instanceColor.needsUpdate = true
+        }
       }
 
       const updateFidArrows = () => {
@@ -588,6 +696,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           renderedFidStatesRef.current.forEach((state) => {
             hideFidArrow(state.index)
           })
+          if (active) updateFidArrowColors(states)
           renderedFidStatesRef.current = active ? states : []
         }
 
@@ -660,6 +769,60 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         fidArrowHeads.instanceMatrix.needsUpdate = true
       }
 
+      const updateB1PulseAxis = (time: number) => {
+        const visualization = b1PulseVisualizationRef.current
+        if (!visualization) {
+          b1PulseAxis.visible = false
+          return
+        }
+
+        const progress =
+          (time - visualization.startedAt) /
+          B1_PULSE_VISIBILITY_MILLISECONDS
+        if (progress >= 1) {
+          b1PulseAxis.visible = false
+          b1PulseVisualizationRef.current = null
+          return
+        }
+
+        const rotatingFramePhase =
+          VISUAL_PRECESSION_RADIANS_PER_MILLISECOND *
+          visualization.pulseEvent.timeMilliseconds
+        const pulseAxisPhase =
+          rotatingFramePhase +
+          (visualization.pulseEvent.kind === '90-y' ? Math.PI / 2 : 0)
+        b1AxisDirection.set(
+          Math.cos(pulseAxisPhase),
+          Math.sin(pulseAxisPhase),
+          0,
+        )
+        b1AxisQuaternion.setFromUnitVectors(
+          b1AxisLocalDirection,
+          b1AxisDirection,
+        )
+        b1PulseAxis.quaternion.copy(b1AxisQuaternion)
+
+        if (renderModeRef.current === 'stacked') {
+          b1PulseAxis.position.copy(CAMERA_TARGET)
+          b1PulseAxis.scale.setScalar(1)
+        } else {
+          const cameraDistance = camera.position.distanceTo(controls.target)
+          const stackedCameraDistance = STACKED_CAMERA_POSITION.length()
+          const scale = THREE.MathUtils.clamp(
+            (cameraDistance / stackedCameraDistance) *
+              B1_SLICE_AXIS_SCREEN_SCALE,
+            0.8,
+            30,
+          )
+          b1PulseAxis.position.copy(controls.target)
+          b1PulseAxis.scale.setScalar(scale)
+        }
+
+        const fadeProgress = Math.max(0, (progress - 0.55) / 0.45)
+        b1AxisMaterial.opacity = 0.92 * (1 - smoothStep(fadeProgress))
+        b1PulseAxis.visible = true
+      }
+
       const animate = (time: number) => {
         const focusTransition = focusTransitionRef.current
         if (focusTransition) {
@@ -685,6 +848,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
         updateFidArrows()
         controls.update()
+        updateB1PulseAxis(time)
 
         renderer.render(scene, camera)
         animationFrame = window.requestAnimationFrame(animate)
@@ -726,6 +890,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         fidArrowShaftGeometry.dispose()
         fidArrowHeadGeometry.dispose()
         fidArrowMaterial.dispose()
+        b1AxisShaftGeometry.dispose()
+        b1AxisTipGeometry.dispose()
+        b1AxisMaterial.dispose()
         boundaryGeometry.dispose()
         boundaryMaterial.dispose()
 
@@ -739,6 +906,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         fidArrowHeadsRef.current = null
         modeObjectsRef.current = null
         focusTransitionRef.current = null
+        b1PulseVisualizationRef.current = null
       }
     }, [])
 
