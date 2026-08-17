@@ -12,6 +12,7 @@ import {
 
 export interface GradientCalibrationOptions {
   adcDwellTimeMilliseconds?: number
+  encodingStartTimeMilliseconds?: number
   gradientImperfections?: boolean
   gridSize?: number
   voxelSizeMillimeters?: number
@@ -137,6 +138,10 @@ export function calibrateGradientEncoding(
     adcDwellTimeMilliseconds:
       suppliedOptions.adcDwellTimeMilliseconds ??
       ADC_DWELL_TIME_MILLISECONDS,
+    encodingStartTimeMilliseconds:
+      suppliedOptions.encodingStartTimeMilliseconds ??
+      (DEFAULT_RF_EXCITATION_PULSES[0]?.end ?? 0) *
+        GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
     gradientImperfections: suppliedOptions.gradientImperfections ?? false,
     gridSize: suppliedOptions.gridSize ?? DEFAULT_GRID_SIZE,
     voxelSizeMillimeters:
@@ -158,6 +163,14 @@ export function calibrateGradientEncoding(
   ) {
     throw new RangeError('ADC dwell time must be greater than zero')
   }
+  if (
+    !Number.isFinite(options.encodingStartTimeMilliseconds) ||
+    options.encodingStartTimeMilliseconds < 0 ||
+    options.encodingStartTimeMilliseconds >=
+      GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+  ) {
+    throw new RangeError('Encoding start time must lie inside the sequence')
+  }
 
   const phasePulse = DEFAULT_PHASE_ENCODING_PULSES[0]
   const [readoutPrephaser, readoutGradient] = DEFAULT_READOUT_PULSES
@@ -168,9 +181,7 @@ export function calibrateGradientEncoding(
 
   const sequenceDurationMilliseconds =
     GRADIENT_SEQUENCE_DURATION_MILLISECONDS
-  const encodingStartTimeMilliseconds =
-    (DEFAULT_RF_EXCITATION_PULSES[0]?.end ?? 0) *
-    sequenceDurationMilliseconds
+  const encodingStartTimeMilliseconds = options.encodingStartTimeMilliseconds
   const adcStartTimeMilliseconds = adcPulse.start * sequenceDurationMilliseconds
   const adcEndTimeMilliseconds = adcPulse.end * sequenceDurationMilliseconds
   const {

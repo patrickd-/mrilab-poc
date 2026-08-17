@@ -182,6 +182,15 @@ describe('GradientEncodingExperimentPanel', () => {
       }),
     ).not.toBeNull()
     expect(
+      screen.getByRole('progressbar', {
+        name: 'K-space exploration progress',
+      }),
+    ).toHaveProperty('value', 0)
+    expect(screen.getByText('0.0%')).not.toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Auto-Fill' }),
+    ).not.toBeNull()
+    expect(
       screen.queryByRole('slider', {
         name: /Signal acquisition window, pulse 1, top handle/,
       }),
@@ -338,6 +347,26 @@ describe('GradientEncodingExperimentPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset' }))
     expect(runningProps.onSimulationReset).toHaveBeenCalledOnce()
+  })
+
+  it('configures a calibrated center-out acquisition plan when Auto-Fill starts', async () => {
+    const user = userEvent.setup()
+    const props = panelProps()
+    render(<GradientEncodingExperimentPanel {...props} />)
+
+    await user.click(screen.getByRole('button', { name: 'Auto-Fill' }))
+
+    expect(props.onAdcPulsesChange).toHaveBeenCalledOnce()
+    expect(props.onReadoutPulsesChange).toHaveBeenCalledOnce()
+    expect(props.onPhaseEncodingPulsesChange).toHaveBeenCalledOnce()
+    expect(props.onSpeedChange).toHaveBeenCalledWith('4')
+    expect(
+      vi.mocked(props.onPhaseEncodingPulsesChange).mock.calls[0][0][0]
+        .amplitude,
+    ).toBe(0)
+    expect(
+      screen.getByRole('button', { name: 'Stop Auto-Fill' }),
+    ).not.toBeNull()
   })
 
   it('keeps reset available while idle when k-space history is retained', async () => {

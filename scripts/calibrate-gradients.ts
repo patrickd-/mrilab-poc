@@ -8,6 +8,7 @@ function numericArgument(name: string) {
 
 const report = calibrateGradientEncoding({
   adcDwellTimeMilliseconds: numericArgument('adc-dwell-ms'),
+  encodingStartTimeMilliseconds: numericArgument('encoding-start-ms'),
   gradientImperfections: process.argv.includes('--imperfections'),
   gridSize: numericArgument('grid-size'),
   voxelSizeMillimeters: numericArgument('voxel-mm'),

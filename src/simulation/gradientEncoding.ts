@@ -12,6 +12,13 @@ export interface GradientPulse {
   amplitude: number
 }
 
+export type GradientChannelId =
+  | 'adc'
+  | 'rf'
+  | 'slice-selection'
+  | 'phase-encoding'
+  | 'readout'
+
 export interface TransmitFrequencyBand {
   lowerAngularFrequencyKilradiansPerSecond: number
   upperAngularFrequencyKilradiansPerSecond: number

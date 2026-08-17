@@ -106,5 +106,8 @@ describe('gradient encoding calibration', () => {
     expect(() =>
       calibrateGradientEncoding({ adcDwellTimeMilliseconds: 0 }),
     ).toThrow(/ADC dwell/)
+    expect(() =>
+      calibrateGradientEncoding({ encodingStartTimeMilliseconds: -1 }),
+    ).toThrow(/Encoding start time/)
   })
 })

@@ -1,9 +1,11 @@
 import {
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import { useKSpaceAutoFill } from '../hooks/useKSpaceAutoFill'
 import type {
   GradientPlaybackSpeed,
   GradientPlaybackStatus,
@@ -30,10 +32,12 @@ import {
   rfPulseTimeBandwidthProduct,
   sliceRephasingAreaRatio,
   transmitBandwidthAngularRadiansPerMillisecond,
+  type GradientChannelId,
   type GradientPulse,
   type GradientSignalPoint,
   type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
+import { kSpaceCoverageForGrid } from '../simulation/kSpaceCoverage'
 import DarkSelect from './DarkSelect'
 import GradientAcquisitionGraph from './GradientAcquisitionGraph'
 import InverseFourierReconstruction from './InverseFourierReconstruction'
@@ -41,13 +45,9 @@ import KSpaceAcquisitionGraph from './KSpaceAcquisitionGraph'
 import KSpaceEncodingMaps from './KSpaceEncodingMaps'
 import SliceSelectionMappingGraph from './SliceSelectionMappingGraph'
 
+export type { GradientChannelId } from '../simulation/gradientEncoding'
+
 export type PulseHandle = 'left' | 'right' | 'top'
-export type GradientChannelId =
-  | 'adc'
-  | 'rf'
-  | 'slice-selection'
-  | 'phase-encoding'
-  | 'readout'
 
 interface DragState {
   handle: PulseHandle
@@ -847,7 +847,47 @@ function GradientEncodingExperimentPanel({
     gradientImperfections,
     encodingStartTimeMilliseconds,
   )
+  const kSpaceCoverage = useMemo(
+    () =>
+      kSpaceCoverageForGrid(
+        adcAcquisitionRuns,
+        gridSize,
+        reconstructionVoxelSizeMillimeters,
+      ),
+    [adcAcquisitionRuns, gridSize, reconstructionVoxelSizeMillimeters],
+  )
+  const autoFill = useKSpaceAutoFill({
+    acquisitionRuns: adcAcquisitionRuns,
+    adcPulses,
+    coveragePercentage: kSpaceCoverage.percentage,
+    enabledChannels,
+    encodingStartTimeMilliseconds:
+      (rfExcitationPulse?.end ?? 0) * durationMilliseconds,
+    gradientImperfections,
+    gridSize,
+    onAdcPulsesChange,
+    onChannelEnabledChange,
+    onPause,
+    onPhaseEncodingPulsesChange,
+    onReadoutPulsesChange,
+    onSpeedChange,
+    onStart,
+    phaseEncodingPulses,
+    readoutPulses,
+    speed,
+    status,
+    voxelSizeMillimeters: reconstructionVoxelSizeMillimeters,
+  })
+  const displayedCoveragePercentage =
+    kSpaceCoverage.coveredBinCount === kSpaceCoverage.totalBinCount
+      ? 100
+      : Math.floor(kSpaceCoverage.percentage * 10) / 10
+  const changeReconstructionVoxelSize = (voxelSizeMillimeters: number) => {
+    autoFill.stop()
+    setReconstructionVoxelSize(voxelSizeMillimeters)
+  }
   const resetSimulationAndReconstruction = () => {
+    autoFill.cancel()
     setReconstructionVoxelSize(DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS)
     onSimulationReset()
   }
@@ -1132,7 +1172,7 @@ function GradientEncodingExperimentPanel({
             reconstructionVoxelSizeMillimeters={
               reconstructionVoxelSizeMillimeters
             }
-            onReconstructionVoxelSizeChange={setReconstructionVoxelSize}
+            onReconstructionVoxelSizeChange={changeReconstructionVoxelSize}
             phaseEncodingPulses={
               enabledChannels['phase-encoding']
                 ? phaseEncodingPulses
@@ -1166,6 +1206,41 @@ function GradientEncodingExperimentPanel({
           gridSize={gridSize}
           voxelSizeMillimeters={reconstructionVoxelSizeMillimeters}
         />
+        <div className="k-space-coverage-controls">
+          <div className="k-space-coverage-progress">
+            <div>
+              <span>K-space sufficiently explored</span>
+              <strong>{displayedCoveragePercentage.toFixed(1)}%</strong>
+            </div>
+            <progress
+              aria-label="K-space exploration progress"
+              max={kSpaceCoverage.totalBinCount}
+              value={kSpaceCoverage.coveredBinCount}
+            />
+            <small>
+              {kSpaceCoverage.coveredBinCount.toLocaleString()} /{' '}
+              {kSpaceCoverage.totalBinCount.toLocaleString()} Cartesian cells
+              {autoFill.active &&
+                ` · acquisition ${Math.min(
+                  autoFill.completedAcquisitionCount + 1,
+                  autoFill.plannedAcquisitionCount,
+                )} of ${autoFill.plannedAcquisitionCount}`}
+            </small>
+          </div>
+          <button
+            className={`k-space-auto-fill${autoFill.active ? ' active' : ''}`}
+            type="button"
+            disabled={
+              !autoFill.active &&
+              (kSpaceCoverage.percentage >= 100 ||
+                status === 'running' ||
+                status === 'paused')
+            }
+            onClick={autoFill.active ? autoFill.stop : autoFill.start}
+          >
+            {autoFill.active ? 'Stop Auto-Fill' : 'Auto-Fill'}
+          </button>
+        </div>
       </section>
     </>
   )

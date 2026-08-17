@@ -33,6 +33,7 @@ npm run calibrate:gradients
 The report compares the current pulse amplitudes with a Cartesian matrix sized
 for the rendered grid. Optional flags include `--grid-size=64`,
 `--voxel-mm=2`, `--adc-dwell-ms=0.1`, `--imperfections`, and `--json`.
+Use `--encoding-start-ms=6.8` when calibrating a custom RF end time.
 
 The automated suite also covers workers, playback hooks, graph editing,
 renderer-independent 3D surface math, and app-level UX. Run coverage with

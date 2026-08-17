@@ -1869,6 +1869,100 @@ a:focus-visible {
   text-align: right;
 }
 
+.k-space-coverage-controls {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  background: rgba(7, 9, 12, 0.52);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  text-transform: uppercase;
+}
+
+.k-space-coverage-progress {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 6px;
+}
+
+.k-space-coverage-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+}
+
+.k-space-coverage-progress strong {
+  color: var(--green);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.k-space-coverage-progress progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(145, 230, 179, 0.28);
+  border-radius: 0;
+  appearance: none;
+  background: rgba(145, 230, 179, 0.06);
+}
+
+.k-space-coverage-progress progress::-webkit-progress-bar {
+  background: rgba(145, 230, 179, 0.06);
+}
+
+.k-space-coverage-progress progress::-webkit-progress-value {
+  background: linear-gradient(90deg, #4fa57b, var(--green));
+}
+
+.k-space-coverage-progress progress::-moz-progress-bar {
+  background: linear-gradient(90deg, #4fa57b, var(--green));
+}
+
+.k-space-coverage-progress small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.k-space-auto-fill {
+  min-width: 92px;
+  padding: 0 12px;
+  border: 1px solid rgba(145, 230, 179, 0.42);
+  color: var(--green);
+  background: rgba(145, 230, 179, 0.08);
+  cursor: pointer;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.k-space-auto-fill:hover:not(:disabled) {
+  border-color: var(--green);
+  color: var(--white);
+  background: rgba(145, 230, 179, 0.14);
+}
+
+.k-space-auto-fill.active {
+  border-color: rgba(255, 120, 102, 0.5);
+  color: var(--coral);
+  background: rgba(255, 120, 102, 0.08);
+}
+
+.k-space-auto-fill:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
 .gradient-handle-hit {
   stroke: transparent;
   stroke-width: 14;
