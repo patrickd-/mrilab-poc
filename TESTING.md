@@ -64,6 +64,8 @@ window.
 - the RF, G_SS, G_PE, and G_RO default timing relationships;
 - ideal and imperfect gradient amplitudes, causal coil rise, eddy-current tail,
   pulse boundaries, and integrated phase;
+- k-space coordinates from post-excitation gradient moments and the real and
+  imaginary sinusoidal spatial-encoding basis;
 - orthogonal phase/readout axes and polarity;
 - frequency-to-position mapping for positive, negative, and zero G_SS;
 - Hamming-windowed sinc symmetry and zero spacing, physical peak B1 and RF
@@ -94,6 +96,8 @@ linked pulse boundaries, independent channel bypass controls that preserve
 configured waveforms, automatic half-area rewinder matching, timing guides,
 gradient imperfection traces, transmit-band dragging, minimum bandwidth,
 zero-gradient states, and negative-gradient position mirroring.
+`src/components/KSpaceEncodingMaps.test.tsx` verifies the paired canvas maps'
+real/imaginary grayscale values at known phases.
 
 ### Timing, worker, and React state
 

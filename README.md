@@ -151,6 +151,14 @@ rewinder amplitude is deliberately overridden. RF ends as phase encoding
 begins, while readout prephasing leads into a positive lobe with the same
 duration as the RF pulse.
 
+Below G_PE and G_RO, paired grayscale maps display the current complex spatial
+encoding basis. The playhead's integrated applied gradient moments determine
+`kx` and `ky`; each voxel is rendered as `cos(2 pi k dot r)` in the real map and
+`sin(2 pi k dot r)` in the imaginary map. Zero is mid-gray, while -1 and +1 are
+black and white. With gradient imperfections enabled, the maps follow the
+modeled coil response and eddy-current tail rather than the commanded square
+pulses.
+
 The brain T2* values use [published 1.5/3/7 T measurements](https://pubmed.ncbi.nlm.nih.gov/17459640/).
 CSF uses the 333.5 ms and 168 ms values from a [compiled 3/7 T quantitative-MRI
 table](https://cris.maastrichtuniversity.nl/ws/files/32795321/c6050.pdf); its

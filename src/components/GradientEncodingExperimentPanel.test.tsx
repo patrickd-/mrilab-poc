@@ -11,6 +11,7 @@ import {
   DEFAULT_RF_EXCITATION_PULSES,
   DEFAULT_SLICE_SELECTION_PULSES,
   GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  gradientKSpaceCyclesPerMeterAt,
   sliceRephasingAreaRatio,
   type GradientPulse,
 } from '../simulation/gradientEncoding'
@@ -177,6 +178,71 @@ describe('GradientEncodingExperimentPanel', () => {
     expect(
       screen.getByLabelText('Slice rephasing area').textContent,
     ).toContain('0.500')
+    expect(
+      screen.getByRole('region', {
+        name: 'Current complex spatial encoding basis',
+      }),
+    ).not.toBeNull()
+    expect(
+      screen.getByRole('img', { name: /Real .* spatial encoding map/i }),
+    ).not.toBeNull()
+    expect(
+      screen.getByRole('img', {
+        name: /Imaginary .* spatial encoding map/i,
+      }),
+    ).not.toBeNull()
+  })
+
+  it('moves the complex basis maps along the integrated k-space trajectory', () => {
+    const timeMilliseconds = 9
+    const encodingStartMilliseconds =
+      DEFAULT_RF_EXCITATION_PULSES[0].end *
+      GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+    const expectedKx = gradientKSpaceCyclesPerMeterAt(
+      DEFAULT_READOUT_PULSES,
+      timeMilliseconds,
+      GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+      false,
+      encodingStartMilliseconds,
+    )
+    const expectedKy = gradientKSpaceCyclesPerMeterAt(
+      DEFAULT_PHASE_ENCODING_PULSES,
+      timeMilliseconds,
+      GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+      false,
+      encodingStartMilliseconds,
+    )
+    const { rerender } = render(
+      <GradientEncodingExperimentPanel
+        {...panelProps({ status: 'running', timeMilliseconds })}
+      />,
+    )
+
+    expect(
+      screen.getByRole('img', { name: /Real .* spatial encoding map/i })
+        .getAttribute('aria-label'),
+    ).toContain(
+      `kx ${(expectedKx / 1000).toFixed(3)} and ky ${(expectedKy / 1000).toFixed(3)}`,
+    )
+
+    rerender(
+      <GradientEncodingExperimentPanel
+        {...panelProps({
+          enabledChannels: {
+            rf: true,
+            'slice-selection': true,
+            'phase-encoding': false,
+            readout: true,
+          },
+          status: 'running',
+          timeMilliseconds,
+        })}
+      />,
+    )
+    expect(
+      screen.getByRole('img', { name: /Real .* spatial encoding map/i })
+        .getAttribute('aria-label'),
+    ).toContain('ky 0.000')
   })
 
   it('warns when a 90-degree pulse exceeds the available peak B1', () => {

@@ -915,6 +915,86 @@ a:focus-visible {
   gap: 14px;
 }
 
+.k-space-encoding-maps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.k-space-encoding-map {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  background: rgba(7, 9, 12, 0.52);
+}
+
+.k-space-encoding-map figcaption {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px 7px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.k-space-encoding-map figcaption strong {
+  color: var(--white);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.k-space-encoding-map figcaption span {
+  color: var(--muted);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.k-space-encoding-map canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  background: #808080;
+}
+
+.k-space-grayscale-key {
+  display: grid;
+  grid-template-columns: auto minmax(24px, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 9px 8px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+}
+
+.k-space-grayscale-key i {
+  height: 3px;
+  background: linear-gradient(90deg, #000, #808080, #fff);
+}
+
+.k-space-encoding-maps > footer {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.k-space-encoding-maps > footer sub {
+  font-size: 0.7em;
+}
+
 .gradient-input {
   min-width: 0;
   border: 1px solid var(--line);

@@ -461,6 +461,68 @@ function gradientAreaSecondsAt(
   return areaMilliseconds / 1000
 }
 
+export function gradientKSpaceCyclesPerMeterAt(
+  pulses: ReadonlyArray<GradientPulse>,
+  timeMilliseconds: number,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  imperfections = false,
+  encodingStartTimeMilliseconds = 0,
+) {
+  const boundedTimeMilliseconds = Math.min(
+    durationMilliseconds,
+    Math.max(0, timeMilliseconds),
+  )
+  const boundedStartMilliseconds = Math.min(
+    durationMilliseconds,
+    Math.max(0, encodingStartTimeMilliseconds),
+  )
+  if (boundedTimeMilliseconds <= boundedStartMilliseconds) return 0
+
+  const gradientAreaSinceEncodingStart =
+    gradientAreaSecondsAt(
+      pulses,
+      boundedTimeMilliseconds,
+      durationMilliseconds,
+      imperfections,
+    ) -
+    gradientAreaSecondsAt(
+      pulses,
+      boundedStartMilliseconds,
+      durationMilliseconds,
+      imperfections,
+    )
+
+  return (
+    (PROTON_GYROMAGNETIC_RATIO *
+      MAXIMUM_GRADIENT_TESLA_PER_METER *
+      gradientAreaSinceEncodingStart) /
+    (2 * Math.PI)
+  )
+}
+
+export function spatialEncodingBasisAt(
+  column: number,
+  row: number,
+  gridSize: number,
+  kxCyclesPerMeter: number,
+  kyCyclesPerMeter: number,
+) {
+  const gridCenter = (gridSize - 1) / 2
+  const positionXMeters = (column - gridCenter) * 1e-3
+  const positionYMeters = (gridCenter - row) * 1e-3
+  const phaseRadians =
+    2 *
+    Math.PI *
+    (kxCyclesPerMeter * positionXMeters +
+      kyCyclesPerMeter * positionYMeters)
+
+  return {
+    phaseRadians,
+    real: Math.cos(phaseRadians),
+    imaginary: Math.sin(phaseRadians),
+  }
+}
+
 export function gradientPhaseRadiansAt(
   column: number,
   row: number,

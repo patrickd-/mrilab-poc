@@ -15,6 +15,7 @@ import {
   DEFAULT_READOUT_PULSES,
   DEFAULT_RF_EXCITATION_PULSES,
   DEFAULT_SLICE_SELECTION_PULSES,
+  gradientKSpaceCyclesPerMeterAt,
   matchHalfAreaSliceRephasing,
   MAXIMUM_GRADIENT_TESLA_PER_METER,
   MAXIMUM_RF_B1_TESLA,
@@ -28,6 +29,7 @@ import {
   type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
 import DarkSelect from './DarkSelect'
+import KSpaceEncodingMaps from './KSpaceEncodingMaps'
 import SliceSelectionMappingGraph from './SliceSelectionMappingGraph'
 
 export type PulseHandle = 'left' | 'right' | 'top'
@@ -786,6 +788,23 @@ function GradientEncodingExperimentPanel({
   const rephasingAreaMatched =
     rephasingAreaRatio !== null &&
     Math.abs(rephasingAreaRatio - 0.5) < 0.001
+  const encodingStartTimeMilliseconds = rfExcitationPulse
+    ? rfExcitationPulse.end * durationMilliseconds
+    : 0
+  const kxCyclesPerMeter = gradientKSpaceCyclesPerMeterAt(
+    enabledChannels.readout ? readoutPulses : [],
+    timeMilliseconds,
+    durationMilliseconds,
+    gradientImperfections,
+    encodingStartTimeMilliseconds,
+  )
+  const kyCyclesPerMeter = gradientKSpaceCyclesPerMeterAt(
+    enabledChannels['phase-encoding'] ? phaseEncodingPulses : [],
+    timeMilliseconds,
+    durationMilliseconds,
+    gradientImperfections,
+    encodingStartTimeMilliseconds,
+  )
 
   return (
     <>
@@ -959,7 +978,9 @@ function GradientEncodingExperimentPanel({
         <p className="gradient-input-instructions">
           Gray lines mark the default encoding steps on the shared 20 ms
           timeline. G<sub>PE</sub> occupies the middle interval; readout
-          prephasing leads directly into positive acquisition.
+          prephasing leads directly into positive acquisition. The grayscale
+          maps show cos φ and sin φ for the integrated k-space coordinate
+          under the playhead.
           {gradientImperfections &&
             ' Dashed yellow shows the applied gradient response.'}
         </p>
@@ -999,6 +1020,11 @@ function GradientEncodingExperimentPanel({
             }
             onGuideTimeChange={setTimingGuideTime}
             onReset={onReadoutReset}
+          />
+          <KSpaceEncodingMaps
+            gridSize={gridSize}
+            kxCyclesPerMeter={kxCyclesPerMeter}
+            kyCyclesPerMeter={kyCyclesPerMeter}
           />
         </div>
       </section>

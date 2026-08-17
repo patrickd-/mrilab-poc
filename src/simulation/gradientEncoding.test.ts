@@ -13,6 +13,7 @@ import {
   GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
   gradientAmplitudeAt,
   gradientEnsembleMagnetizationStateAt,
+  gradientKSpaceCyclesPerMeterAt,
   gradientPhaseRadiansAt,
   MAXIMUM_GRADIENT_TESLA_PER_METER,
   MAXIMUM_RF_B1_TESLA,
@@ -24,6 +25,7 @@ import {
   rfPulseTimeBandwidthProduct,
   sliceMappingAngularFrequencyKilradiansPerSecondAt,
   sliceSelectiveRfMagnetizationAt,
+  spatialEncodingBasisAt,
   type GradientPulse,
 } from './gradientEncoding'
 
@@ -344,6 +346,58 @@ describe('gradient phase accumulation', () => {
 
     expect(imperfect).toBeGreaterThan(0)
     expect(imperfect).toBeLessThan(ideal)
+  })
+})
+
+describe('k-space encoding basis', () => {
+  it('derives k from gradient area accumulated after excitation', () => {
+    const pulse = [{ start: 0.1, end: 0.6, amplitude: 0.5 }]
+    const kAtEnd = gradientKSpaceCyclesPerMeterAt(
+      pulse,
+      12,
+      20,
+      false,
+      4,
+    )
+    const expectedAreaSeconds = 0.5 * 8e-3
+
+    expect(
+      gradientKSpaceCyclesPerMeterAt(pulse, 3, 20, false, 4),
+    ).toBe(0)
+    expect(kAtEnd).toBeCloseTo(
+      (PROTON_GYROMAGNETIC_RATIO *
+        MAXIMUM_GRADIENT_TESLA_PER_METER *
+        expectedAreaSeconds) /
+        (2 * Math.PI),
+      10,
+    )
+  })
+
+  it('uses the applied gradient response when imperfections are enabled', () => {
+    const pulse = [{ start: 0.1, end: 0.6, amplitude: 1 }]
+    const ideal = gradientKSpaceCyclesPerMeterAt(pulse, 2.1, 20)
+    const applied = gradientKSpaceCyclesPerMeterAt(
+      pulse,
+      2.1,
+      20,
+      true,
+    )
+
+    expect(applied).toBeGreaterThan(0)
+    expect(applied).toBeLessThan(ideal)
+  })
+
+  it('returns the real and imaginary sinusoidal basis across space', () => {
+    const center = spatialEncodingBasisAt(1, 1, 3, 250, 0)
+    const oneMillimeterRight = spatialEncodingBasisAt(2, 1, 3, 250, 0)
+    const oneMillimeterUp = spatialEncodingBasisAt(1, 0, 3, 0, 250)
+
+    expect(center.real).toBe(1)
+    expect(center.imaginary).toBe(0)
+    expect(oneMillimeterRight.phaseRadians).toBeCloseTo(Math.PI / 2, 12)
+    expect(oneMillimeterRight.real).toBeCloseTo(0, 12)
+    expect(oneMillimeterRight.imaginary).toBeCloseTo(1, 12)
+    expect(oneMillimeterUp.imaginary).toBeCloseTo(1, 12)
   })
 })
 
