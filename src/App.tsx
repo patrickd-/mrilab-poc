@@ -70,7 +70,7 @@ const B0_OPTIONS: ReadonlyArray<{ id: B0Tesla; label: string }> = [
 // LabScene owns a long-lived Three.js animation loop. Bump this key whenever
 // the data contract consumed inside that loop changes so Vite hot reload does
 // not leave an already-mounted scene running an incompatible closure.
-const LAB_SCENE_RUNTIME_VERSION = 'spatial-magnetic-field-v2'
+const LAB_SCENE_RUNTIME_VERSION = 'idealized-spatial-gradient-phase-v1'
 const EMPTY_GRADIENT_PULSES: ReadonlyArray<GradientPulse> = []
 const DEFAULT_GRADIENT_CHANNELS_ENABLED: Readonly<
   Record<GradientChannelId, boolean>
@@ -395,6 +395,28 @@ function App() {
       tissueHeterogeneity,
     ],
   )
+  const spatialGradientEnsembleStates = useMemo(
+    () =>
+      spatialGradientExperimentSelected
+        ? createFidEnsembleStates(
+            simulationEnsembles,
+            fieldStrengthTesla,
+            fieldUniformity,
+            {
+              includeAirEnsembles: true,
+              tissueHeterogeneity,
+            },
+          )
+        : [],
+    [
+      ensembleRevision,
+      simulationEnsembles,
+      fieldStrengthTesla,
+      fieldUniformity,
+      spatialGradientExperimentSelected,
+      tissueHeterogeneity,
+    ],
+  )
   const fidSimulation = useFidSimulation({
     active: simulationExperimentSelected,
     ensembles: simulationEnsembles,
@@ -638,6 +660,7 @@ function App() {
           gradientTransmitFrequencyBand={transmitFrequencyBand}
           gradientSliceSelectionPulses={appliedSliceSelectionPulses}
           spatialGradientActive={spatialGradientExperimentSelected}
+          spatialGradientEnsembleStates={spatialGradientEnsembleStates}
           spatialGradientXEnabled={spatialGradientXEnabled}
           spatialGradientXProfile={spatialGradientXProfile}
           spatialGradientYEnabled={spatialGradientYEnabled}
@@ -669,7 +692,12 @@ function App() {
           <div className="slice-size">
             {renderMode === 'stacked' ? (
               <>
-                <span>{stackedEnsembleCount.toLocaleString()} vectors</span>
+                <span>
+                  {(spatialGradientExperimentSelected
+                    ? simulationEnsembles.length
+                    : stackedEnsembleCount
+                  ).toLocaleString()} vectors
+                </span>
                 <small>Spatial positions collapsed</small>
               </>
             ) : renderMode === 'block' ? (

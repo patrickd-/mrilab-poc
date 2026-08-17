@@ -36,6 +36,7 @@ import {
 import {
   spatialGradientProfileHasField,
   type SpatialGradientProfile,
+  visualizedSpatialPhaseIncrementRadians,
 } from '../simulation/spatialGradient'
 import {
   amplitudeHeight,
@@ -148,6 +149,7 @@ interface LabSceneProps {
   gradientTransmitFrequencyBand: TransmitFrequencyBand
   gradientSliceSelectionPulses: ReadonlyArray<GradientPulse>
   spatialGradientActive: boolean
+  spatialGradientEnsembleStates: ReadonlyArray<FidEnsembleState>
   spatialGradientXEnabled: boolean
   spatialGradientXProfile: SpatialGradientProfile
   spatialGradientYEnabled: boolean
@@ -199,6 +201,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientTransmitFrequencyBand,
       gradientSliceSelectionPulses,
       spatialGradientActive,
+      spatialGradientEnsembleStates,
       spatialGradientXEnabled,
       spatialGradientXProfile,
       spatialGradientYEnabled,
@@ -274,11 +277,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     })
     const spatialGradientRef = useRef({
       active: spatialGradientActive,
+      states: spatialGradientEnsembleStates,
       xEnabled: spatialGradientXEnabled,
       xProfile: spatialGradientXProfile,
       yEnabled: spatialGradientYEnabled,
       yProfile: spatialGradientYProfile,
     })
+    const spatialGradientResetRevisionRef = useRef(0)
     const fidArrowsDirtyRef = useRef(true)
     const sliceGraphDirtyRef = useRef(true)
     const renderedFidStatesRef = useRef<ReadonlyArray<FidEnsembleState>>([])
@@ -322,19 +327,47 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         }
       }
       sliceGraphDirtyRef.current = true
+      if (spatialGradientRef.current.active) {
+        spatialGradientResetRevisionRef.current += 1
+        fidArrowsDirtyRef.current = true
+      }
     }, [fieldStrengthTesla, fieldUniformity])
 
     useEffect(() => {
+      const previous = spatialGradientRef.current
+      const profileChanged =
+        previous.xEnabled !== spatialGradientXEnabled ||
+        previous.yEnabled !== spatialGradientYEnabled ||
+        previous.xProfile.startFieldOffsetMillitesla !==
+          spatialGradientXProfile.startFieldOffsetMillitesla ||
+        previous.xProfile.endFieldOffsetMillitesla !==
+          spatialGradientXProfile.endFieldOffsetMillitesla ||
+        previous.yProfile.startFieldOffsetMillitesla !==
+          spatialGradientYProfile.startFieldOffsetMillitesla ||
+        previous.yProfile.endFieldOffsetMillitesla !==
+          spatialGradientYProfile.endFieldOffsetMillitesla
+      const shouldResetPhase =
+        spatialGradientActive &&
+        (!previous.active ||
+          previous.states !== spatialGradientEnsembleStates ||
+          profileChanged)
+
       spatialGradientRef.current = {
         active: spatialGradientActive,
+        states: spatialGradientEnsembleStates,
         xEnabled: spatialGradientXEnabled,
         xProfile: spatialGradientXProfile,
         yEnabled: spatialGradientYEnabled,
         yProfile: spatialGradientYProfile,
       }
+      if (shouldResetPhase) {
+        spatialGradientResetRevisionRef.current += 1
+      }
+      fidArrowsDirtyRef.current = true
       sliceGraphDirtyRef.current = true
     }, [
       spatialGradientActive,
+      spatialGradientEnsembleStates,
       spatialGradientXEnabled,
       spatialGradientXProfile,
       spatialGradientYEnabled,
@@ -1189,6 +1222,64 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       let renderedB1PulseStartedAt = -1
       let renderedB1ReferenceFrame: ReferenceFrame | null = null
       let renderedGradientRfPulseKey: string | null = null
+      const spatialGradientPhases = new Float64Array(
+        SLICE_ENSEMBLE_COUNT,
+      )
+      const spatialGradientFieldOffsetsTesla = new Float64Array(
+        SLICE_ENSEMBLE_COUNT,
+      )
+      let spatialGradientElapsedMilliseconds = 0
+      let spatialGradientLastFrameTime: number | null = null
+      let renderedSpatialGradientResetRevision = -1
+
+      const updateSpatialGradientPhases = (time: number) => {
+        const spatialGradient = spatialGradientRef.current
+        if (!spatialGradient.active) {
+          spatialGradientLastFrameTime = null
+          return
+        }
+
+        const resetRevision = spatialGradientResetRevisionRef.current
+        if (renderedSpatialGradientResetRevision !== resetRevision) {
+          const magneticField = sliceMagneticField(
+            staticFieldOffsetsTeslaRef.current,
+            GRID_SIZE,
+            0,
+            0,
+            spatialGradient.xEnabled ? spatialGradient.xProfile : null,
+            spatialGradient.yEnabled ? spatialGradient.yProfile : null,
+          )
+          spatialGradientFieldOffsetsTesla.set(
+            magneticField.fieldOffsetsTesla,
+          )
+          spatialGradientPhases.fill(0)
+          spatialGradientElapsedMilliseconds = 0
+          spatialGradientLastFrameTime = time
+          renderedSpatialGradientResetRevision = resetRevision
+        } else if (spatialGradientLastFrameTime !== null) {
+          const elapsedMilliseconds = Math.min(
+            50,
+            Math.max(0, time - spatialGradientLastFrameTime),
+          )
+          spatialGradient.states.forEach((state) => {
+            const fieldIndex = state.row * GRID_SIZE + state.column
+            spatialGradientPhases[state.index] +=
+              visualizedSpatialPhaseIncrementRadians(
+                spatialGradientFieldOffsetsTesla[fieldIndex],
+                elapsedMilliseconds,
+              )
+          })
+          spatialGradientElapsedMilliseconds += elapsedMilliseconds
+          spatialGradientLastFrameTime = time
+        } else {
+          spatialGradientLastFrameTime = time
+        }
+
+        fidArrowsDirtyRef.current = true
+        if (sliceGraphModeRef.current === 'phase') {
+          sliceGraphDirtyRef.current = true
+        }
+      }
 
       const hideFidArrow = (index: number) => {
         if (index < SLICE_ENSEMBLE_COUNT) {
@@ -1273,14 +1364,23 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
         const fidAnimation = fidAnimationRef.current
         const gradientAnimation = gradientAnimationRef.current
+        const spatialGradient = spatialGradientRef.current
+        const renderingSpatialGradient = spatialGradient.active
         const renderingGradientEncoding = gradientAnimation.active
-        const active = renderingGradientEncoding || fidAnimation.active
-        const states = renderingGradientEncoding
-          ? gradientAnimation.states
-          : fidAnimation.states
-        const timeMilliseconds = renderingGradientEncoding
-          ? gradientAnimation.timeMilliseconds
-          : fidAnimation.timeMilliseconds
+        const active =
+          renderingSpatialGradient ||
+          renderingGradientEncoding ||
+          fidAnimation.active
+        const states = renderingSpatialGradient
+          ? spatialGradient.states
+          : renderingGradientEncoding
+            ? gradientAnimation.states
+            : fidAnimation.states
+        const timeMilliseconds = renderingSpatialGradient
+          ? spatialGradientElapsedMilliseconds
+          : renderingGradientEncoding
+            ? gradientAnimation.timeMilliseconds
+            : fidAnimation.timeMilliseconds
         const currentRenderMode = renderModeRef.current
 
         if (!active || states !== renderedFidStatesRef.current) {
@@ -1293,23 +1393,31 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
         if (active) {
           states.forEach((state) => {
-            const magnetizationState = renderingGradientEncoding
-              ? gradientEnsembleMagnetizationStateAt(
-                  state,
-                  timeMilliseconds,
-                  gradientAnimation.rfExcitationPulses,
-                  gradientAnimation.transmitFrequencyBand,
-                  gradientAnimation.sliceSelectionPulses,
-                  gradientAnimation.phaseEncodingPulses,
-                  gradientAnimation.readoutPulses,
-                  GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
-                  gradientAnimation.imperfections,
-                )
-              : fidEnsembleMagnetizationStateAt(
-                  state,
-                  timeMilliseconds,
-                  fidAnimation.pulseEvents,
-                )
+            const magnetizationState = renderingSpatialGradient
+              ? {
+                  excited: true,
+                  transverseFraction: 1,
+                  longitudinalFraction: 0,
+                  precessionPhaseRadians:
+                    spatialGradientPhases[state.index],
+                }
+              : renderingGradientEncoding
+                ? gradientEnsembleMagnetizationStateAt(
+                    state,
+                    timeMilliseconds,
+                    gradientAnimation.rfExcitationPulses,
+                    gradientAnimation.transmitFrequencyBand,
+                    gradientAnimation.sliceSelectionPulses,
+                    gradientAnimation.phaseEncodingPulses,
+                    gradientAnimation.readoutPulses,
+                    GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+                    gradientAnimation.imperfections,
+                  )
+                : fidEnsembleMagnetizationStateAt(
+                    state,
+                    timeMilliseconds,
+                    fidAnimation.pulseEvents,
+                  )
 
             if (!magnetizationState.excited) {
               hideFidArrow(state.index)
@@ -1421,15 +1529,22 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         const spatialGradient = spatialGradientRef.current
         const fidAnimation = fidAnimationRef.current
         const renderingGradientEncoding = gradientAnimation.selected
-        const simulationActive = renderingGradientEncoding
-          ? gradientAnimation.active
-          : fidAnimation.active
-        const states = renderingGradientEncoding
-          ? gradientAnimation.states
-          : fidAnimation.states
-        const timeMilliseconds = renderingGradientEncoding
-          ? gradientAnimation.timeMilliseconds
-          : fidAnimation.timeMilliseconds
+        const renderingSpatialGradient = spatialGradient.active
+        const simulationActive = renderingSpatialGradient
+          ? true
+          : renderingGradientEncoding
+            ? gradientAnimation.active
+            : fidAnimation.active
+        const states = renderingSpatialGradient
+          ? spatialGradient.states
+          : renderingGradientEncoding
+            ? gradientAnimation.states
+            : fidAnimation.states
+        const timeMilliseconds = renderingSpatialGradient
+          ? spatialGradientElapsedMilliseconds
+          : renderingGradientEncoding
+            ? gradientAnimation.timeMilliseconds
+            : fidAnimation.timeMilliseconds
 
         sliceGraphStateLookup.fill(undefined)
         let maximumEquilibriumMagnetization = 0
@@ -1549,7 +1664,12 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               )
             } else if (graphMode === 'phase') {
               let phaseRadians = 0
-              if (simulationActive && renderingGradientEncoding) {
+              if (renderingSpatialGradient) {
+                phaseRadians = spatialGradientPhases[index]
+              } else if (
+                simulationActive &&
+                renderingGradientEncoding
+              ) {
                 const state = sliceGraphStateLookup[index]
                 phaseRadians = state
                   ? gradientEnsembleMagnetizationStateAt(
@@ -1612,11 +1732,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                       GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
                       gradientAnimation.imperfections,
                     )
-                  : fidEnsembleMagnetizationStateAt(
-                      state,
-                      timeMilliseconds,
-                      fidAnimation.pulseEvents,
-                    )
+                  : renderingSpatialGradient
+                    ? { transverseFraction: 1 }
+                    : fidEnsembleMagnetizationStateAt(
+                        state,
+                        timeMilliseconds,
+                        fidAnimation.pulseEvents,
+                      )
                 normalizedHeight = amplitudeHeight(
                   state.equilibriumMagnetization,
                   maximumEquilibriumMagnetization,
@@ -1869,6 +1991,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           if (progress === 1) focusTransitionRef.current = null
         }
 
+        updateSpatialGradientPhases(time)
         updateFidArrows()
         updateSliceGraph()
         controls.update()

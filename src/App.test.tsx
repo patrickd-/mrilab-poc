@@ -226,6 +226,7 @@ describe('App integration', () => {
     })
     expect(mocks.sceneProps).toMatchObject({
       spatialGradientActive: true,
+      spatialGradientEnsembleStates: expect.any(Array),
       spatialGradientXEnabled: true,
       spatialGradientXProfile: {
         endFieldOffsetMillitesla: 1.28,
@@ -237,6 +238,9 @@ describe('App integration', () => {
       },
       spatialGradientYEnabled: true,
     })
+    expect(
+      mocks.sceneProps?.spatialGradientEnsembleStates,
+    ).toHaveLength(128 * 128)
 
     await user.click(screen.getByRole('button', { name: 'Slice 3D graph' }))
     await user.click(

@@ -64,6 +64,7 @@ export interface FidEnsembleState {
 
 export interface FidRealismOptions {
   b1Inhomogeneity?: boolean
+  includeAirEnsembles?: boolean
   intravoxelDephasing?: boolean
   tissueHeterogeneity?: boolean
 }
@@ -268,6 +269,7 @@ export function createFidEnsembleStates(
   fieldUniformity: FieldUniformity,
   {
     b1Inhomogeneity = false,
+    includeAirEnsembles = false,
     intravoxelDephasing = false,
     tissueHeterogeneity = false,
   }: FidRealismOptions = {},
@@ -275,7 +277,7 @@ export function createFidEnsembleStates(
   const states: FidEnsembleState[] = []
 
   ensembles.forEach((ensemble) => {
-    if (ensemble.samplePreset === 'air') return
+    if (!includeAirEnsembles && ensemble.samplePreset === 'air') return
 
     const sampleProperties = ensemble.sampleProperties(
       fieldStrengthTesla,

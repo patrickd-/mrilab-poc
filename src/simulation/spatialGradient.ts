@@ -8,6 +8,22 @@ export interface SpatialGradientProfiles {
   y: SpatialGradientProfile
 }
 
+// MRI gradient-induced phase evolves much too quickly to inspect directly.
+// This preserves the relative field offsets and their signs while mapping
+// one millitesla to one visible radian per second.
+export const SPATIAL_PHASE_VISUALIZATION_RADIANS_PER_MILLISECOND_PER_TESLA = 1
+
+export function visualizedSpatialPhaseIncrementRadians(
+  fieldOffsetTesla: number,
+  elapsedRealMilliseconds: number,
+) {
+  return (
+    fieldOffsetTesla *
+    elapsedRealMilliseconds *
+    SPATIAL_PHASE_VISUALIZATION_RADIANS_PER_MILLISECOND_PER_TESLA
+  )
+}
+
 export const MAXIMUM_SPATIAL_GRADIENT_MILLITESLA_PER_METER = 40
 export const DEFAULT_SPATIAL_GRADIENT_FIELD_OF_VIEW_MILLIMETERS = 128
 

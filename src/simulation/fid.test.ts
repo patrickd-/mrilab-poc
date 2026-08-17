@@ -267,6 +267,21 @@ describe('FID ensemble-state construction', () => {
     expect(states[0].equilibriumMagnetization).toBeGreaterThan(0)
   })
 
+  it('can retain air ensembles for idealized spatial-gradient displays', () => {
+    const ensembles = createHydrogenEnsembles(2)
+    ensembles[1].samplePreset = 'gray-matter'
+
+    const states = createFidEnsembleStates(
+      ensembles,
+      3,
+      'uniform',
+      { includeAirEnsembles: true },
+    )
+
+    expect(states).toHaveLength(4)
+    expect(states.map((state) => state.index)).toEqual([0, 1, 2, 3])
+  })
+
   it('creates a normalized 3x3 isochromat grid for intravoxel dephasing', () => {
     const ensemble = new HydrogenEnsemble(0, 10, 12, 32)
     ensemble.samplePreset = 'cerebrospinal-fluid'
