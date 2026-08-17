@@ -1101,13 +1101,57 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
+.gradient-input-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.gradient-channel-toggle {
+  display: flex;
+  height: 23px;
+  gap: 5px;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.gradient-channel-toggle input {
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  accent-color: var(--cyan);
+  cursor: pointer;
+}
+
+.gradient-channel-toggle span {
+  color: inherit;
+  font-size: 7px;
+}
+
+.gradient-channel-toggle:has(input:checked) {
+  border-color: rgba(125, 215, 240, 0.38);
+  color: var(--white);
+  background: rgba(125, 215, 240, 0.045);
+}
+
+.gradient-channel-toggle:has(input:focus-visible) {
+  outline: 1px solid var(--cyan);
+  outline-offset: 2px;
+}
+
 .gradient-input-reset {
   display: flex;
   height: 23px;
   flex: 0 0 auto;
   gap: 5px;
   align-items: center;
-  margin: -2px 0 -1px auto;
+  margin: 0;
   padding: 0 7px;
   border: 1px solid var(--line);
   color: var(--muted);
@@ -1119,6 +1163,19 @@ a:focus-visible {
   text-transform: uppercase;
   transition: border-color 140ms ease, color 140ms ease,
     background 140ms ease;
+}
+
+.gradient-input-graph,
+.gradient-input-heading > strong {
+  transition: opacity 140ms ease;
+}
+
+.gradient-input.disabled .gradient-input-graph {
+  opacity: 0.3;
+}
+
+.gradient-input.disabled .gradient-input-heading > strong {
+  opacity: 0.45;
 }
 
 .gradient-input-reset::before {
@@ -1845,6 +1902,8 @@ a:focus-visible {
   .slice-graph-select .dark-select-trigger,
   .ensemble-details-close,
   .gradient-input-reset,
+  .gradient-input-graph,
+  .gradient-input-heading > strong,
   .gradient-handle-stroke,
   .slice-mapping-band-edge,
   .slice-mapping-band-grip {

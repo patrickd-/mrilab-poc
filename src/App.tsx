@@ -9,7 +9,9 @@ import LabScene, {
 } from './components/LabScene'
 import DarkSelect from './components/DarkSelect'
 import FidExperimentPanel from './components/FidExperimentPanel'
-import GradientEncodingExperimentPanel from './components/GradientEncodingExperimentPanel'
+import GradientEncodingExperimentPanel, {
+  type GradientChannelId,
+} from './components/GradientEncodingExperimentPanel'
 import RealismMenu, {
   type RealismOptionId,
 } from './components/RealismMenu'
@@ -53,6 +55,15 @@ const B0_OPTIONS: ReadonlyArray<{ id: B0Tesla; label: string }> = [
 // the data contract consumed inside that loop changes so Vite hot reload does
 // not leave an already-mounted scene running an incompatible closure.
 const LAB_SCENE_RUNTIME_VERSION = 'sinc-bloch-slice-selection-v1'
+const EMPTY_GRADIENT_PULSES: ReadonlyArray<GradientPulse> = []
+const DEFAULT_GRADIENT_CHANNELS_ENABLED: Readonly<
+  Record<GradientChannelId, boolean>
+> = {
+  rf: true,
+  'slice-selection': true,
+  'phase-encoding': true,
+  readout: true,
+}
 const B0_TESLA_VALUES: Readonly<
   Record<B0Tesla, SupportedFieldStrengthTesla>
 > = {
@@ -254,6 +265,9 @@ function App() {
   const [sliceSelectionPulses, setSliceSelectionPulses] = useState<
     GradientPulse[]
   >(() => copyGradientPulses(DEFAULT_SLICE_SELECTION_PULSES))
+  const [gradientChannelsEnabled, setGradientChannelsEnabled] = useState<
+    Record<GradientChannelId, boolean>
+  >(() => ({ ...DEFAULT_GRADIENT_CHANNELS_ENABLED }))
   const selectedEnsemble = selected ? ensembles[selected.index] : null
   const fieldStrengthTesla = B0_TESLA_VALUES[b0Tesla]
   const fieldUniformity: FieldUniformity = enabledRealismOptions.includes(
@@ -390,6 +404,16 @@ function App() {
     )
   }
 
+  const changeGradientChannelEnabled = (
+    channel: GradientChannelId,
+    enabled: boolean,
+  ) => {
+    setGradientChannelsEnabled((currentChannels) => ({
+      ...currentChannels,
+      [channel]: enabled,
+    }))
+  }
+
   const applySlicePreset = (action: SlicePresetAction) => {
     if (action === 'reset') {
       ensembles.forEach((ensemble) => {
@@ -470,11 +494,27 @@ function App() {
           gradientEncodingTimeMilliseconds={
             gradientPlayback.timeMilliseconds
           }
-          gradientPhaseEncodingPulses={phaseEncodingPulses}
-          gradientReadoutPulses={readoutPulses}
-          gradientRfExcitationPulses={rfExcitationPulses}
+          gradientPhaseEncodingPulses={
+            gradientChannelsEnabled['phase-encoding']
+              ? phaseEncodingPulses
+              : EMPTY_GRADIENT_PULSES
+          }
+          gradientReadoutPulses={
+            gradientChannelsEnabled.readout
+              ? readoutPulses
+              : EMPTY_GRADIENT_PULSES
+          }
+          gradientRfExcitationPulses={
+            gradientChannelsEnabled.rf
+              ? rfExcitationPulses
+              : EMPTY_GRADIENT_PULSES
+          }
           gradientTransmitFrequencyBand={transmitFrequencyBand}
-          gradientSliceSelectionPulses={sliceSelectionPulses}
+          gradientSliceSelectionPulses={
+            gradientChannelsEnabled['slice-selection']
+              ? sliceSelectionPulses
+              : EMPTY_GRADIENT_PULSES
+          }
           referenceFrame={referenceFrame}
           renderMode={renderMode}
           sliceGraphMode={sliceGraphMode}
@@ -680,6 +720,7 @@ function App() {
                 durationMilliseconds={
                   GRADIENT_SEQUENCE_DURATION_MILLISECONDS
                 }
+                enabledChannels={gradientChannelsEnabled}
                 gradientImperfections={gradientImperfections}
                 gridSize={GRID_SIZE}
                 phaseEncodingPulses={phaseEncodingPulses}
@@ -690,6 +731,7 @@ function App() {
                 status={gradientPlayback.status}
                 timeMilliseconds={gradientPlayback.timeMilliseconds}
                 onPause={gradientPlayback.pause}
+                onChannelEnabledChange={changeGradientChannelEnabled}
                 onRfExcitationPulsesChange={setRfExcitationPulses}
                 transmitFrequencyBand={transmitFrequencyBand}
                 onRfExcitationReset={() =>

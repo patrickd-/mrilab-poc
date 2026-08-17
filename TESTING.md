@@ -89,7 +89,8 @@ math that has historically been easy to regress:
 `src/components/SliceSelectionMappingGraph.test.tsx` verify default/reference
 waveforms (including the sampled sinc trace), derived RF metadata, independent
 reset buttons, play/pause/speed routing, playheads, keyboard and pointer editing,
-linked pulse boundaries, automatic half-area rewinder matching, timing guides,
+linked pulse boundaries, independent channel bypass controls that preserve
+configured waveforms, automatic half-area rewinder matching, timing guides,
 gradient imperfection traces, transmit-band dragging, minimum bandwidth,
 zero-gradient states, and negative-gradient position mirroring.
 

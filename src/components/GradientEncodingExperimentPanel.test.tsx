@@ -111,9 +111,16 @@ function panelProps(
 ): ComponentProps<typeof GradientEncodingExperimentPanel> {
   return {
     durationMilliseconds: GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+    enabledChannels: {
+      rf: true,
+      'slice-selection': true,
+      'phase-encoding': true,
+      readout: true,
+    },
     gradientImperfections: false,
     gridSize: 128,
     onPause: vi.fn(),
+    onChannelEnabledChange: vi.fn(),
     onRfExcitationPulsesChange: vi.fn(),
     onRfExcitationReset: vi.fn(),
     onPhaseEncodingPulsesChange: vi.fn(),
@@ -225,6 +232,31 @@ describe('GradientEncodingExperimentPanel', () => {
     expect(props.onPhaseEncodingReset).toHaveBeenCalledOnce()
     expect(props.onReadoutReset).toHaveBeenCalledOnce()
     expect(props.onTransmitFrequencyBandReset).toHaveBeenCalledOnce()
+  })
+
+  it('renders every channel enabled by default and routes checkbox changes', async () => {
+    const user = userEvent.setup()
+    const props = panelProps()
+    render(<GradientEncodingExperimentPanel {...props} />)
+
+    const channelCheckboxes = [
+      ['rf', 'Enable rf excitation pulse'],
+      ['slice-selection', 'Enable slice selection gradient'],
+      ['phase-encoding', 'Enable phase encoding gradient'],
+      ['readout', 'Enable readout gradient'],
+    ] as const
+
+    for (const [channel, accessibleName] of channelCheckboxes) {
+      const checkbox = screen.getByRole('checkbox', {
+        name: accessibleName,
+      }) as HTMLInputElement
+      expect(checkbox.checked).toBe(true)
+      await user.click(checkbox)
+      expect(props.onChannelEnabledChange).toHaveBeenCalledWith(
+        channel,
+        false,
+      )
+    }
   })
 
   it('edits pulse amplitude and linked timing with the keyboard', () => {

@@ -121,6 +121,9 @@ nominal flip angle are displayed together. Changing pulse width therefore
 changes both the sinc truncation and RF area—it no longer just changes how fast
 a fixed 90° rotation completes. Reset calibrates the current transmit band to a
 nominal 90° pulse when the 12 µT peak-B1 limit permits it.
+Each timing row can also be bypassed independently with its checked-by-default
+On control. Bypassing a channel removes it from the applied sequence without
+discarding its editable waveform.
 
 A frequency-to-position mapping below G_SS plots angular frequency against the
 slice's 0–127 mm position. Its green line uses the effective first G_SS lobe,

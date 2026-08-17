@@ -30,6 +30,11 @@ import DarkSelect from './DarkSelect'
 import SliceSelectionMappingGraph from './SliceSelectionMappingGraph'
 
 export type PulseHandle = 'left' | 'right' | 'top'
+export type GradientChannelId =
+  | 'rf'
+  | 'slice-selection'
+  | 'phase-encoding'
+  | 'readout'
 
 interface DragState {
   handle: PulseHandle
@@ -41,6 +46,7 @@ interface DragState {
 }
 
 interface EditableGradientGraphProps {
+  channelEnabled: boolean
   description: string
   durationMilliseconds: number
   gradientImperfections: boolean
@@ -49,6 +55,7 @@ interface EditableGradientGraphProps {
   linkedPulses?: boolean
   maintainHalfAreaRephasing?: boolean
   onChange: (pulses: GradientPulse[]) => void
+  onEnabledChange: (enabled: boolean) => void
   onGuideTimeChange: (time: number | null) => void
   onReset: () => void
   playheadTime: number | null
@@ -60,9 +67,14 @@ interface EditableGradientGraphProps {
 
 interface GradientEncodingExperimentPanelProps {
   durationMilliseconds: number
+  enabledChannels: Readonly<Record<GradientChannelId, boolean>>
   gradientImperfections: boolean
   gridSize: number
   onPause: () => void
+  onChannelEnabledChange: (
+    channel: GradientChannelId,
+    enabled: boolean,
+  ) => void
   onRfExcitationPulsesChange: (pulses: GradientPulse[]) => void
   onRfExcitationReset: () => void
   onPhaseEncodingPulsesChange: (pulses: GradientPulse[]) => void
@@ -215,6 +227,7 @@ export function updatePulses(
 }
 
 function EditableGradientGraph({
+  channelEnabled,
   description,
   durationMilliseconds,
   gradientImperfections,
@@ -223,6 +236,7 @@ function EditableGradientGraph({
   linkedPulses = false,
   maintainHalfAreaRephasing = false,
   onChange,
+  onEnabledChange,
   onGuideTimeChange,
   onReset,
   playheadTime,
@@ -407,7 +421,11 @@ function EditableGradientGraph({
       }).join(' ')
     : ''
   return (
-    <div className={`gradient-input gradient-input-${label.toLowerCase()}`}>
+    <div
+      className={`gradient-input gradient-input-${label.toLowerCase()}${
+        channelEnabled ? '' : ' disabled'
+      }`}
+    >
       <header className="gradient-input-heading">
         <strong className="formula">
           {label === 'RF' ? (
@@ -417,15 +435,28 @@ function EditableGradientGraph({
           )}
         </strong>
         <span>{description}</span>
-        <button
-          className="gradient-input-reset"
-          type="button"
-          title={`Reset ${description.toLowerCase()}`}
-          aria-label={`Reset ${description.toLowerCase()}`}
-          onClick={onReset}
-        >
-          Reset
-        </button>
+        <div className="gradient-input-actions">
+          <label className="gradient-channel-toggle">
+            <input
+              type="checkbox"
+              checked={channelEnabled}
+              aria-label={`Enable ${description.toLowerCase()}`}
+              onChange={(event) =>
+                onEnabledChange(event.currentTarget.checked)
+              }
+            />
+            <span>On</span>
+          </label>
+          <button
+            className="gradient-input-reset"
+            type="button"
+            title={`Reset ${description.toLowerCase()}`}
+            aria-label={`Reset ${description.toLowerCase()}`}
+            onClick={onReset}
+          >
+            Reset
+          </button>
+        </div>
       </header>
 
       <svg
@@ -666,9 +697,11 @@ function EditableGradientGraph({
 
 function GradientEncodingExperimentPanel({
   durationMilliseconds,
+  enabledChannels,
   gradientImperfections,
   gridSize,
   onPause,
+  onChannelEnabledChange,
   onRfExcitationPulsesChange,
   onRfExcitationReset,
   onPhaseEncodingPulsesChange,
@@ -814,6 +847,7 @@ function GradientEncodingExperimentPanel({
 
         <div className="gradient-timing-diagram">
           <EditableGradientGraph
+            channelEnabled={enabledChannels.rf}
             description="RF excitation pulse"
             durationMilliseconds={durationMilliseconds}
             gradientImperfections={false}
@@ -827,6 +861,9 @@ function GradientEncodingExperimentPanel({
             }
             rfTransmitFrequencyBand={transmitFrequencyBand}
             onChange={onRfExcitationPulsesChange}
+            onEnabledChange={(enabled) =>
+              onChannelEnabledChange('rf', enabled)
+            }
             onGuideTimeChange={setTimingGuideTime}
             onReset={onRfExcitationReset}
           />
@@ -842,6 +879,7 @@ function GradientEncodingExperimentPanel({
             </strong>
           </div>
           <EditableGradientGraph
+            channelEnabled={enabledChannels['slice-selection']}
             description="Slice selection gradient"
             durationMilliseconds={durationMilliseconds}
             gradientImperfections={gradientImperfections}
@@ -853,6 +891,9 @@ function GradientEncodingExperimentPanel({
             playheadTime={playheadTime}
             referenceWaveforms={SLICE_SELECTION_REFERENCE_WAVEFORMS}
             onChange={onSliceSelectionPulsesChange}
+            onEnabledChange={(enabled) =>
+              onChannelEnabledChange('slice-selection', enabled)
+            }
             onGuideTimeChange={setTimingGuideTime}
             onReset={onSliceSelectionReset}
           />
@@ -896,6 +937,7 @@ function GradientEncodingExperimentPanel({
 
         <div className="gradient-timing-diagram">
           <EditableGradientGraph
+            channelEnabled={enabledChannels['phase-encoding']}
             description="Phase encoding gradient"
             durationMilliseconds={durationMilliseconds}
             gradientImperfections={gradientImperfections}
@@ -905,10 +947,14 @@ function GradientEncodingExperimentPanel({
             playheadTime={playheadTime}
             referenceWaveforms={PHASE_ENCODING_REFERENCE_WAVEFORMS}
             onChange={onPhaseEncodingPulsesChange}
+            onEnabledChange={(enabled) =>
+              onChannelEnabledChange('phase-encoding', enabled)
+            }
             onGuideTimeChange={setTimingGuideTime}
             onReset={onPhaseEncodingReset}
           />
           <EditableGradientGraph
+            channelEnabled={enabledChannels.readout}
             description="Readout gradient"
             durationMilliseconds={durationMilliseconds}
             gradientImperfections={gradientImperfections}
@@ -919,6 +965,9 @@ function GradientEncodingExperimentPanel({
             playheadTime={playheadTime}
             referenceWaveforms={READOUT_REFERENCE_WAVEFORMS}
             onChange={onReadoutPulsesChange}
+            onEnabledChange={(enabled) =>
+              onChannelEnabledChange('readout', enabled)
+            }
             onGuideTimeChange={setTimingGuideTime}
             onReset={onReadoutReset}
           />

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   gradientHook: vi.fn(),
   fidHook: vi.fn(),
+  gradientPanelProps: null as Record<string, any> | null,
   resetCamera: vi.fn(),
   sceneProps: null as Record<string, unknown> | null,
 }))
@@ -64,9 +65,28 @@ vi.mock('./components/SpinEchoExperimentPanel', () => ({
 }))
 
 vi.mock('./components/GradientEncodingExperimentPanel', () => ({
-  default: () => (
-    <div data-testid="gradient-experiment">Gradient experiment view</div>
-  ),
+  default: (props: Record<string, any>) => {
+    mocks.gradientPanelProps = props
+    return (
+      <div data-testid="gradient-experiment">
+        Gradient experiment view
+        {[
+          ['rf', 'Disable RF channel'],
+          ['slice-selection', 'Disable slice-selection channel'],
+          ['phase-encoding', 'Disable phase-encoding channel'],
+          ['readout', 'Disable readout channel'],
+        ].map(([channel, label]) => (
+          <button
+            key={channel}
+            type="button"
+            onClick={() => props.onChannelEnabledChange(channel, false)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    )
+  },
 }))
 
 import App from './App'
@@ -89,6 +109,7 @@ async function selectExperiment(
 describe('App integration', () => {
   beforeEach(() => {
     mocks.resetCamera.mockReset()
+    mocks.gradientPanelProps = null
     mocks.sceneProps = null
     mocks.fidHook.mockReset().mockReturnValue({
       applyPulse: vi.fn(),
@@ -148,6 +169,35 @@ describe('App integration', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByText('Static nuclear properties')).toBeNull()
     expect(experimentViewIsHidden()).toBe(false)
+  })
+
+  it('bypasses disabled gradient channels without discarding their waveforms', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await selectExperiment(user, 'Gradient Encoding Experiment')
+
+    const channels = [
+      ['Disable RF channel', 'gradientRfExcitationPulses', 'rfExcitationPulses'],
+      [
+        'Disable slice-selection channel',
+        'gradientSliceSelectionPulses',
+        'sliceSelectionPulses',
+      ],
+      [
+        'Disable phase-encoding channel',
+        'gradientPhaseEncodingPulses',
+        'phaseEncodingPulses',
+      ],
+      ['Disable readout channel', 'gradientReadoutPulses', 'readoutPulses'],
+    ] as const
+
+    for (const [buttonName, sceneProp, panelProp] of channels) {
+      expect(mocks.sceneProps?.[sceneProp]).not.toHaveLength(0)
+      await user.click(screen.getByRole('button', { name: buttonName }))
+      expect(mocks.sceneProps?.[sceneProp]).toEqual([])
+      expect(mocks.gradientPanelProps?.[panelProp]).not.toHaveLength(0)
+    }
   })
 
   it('applies nested slice presets and resets the selected ensemble to air', async () => {
