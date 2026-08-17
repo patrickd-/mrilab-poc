@@ -20,6 +20,7 @@ import SpinEchoExperimentPanel from './components/SpinEchoExperimentPanel'
 import { useFidSimulation } from './hooks/useFidSimulation'
 import { useGradientEncodingPlayback } from './hooks/useGradientEncodingPlayback'
 import {
+  createBlockSimulationEnsembles,
   createHydrogenEnsembles,
   type FieldUniformity,
   PHYSICAL_CONSTANTS,
@@ -62,6 +63,7 @@ const RENDER_MODE_OPTIONS: ReadonlyArray<{
   label: string
 }> = [
   { id: 'slice', label: 'Slice View' },
+  { id: 'block', label: 'Block View' },
   { id: 'stacked', label: 'Stacked View' },
 ]
 const REFERENCE_FRAME_OPTIONS: ReadonlyArray<{
@@ -253,6 +255,13 @@ function App() {
   const tissueHeterogeneity = enabledRealismOptions.includes(
     'tissue-heterogeneity',
   )
+  const simulationEnsembles = useMemo(
+    () =>
+      renderMode === 'block'
+        ? createBlockSimulationEnsembles(ensembles)
+        : ensembles,
+    [ensembleRevision, ensembles, renderMode],
+  )
   const magneticProperties = selectedEnsemble?.magneticProperties(
     fieldStrengthTesla,
     fieldUniformity,
@@ -278,7 +287,7 @@ function App() {
     () =>
       gradientExperimentSelected
         ? createFidEnsembleStates(
-            ensembles,
+            simulationEnsembles,
             fieldStrengthTesla,
             fieldUniformity,
             {
@@ -289,7 +298,7 @@ function App() {
         : [],
     [
       ensembleRevision,
-      ensembles,
+      simulationEnsembles,
       fieldStrengthTesla,
       fieldUniformity,
       gradientExperimentSelected,
@@ -299,7 +308,7 @@ function App() {
   )
   const fidSimulation = useFidSimulation({
     active: simulationExperimentSelected,
-    ensembles,
+    ensembles: simulationEnsembles,
     ensembleRevision,
     fieldStrengthTesla,
     fieldUniformity,
@@ -415,7 +424,9 @@ function App() {
         aria-label={
           renderMode === 'stacked'
             ? 'Stacked hydrogen ensemble magnetization'
-            : 'Hydrogen ensemble grid'
+            : renderMode === 'block'
+              ? 'Cutaway hydrogen ensemble block'
+              : 'Hydrogen ensemble grid'
         }
       >
         <LabScene
@@ -451,12 +462,18 @@ function App() {
         <header className="viewport-header">
           <div>
             <span className="overline">
-              {renderMode === 'stacked' ? 'Phase domain' : 'Spatial domain'}
+              {renderMode === 'stacked'
+                ? 'Phase domain'
+                : renderMode === 'block'
+                  ? 'Volumetric domain'
+                  : 'Spatial domain'}
             </span>
             <strong>
               {renderMode === 'stacked'
                 ? 'STACKED ENSEMBLES'
-                : 'ENSEMBLE SLICE'}
+                : renderMode === 'block'
+                  ? 'CUTAWAY BLOCK'
+                  : 'ENSEMBLE SLICE'}
             </strong>
           </div>
           <div className="slice-size">
@@ -464,6 +481,15 @@ function App() {
               <>
                 <span>{stackedEnsembleCount.toLocaleString()} vectors</span>
                 <small>Spatial positions collapsed</small>
+              </>
+            ) : renderMode === 'block' ? (
+              <>
+                <span>{GRID_SIZE} × {GRID_SIZE} × {GRID_SIZE}</span>
+                <small>
+                  {simulationEnsembles.length.toLocaleString()} simulated
+                  surface ensembles
+                </small>
+                <small>1 ensemble = 1 mm³</small>
               </>
             ) : (
               <>

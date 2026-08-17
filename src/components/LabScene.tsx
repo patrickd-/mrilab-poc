@@ -13,6 +13,7 @@ import type {
   SupportedFieldStrengthTesla,
 } from '../models/HydrogenEnsemble'
 import {
+  blockSimulationSourceIndices,
   fieldProfileAt,
   NON_UNIFORM_FIELD_MODEL,
   PROTON_GYROMAGNETIC_RATIO,
@@ -35,6 +36,16 @@ export const GRID_SIZE = 128
 const GRID_SPACING = 0.42
 const SPHERE_RADIUS = 0.198
 const GRID_OFFSET = ((GRID_SIZE - 1) * GRID_SPACING) / 2
+const BLOCK_CUT_SIZE = GRID_SIZE / 2
+const BLOCK_PLANE_ENSEMBLE_COUNT = GRID_SIZE * GRID_SIZE
+const BLOCK_FACE_ENSEMBLE_COUNT = BLOCK_CUT_SIZE * BLOCK_CUT_SIZE
+const BLOCK_SIMULATED_ENSEMBLE_COUNT =
+  BLOCK_PLANE_ENSEMBLE_COUNT + 3 * BLOCK_FACE_ENSEMBLE_COUNT
+const BLOCK_CONTEXT_ENSEMBLE_COUNT =
+  GRID_SIZE ** 3 -
+  BLOCK_CUT_SIZE ** 3 -
+  BLOCK_PLANE_ENSEMBLE_COUNT -
+  3 * BLOCK_FACE_ENSEMBLE_COUNT
 const SLICE_GRAPH_BASE_HEIGHT = 10
 const SLICE_GRAPH_HEIGHT = 5.6
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
@@ -51,6 +62,7 @@ const CAMERA_POSITION = new THREE.Vector3(0, -0.001, CAMERA_DISTANCE)
 const CAMERA_TARGET = new THREE.Vector3(0, 0, 0)
 const CAMERA_UP = new THREE.Vector3(0, 0, 1)
 const STACKED_CAMERA_POSITION = new THREE.Vector3(0.68, 0.52, 1.08)
+const BLOCK_CAMERA_POSITION = new THREE.Vector3(88, -88, 78)
 const SLICE_CAMERA_MIN_POLAR_ANGLE = 0.0001
 const SLICE_CAMERA_MAX_POLAR_ANGLE = Math.PI / 2 - 0.04
 const STACKED_CAMERA_MIN_POLAR_ANGLE = 0.08
@@ -86,13 +98,14 @@ export interface EnsembleSelection {
   column: number
   row: number
   index: number
+  worldPosition?: { x: number; y: number; z: number }
 }
 
 export interface LabSceneHandle {
   resetCamera: () => void
 }
 
-export type RenderMode = 'slice' | 'stacked'
+export type RenderMode = 'slice' | 'block' | 'stacked'
 export type ReferenceFrame = 'laboratory-slowed' | 'rotating'
 export type SliceGraphMode =
   | 'none'
@@ -132,6 +145,130 @@ function gridPosition(column: number, row: number) {
   )
 }
 
+interface BlockLayout {
+  contextPositions: Float32Array
+  simulatedPositions: Float32Array
+  sourceIndices: number[]
+}
+
+function createBlockLayout(): BlockLayout {
+  const sourceIndices = blockSimulationSourceIndices(GRID_SIZE)
+  const simulatedPositions = new Float32Array(
+    BLOCK_SIMULATED_ENSEMBLE_COUNT * 3,
+  )
+  const cutBoundary =
+    (BLOCK_CUT_SIZE - 1) * GRID_SPACING - GRID_OFFSET
+
+  const setSimulatedPosition = (
+    index: number,
+    x: number,
+    y: number,
+    z: number,
+  ) => {
+    const offset = index * 3
+    simulatedPositions[offset] = x
+    simulatedPositions[offset + 1] = y
+    simulatedPositions[offset + 2] = z
+  }
+
+  let simulatedIndex = 0
+  for (let row = 0; row < GRID_SIZE; row += 1) {
+    for (let column = 0; column < GRID_SIZE; column += 1) {
+      setSimulatedPosition(
+        simulatedIndex,
+        column * GRID_SPACING - GRID_OFFSET,
+        GRID_OFFSET - row * GRID_SPACING,
+        -GRID_OFFSET,
+      )
+      simulatedIndex += 1
+    }
+  }
+
+  // The same source quadrant is rotated onto each exposed cut face.
+  for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
+    for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
+      const x = column * GRID_SPACING - GRID_OFFSET
+      const y = GRID_OFFSET - row * GRID_SPACING
+      setSimulatedPosition(simulatedIndex, x, y, cutBoundary)
+      simulatedIndex += 1
+    }
+  }
+  for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
+    for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
+      const y = GRID_OFFSET - row * GRID_SPACING
+      const z = column * GRID_SPACING - GRID_OFFSET
+      setSimulatedPosition(simulatedIndex, cutBoundary, y, z)
+      simulatedIndex += 1
+    }
+  }
+  for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
+    for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
+      const x = column * GRID_SPACING - GRID_OFFSET
+      const z = row * GRID_SPACING - GRID_OFFSET
+      setSimulatedPosition(simulatedIndex, x, -cutBoundary, z)
+      simulatedIndex += 1
+    }
+  }
+
+  const contextPositions = new Float32Array(
+    BLOCK_CONTEXT_ENSEMBLE_COUNT * 3,
+  )
+  let contextOffset = 0
+  for (let layer = 0; layer < GRID_SIZE; layer += 1) {
+    for (let row = 0; row < GRID_SIZE; row += 1) {
+      for (let column = 0; column < GRID_SIZE; column += 1) {
+        const inRemovedCorner =
+          column >= BLOCK_CUT_SIZE &&
+          row >= BLOCK_CUT_SIZE &&
+          layer >= BLOCK_CUT_SIZE
+        const onSourcePlane = layer === 0
+        const onHorizontalCutFace =
+          layer === BLOCK_CUT_SIZE - 1 &&
+          column >= BLOCK_CUT_SIZE &&
+          row >= BLOCK_CUT_SIZE
+        const onVerticalXCutFace =
+          column === BLOCK_CUT_SIZE - 1 &&
+          row >= BLOCK_CUT_SIZE &&
+          layer >= BLOCK_CUT_SIZE
+        const onVerticalYCutFace =
+          row === BLOCK_CUT_SIZE - 1 &&
+          column >= BLOCK_CUT_SIZE &&
+          layer >= BLOCK_CUT_SIZE
+
+        if (
+          inRemovedCorner ||
+          onSourcePlane ||
+          onHorizontalCutFace ||
+          onVerticalXCutFace ||
+          onVerticalYCutFace
+        ) {
+          continue
+        }
+
+        contextPositions[contextOffset] =
+          column * GRID_SPACING - GRID_OFFSET
+        contextPositions[contextOffset + 1] =
+          GRID_OFFSET - row * GRID_SPACING
+        contextPositions[contextOffset + 2] =
+          layer * GRID_SPACING - GRID_OFFSET
+        contextOffset += 3
+      }
+    }
+  }
+
+  return {
+    contextPositions,
+    simulatedPositions,
+    sourceIndices,
+  }
+}
+
+function initialCameraPosition(renderMode: RenderMode) {
+  if (renderMode === 'stacked') return STACKED_CAMERA_POSITION
+  if (renderMode === 'block') return BLOCK_CAMERA_POSITION
+  return CAMERA_POSITION
+}
+
 function smoothStep(progress: number) {
   return progress * progress * (3 - 2 * progress)
 }
@@ -166,6 +303,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
     const controlsRef = useRef<OrbitControls | null>(null)
     const ensemblesRef = useRef<THREE.InstancedMesh | null>(null)
+    const blockEnsemblesRef = useRef<THREE.InstancedMesh | null>(null)
+    const blockSourceIndicesRef = useRef<ReadonlyArray<number>>([])
     const fidArrowShaftsRef = useRef<THREE.InstancedMesh | null>(null)
     const fidArrowHeadsRef = useRef<THREE.InstancedMesh | null>(null)
     const referenceFrameRef = useRef(referenceFrame)
@@ -179,10 +318,20 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       boundary: THREE.LineLoop
       b1ArrowHeads: THREE.InstancedMesh
       b1ArrowShafts: THREE.InstancedMesh
+      blockB1ArrowHeads: THREE.InstancedMesh
+      blockB1ArrowShafts: THREE.InstancedMesh
+      blockContext: THREE.Points
+      blockEnsembles: THREE.InstancedMesh
+      blockFidArrowHeads: THREE.InstancedMesh
+      blockFidArrowShafts: THREE.InstancedMesh
+      blockFieldArrowHeads: THREE.InstancedMesh
+      blockFieldArrowShafts: THREE.InstancedMesh
       ensembles: THREE.InstancedMesh
+      fidArrowHeads: THREE.InstancedMesh
       fieldArrowHeads: THREE.InstancedMesh
       fieldArrowShafts: THREE.InstancedMesh
       fidArrowMaterial: THREE.MeshBasicMaterial
+      fidArrowShafts: THREE.InstancedMesh
       sliceGraphSurface: THREE.Mesh
       stackedFieldArrowHead: THREE.Mesh
       stackedFieldArrowShaft: THREE.Mesh
@@ -262,16 +411,26 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const modeObjects = modeObjectsRef.current
       if (!modeObjects) return
 
+      const slice = renderMode === 'slice'
+      const block = renderMode === 'block'
       const stacked = renderMode === 'stacked'
-      modeObjects.ensembles.visible = !stacked
-      modeObjects.boundary.visible = !stacked
-      modeObjects.fieldArrowShafts.visible = !stacked
-      modeObjects.fieldArrowHeads.visible = !stacked
+      modeObjects.ensembles.visible = slice
+      modeObjects.boundary.visible = slice
+      modeObjects.fieldArrowShafts.visible = slice
+      modeObjects.fieldArrowHeads.visible = slice
+      modeObjects.fidArrowShafts.visible = !block
+      modeObjects.fidArrowHeads.visible = !block
+      modeObjects.blockContext.visible = block
+      modeObjects.blockEnsembles.visible = block
+      modeObjects.blockFieldArrowShafts.visible = block
+      modeObjects.blockFieldArrowHeads.visible = block
+      modeObjects.blockFidArrowShafts.visible = block
+      modeObjects.blockFidArrowHeads.visible = block
       modeObjects.stackedSphere.visible = stacked
       modeObjects.stackedFieldArrowShaft.visible = stacked
       modeObjects.stackedFieldArrowHead.visible = stacked
       modeObjects.sliceGraphSurface.visible =
-        !stacked && sliceGraphModeRef.current !== 'none'
+        slice && sliceGraphModeRef.current !== 'none'
       modeObjects.fidArrowMaterial.opacity = stacked ? 0.025 : 1
       modeObjects.fidArrowMaterial.needsUpdate = true
       fidArrowsDirtyRef.current = true
@@ -281,15 +440,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const controls = controlsRef.current
       if (!camera || !controls) return
       focusTransitionRef.current = null
-      controls.minPolarAngle = stacked
-        ? STACKED_CAMERA_MIN_POLAR_ANGLE
-        : SLICE_CAMERA_MIN_POLAR_ANGLE
-      controls.maxPolarAngle = stacked
-        ? STACKED_CAMERA_MAX_POLAR_ANGLE
-        : SLICE_CAMERA_MAX_POLAR_ANGLE
-      camera.position.copy(
-        stacked ? STACKED_CAMERA_POSITION : CAMERA_POSITION,
-      )
+      controls.minPolarAngle = slice
+        ? SLICE_CAMERA_MIN_POLAR_ANGLE
+        : STACKED_CAMERA_MIN_POLAR_ANGLE
+      controls.maxPolarAngle = slice
+        ? SLICE_CAMERA_MAX_POLAR_ANGLE
+        : STACKED_CAMERA_MAX_POLAR_ANGLE
+      camera.position.copy(initialCameraPosition(renderMode))
       camera.up.copy(CAMERA_UP)
       controls.target.copy(CAMERA_TARGET)
       controls.update()
@@ -305,6 +462,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         if (modeObjects) {
           modeObjects.b1ArrowHeads.visible = false
           modeObjects.b1ArrowShafts.visible = false
+          modeObjects.blockB1ArrowHeads.visible = false
+          modeObjects.blockB1ArrowShafts.visible = false
           modeObjects.stackedB1ArrowHead.visible = false
           modeObjects.stackedB1ArrowShaft.visible = false
         }
@@ -354,42 +513,63 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
     useEffect(() => {
       const ensembles = ensemblesRef.current
+      const blockEnsembles = blockEnsemblesRef.current
+      const blockSourceIndices = blockSourceIndicesRef.current
+
+      const colorSourceInstances = (
+        sourceIndex: number,
+        color: THREE.Color,
+      ) => {
+        ensembles?.setColorAt(sourceIndex, color)
+        if (!blockEnsembles) return
+        blockSourceIndices.forEach((candidate, blockIndex) => {
+          if (candidate === sourceIndex) {
+            blockEnsembles.setColorAt(blockIndex, color)
+          }
+        })
+      }
 
       if (!selected || renderMode === 'stacked') {
-        if (ensembles && previousSelectionRef.current !== null) {
-          ensembles.setColorAt(
+        if (previousSelectionRef.current !== null) {
+          colorSourceInstances(
             previousSelectionRef.current,
             SAMPLE_SPHERE_COLORS[
               ensembleModels[previousSelectionRef.current].samplePreset
             ],
           )
-          if (ensembles.instanceColor) {
-            ensembles.instanceColor.needsUpdate = true
-          }
+        }
+        if (ensembles?.instanceColor) ensembles.instanceColor.needsUpdate = true
+        if (blockEnsembles?.instanceColor) {
+          blockEnsembles.instanceColor.needsUpdate = true
         }
         previousSelectionRef.current = null
         selectedIndexRef.current = null
         return
       }
 
-      const selectedPosition = gridPosition(selected.column, selected.row)
-
-      if (ensembles) {
-        if (previousSelectionRef.current !== null) {
-          ensembles.setColorAt(
-            previousSelectionRef.current,
-            SAMPLE_SPHERE_COLORS[
-              ensembleModels[previousSelectionRef.current].samplePreset
-            ],
+      const selectedPosition = selected.worldPosition
+        ? new THREE.Vector3(
+            selected.worldPosition.x,
+            selected.worldPosition.y,
+            selected.worldPosition.z,
           )
-        }
-        ensembles.setColorAt(selected.index, SELECTED_SPHERE_COLOR)
-        if (ensembles.instanceColor) {
-          ensembles.instanceColor.needsUpdate = true
-        }
-        previousSelectionRef.current = selected.index
-        selectedIndexRef.current = selected.index
+        : gridPosition(selected.column, selected.row)
+
+      if (previousSelectionRef.current !== null) {
+        colorSourceInstances(
+          previousSelectionRef.current,
+          SAMPLE_SPHERE_COLORS[
+            ensembleModels[previousSelectionRef.current].samplePreset
+          ],
+        )
       }
+      colorSourceInstances(selected.index, SELECTED_SPHERE_COLOR)
+      if (ensembles?.instanceColor) ensembles.instanceColor.needsUpdate = true
+      if (blockEnsembles?.instanceColor) {
+        blockEnsembles.instanceColor.needsUpdate = true
+      }
+      previousSelectionRef.current = selected.index
+      selectedIndexRef.current = selected.index
 
       const camera = cameraRef.current
       const controls = controlsRef.current
@@ -407,7 +587,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
     useEffect(() => {
       const ensembles = ensemblesRef.current
-      if (!ensembles) return
+      const blockEnsembles = blockEnsemblesRef.current
+      const blockSourceIndices = blockSourceIndicesRef.current
+      if (!ensembles || !blockEnsembles) return
 
       ensembleModels.forEach((ensemble, index) => {
         ensembles.setColorAt(
@@ -420,6 +602,19 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       if (ensembles.instanceColor) {
         ensembles.instanceColor.needsUpdate = true
       }
+      blockSourceIndices.forEach((sourceIndex, blockIndex) => {
+        blockEnsembles.setColorAt(
+          blockIndex,
+          sourceIndex === selectedIndexRef.current
+            ? SELECTED_SPHERE_COLOR
+            : SAMPLE_SPHERE_COLORS[
+                ensembleModels[sourceIndex].samplePreset
+              ],
+        )
+      })
+      if (blockEnsembles.instanceColor) {
+        blockEnsembles.instanceColor.needsUpdate = true
+      }
     }, [ensembleModels, ensembleRevision])
 
     useImperativeHandle(ref, () => ({
@@ -429,11 +624,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         if (!camera || !controls) return
 
         focusTransitionRef.current = null
-        camera.position.copy(
-          renderModeRef.current === 'stacked'
-            ? STACKED_CAMERA_POSITION
-            : CAMERA_POSITION,
-        )
+        camera.position.copy(initialCameraPosition(renderModeRef.current))
         camera.up.copy(CAMERA_UP)
         controls.target.copy(CAMERA_TARGET)
         controls.update()
@@ -449,11 +640,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
       const camera = new THREE.PerspectiveCamera(40, 1, 0.025, 800)
       camera.up.copy(CAMERA_UP)
-      camera.position.copy(
-        renderModeRef.current === 'stacked'
-          ? STACKED_CAMERA_POSITION
-          : CAMERA_POSITION,
-      )
+      camera.position.copy(initialCameraPosition(renderModeRef.current))
       cameraRef.current = camera
 
       const renderer = new THREE.WebGLRenderer({
@@ -471,13 +658,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       controls.minDistance = 0.12
       controls.maxDistance = CAMERA_DISTANCE * 2.4
       controls.minPolarAngle =
-        renderModeRef.current === 'stacked'
-          ? STACKED_CAMERA_MIN_POLAR_ANGLE
-          : SLICE_CAMERA_MIN_POLAR_ANGLE
+        renderModeRef.current === 'slice'
+          ? SLICE_CAMERA_MIN_POLAR_ANGLE
+          : STACKED_CAMERA_MIN_POLAR_ANGLE
       controls.maxPolarAngle =
-        renderModeRef.current === 'stacked'
-          ? STACKED_CAMERA_MAX_POLAR_ANGLE
-          : SLICE_CAMERA_MAX_POLAR_ANGLE
+        renderModeRef.current === 'slice'
+          ? SLICE_CAMERA_MAX_POLAR_ANGLE
+          : STACKED_CAMERA_MAX_POLAR_ANGLE
       controls.zoomSpeed = 0.85
       controls.zoomToCursor = false
       controls.panSpeed = 0.75
@@ -632,6 +819,97 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         stackedB1ArrowHead,
       )
 
+      const blockLayout = createBlockLayout()
+      blockSourceIndicesRef.current = blockLayout.sourceIndices
+      const blockEnsembles = new THREE.InstancedMesh(
+        sphereGeometry,
+        sphereMaterial,
+        BLOCK_SIMULATED_ENSEMBLE_COUNT,
+      )
+      const blockFieldArrowShafts = new THREE.InstancedMesh(
+        arrowShaftGeometry,
+        arrowMaterial,
+        BLOCK_SIMULATED_ENSEMBLE_COUNT,
+      )
+      const blockFieldArrowHeads = new THREE.InstancedMesh(
+        arrowHeadGeometry,
+        arrowMaterial,
+        BLOCK_SIMULATED_ENSEMBLE_COUNT,
+      )
+      const blockFidArrowShafts = new THREE.InstancedMesh(
+        fidArrowShaftGeometry,
+        fidArrowMaterial,
+        BLOCK_SIMULATED_ENSEMBLE_COUNT,
+      )
+      const blockFidArrowHeads = new THREE.InstancedMesh(
+        fidArrowHeadGeometry,
+        fidArrowMaterial,
+        BLOCK_SIMULATED_ENSEMBLE_COUNT,
+      )
+      const blockB1ArrowShafts = new THREE.InstancedMesh(
+        arrowShaftGeometry,
+        b1ArrowMaterial,
+        BLOCK_SIMULATED_ENSEMBLE_COUNT,
+      )
+      const blockB1ArrowHeads = new THREE.InstancedMesh(
+        arrowHeadGeometry,
+        b1ArrowMaterial,
+        BLOCK_SIMULATED_ENSEMBLE_COUNT,
+      )
+      ;[
+        blockFidArrowShafts,
+        blockFidArrowHeads,
+        blockB1ArrowShafts,
+        blockB1ArrowHeads,
+      ].forEach((mesh) => {
+        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+        mesh.frustumCulled = false
+      })
+      blockB1ArrowShafts.renderOrder = 20
+      blockB1ArrowHeads.renderOrder = 20
+
+      const contextSpriteCanvas = document.createElement('canvas')
+      contextSpriteCanvas.width = 32
+      contextSpriteCanvas.height = 32
+      const contextSpriteContext = contextSpriteCanvas.getContext('2d')
+      if (contextSpriteContext) {
+        const gradient = contextSpriteContext.createRadialGradient(
+          11,
+          10,
+          2,
+          16,
+          16,
+          15,
+        )
+        gradient.addColorStop(0, 'rgba(255,255,255,1)')
+        gradient.addColorStop(0.55, 'rgba(220,228,232,0.8)')
+        gradient.addColorStop(1, 'rgba(190,200,206,0)')
+        contextSpriteContext.fillStyle = gradient
+        contextSpriteContext.fillRect(0, 0, 32, 32)
+      }
+      const blockContextTexture = new THREE.CanvasTexture(contextSpriteCanvas)
+      blockContextTexture.colorSpace = THREE.SRGBColorSpace
+      const blockContextGeometry = new THREE.BufferGeometry()
+      blockContextGeometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(blockLayout.contextPositions, 3),
+      )
+      const blockContextMaterial = new THREE.PointsMaterial({
+        alphaTest: 0.04,
+        color: '#b8c0c5',
+        depthWrite: false,
+        map: blockContextTexture,
+        opacity: 0.055,
+        size: 2.3,
+        sizeAttenuation: true,
+        transparent: true,
+      })
+      const blockContext = new THREE.Points(
+        blockContextGeometry,
+        blockContextMaterial,
+      )
+      blockContext.frustumCulled = false
+
       const instanceMatrix = new THREE.Matrix4()
       const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0)
       let instanceIndex = 0
@@ -660,6 +938,33 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         }
       }
 
+      for (
+        let blockIndex = 0;
+        blockIndex < BLOCK_SIMULATED_ENSEMBLE_COUNT;
+        blockIndex += 1
+      ) {
+        const positionOffset = blockIndex * 3
+        instanceMatrix.makeTranslation(
+          blockLayout.simulatedPositions[positionOffset],
+          blockLayout.simulatedPositions[positionOffset + 1],
+          blockLayout.simulatedPositions[positionOffset + 2],
+        )
+        blockEnsembles.setMatrixAt(blockIndex, instanceMatrix)
+        blockFieldArrowShafts.setMatrixAt(blockIndex, instanceMatrix)
+        blockFieldArrowHeads.setMatrixAt(blockIndex, instanceMatrix)
+        blockFidArrowShafts.setMatrixAt(blockIndex, hiddenMatrix)
+        blockFidArrowHeads.setMatrixAt(blockIndex, hiddenMatrix)
+        const sourceIndex = blockLayout.sourceIndices[blockIndex]
+        blockEnsembles.setColorAt(
+          blockIndex,
+          sourceIndex === selected?.index
+            ? SELECTED_SPHERE_COLOR
+            : SAMPLE_SPHERE_COLORS[
+                ensembleModels[sourceIndex].samplePreset
+              ],
+        )
+      }
+
       ensembles.instanceMatrix.needsUpdate = true
       arrowShafts.instanceMatrix.needsUpdate = true
       arrowHeads.instanceMatrix.needsUpdate = true
@@ -668,11 +973,31 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       if (ensembles.instanceColor) {
         ensembles.instanceColor.needsUpdate = true
       }
+      blockEnsembles.instanceMatrix.needsUpdate = true
+      blockFieldArrowShafts.instanceMatrix.needsUpdate = true
+      blockFieldArrowHeads.instanceMatrix.needsUpdate = true
+      blockFidArrowShafts.instanceMatrix.needsUpdate = true
+      blockFidArrowHeads.instanceMatrix.needsUpdate = true
+      if (blockEnsembles.instanceColor) {
+        blockEnsembles.instanceColor.needsUpdate = true
+      }
       ensembles.computeBoundingSphere()
+      blockEnsembles.computeBoundingSphere()
       scene.add(ensembles)
       ensemblesRef.current = ensembles
+      blockEnsemblesRef.current = blockEnsembles
 
       scene.add(arrowShafts, arrowHeads, fidArrowShafts, fidArrowHeads)
+      scene.add(
+        blockContext,
+        blockEnsembles,
+        blockFieldArrowShafts,
+        blockFieldArrowHeads,
+        blockFidArrowShafts,
+        blockFidArrowHeads,
+        blockB1ArrowShafts,
+        blockB1ArrowHeads,
+      )
       fidArrowShaftsRef.current = fidArrowShafts
       fidArrowHeadsRef.current = fidArrowHeads
 
@@ -746,11 +1071,23 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         arrowHeadGeometry,
         arrowMaterial,
       )
+      const slice = renderModeRef.current === 'slice'
+      const block = renderModeRef.current === 'block'
       const stacked = renderModeRef.current === 'stacked'
-      ensembles.visible = !stacked
-      boundary.visible = !stacked
-      arrowShafts.visible = !stacked
-      arrowHeads.visible = !stacked
+      ensembles.visible = slice
+      boundary.visible = slice
+      arrowShafts.visible = slice
+      arrowHeads.visible = slice
+      fidArrowShafts.visible = !block
+      fidArrowHeads.visible = !block
+      blockContext.visible = block
+      blockEnsembles.visible = block
+      blockFieldArrowShafts.visible = block
+      blockFieldArrowHeads.visible = block
+      blockFidArrowShafts.visible = block
+      blockFidArrowHeads.visible = block
+      blockB1ArrowShafts.visible = false
+      blockB1ArrowHeads.visible = false
       stackedSphere.visible = stacked
       stackedFieldArrowShaft.visible = stacked
       stackedFieldArrowHead.visible = stacked
@@ -763,10 +1100,20 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         boundary,
         b1ArrowHeads,
         b1ArrowShafts,
+        blockB1ArrowHeads,
+        blockB1ArrowShafts,
+        blockContext,
+        blockEnsembles,
+        blockFidArrowHeads,
+        blockFidArrowShafts,
+        blockFieldArrowHeads,
+        blockFieldArrowShafts,
         ensembles,
+        fidArrowHeads,
         fieldArrowHeads: arrowHeads,
         fieldArrowShafts: arrowShafts,
         fidArrowMaterial,
+        fidArrowShafts,
         sliceGraphSurface,
         stackedFieldArrowHead,
         stackedFieldArrowShaft,
@@ -780,6 +1127,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const pointer = new THREE.Vector2()
       const intersection = new THREE.Vector3()
       const pointerStart = new THREE.Vector2()
+      const selectedBlockMatrix = new THREE.Matrix4()
+      const selectedBlockPosition = new THREE.Vector3()
 
       const handlePointerDown = (event: PointerEvent) => {
         pointerStart.set(event.clientX, event.clientY)
@@ -799,6 +1148,31 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
         )
         raycaster.setFromCamera(pointer, camera)
+
+        if (renderModeRef.current === 'block') {
+          const [blockIntersection] = raycaster.intersectObject(
+            blockEnsembles,
+            false,
+          )
+          if (blockIntersection?.instanceId === undefined) return
+
+          const blockIndex = blockIntersection.instanceId
+          const sourceIndex = blockLayout.sourceIndices[blockIndex]
+          const sourceEnsemble = ensembleModels[sourceIndex]
+          blockEnsembles.getMatrixAt(blockIndex, selectedBlockMatrix)
+          selectedBlockPosition.setFromMatrixPosition(selectedBlockMatrix)
+          onSelectRef.current({
+            column: sourceEnsemble.column,
+            row: sourceEnsemble.row,
+            index: sourceIndex,
+            worldPosition: {
+              x: selectedBlockPosition.x,
+              y: selectedBlockPosition.y,
+              z: selectedBlockPosition.z,
+            },
+          })
+          return
+        }
 
         if (!raycaster.ray.intersectPlane(slicePlane, intersection)) return
 
@@ -865,8 +1239,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       let renderedB1ReferenceFrame: ReferenceFrame | null = null
 
       const hideFidArrow = (index: number) => {
-        fidArrowShafts.setMatrixAt(index, hiddenMatrix)
-        fidArrowHeads.setMatrixAt(index, hiddenMatrix)
+        if (index < BLOCK_PLANE_ENSEMBLE_COUNT) {
+          fidArrowShafts.setMatrixAt(index, hiddenMatrix)
+          fidArrowHeads.setMatrixAt(index, hiddenMatrix)
+        }
+        if (index < BLOCK_SIMULATED_ENSEMBLE_COUNT) {
+          blockFidArrowShafts.setMatrixAt(index, hiddenMatrix)
+          blockFidArrowHeads.setMatrixAt(index, hiddenMatrix)
+        }
       }
 
       const updateFidArrowColors = (
@@ -911,8 +1291,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               0.84,
             ),
           )
-          fidArrowShafts.setColorAt(state.index, fidArrowColor)
-          fidArrowHeads.setColorAt(state.index, fidArrowColor)
+          if (state.index < BLOCK_PLANE_ENSEMBLE_COUNT) {
+            fidArrowShafts.setColorAt(state.index, fidArrowColor)
+            fidArrowHeads.setColorAt(state.index, fidArrowColor)
+          }
+          if (state.index < BLOCK_SIMULATED_ENSEMBLE_COUNT) {
+            blockFidArrowShafts.setColorAt(state.index, fidArrowColor)
+            blockFidArrowHeads.setColorAt(state.index, fidArrowColor)
+          }
         })
 
         if (fidArrowShafts.instanceColor) {
@@ -920,6 +1306,12 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         }
         if (fidArrowHeads.instanceColor) {
           fidArrowHeads.instanceColor.needsUpdate = true
+        }
+        if (blockFidArrowShafts.instanceColor) {
+          blockFidArrowShafts.instanceColor.needsUpdate = true
+        }
+        if (blockFidArrowHeads.instanceColor) {
+          blockFidArrowHeads.instanceColor.needsUpdate = true
         }
       }
 
@@ -937,6 +1329,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         const timeMilliseconds = renderingGradientEncoding
           ? gradientAnimation.timeMilliseconds
           : fidAnimation.timeMilliseconds
+        const currentRenderMode = renderModeRef.current
 
         if (!active || states !== renderedFidStatesRef.current) {
           renderedFidStatesRef.current.forEach((state) => {
@@ -994,9 +1387,17 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               fidArrowAxis,
               fidArrowDirection,
             )
-            if (renderModeRef.current === 'stacked') {
+            if (currentRenderMode === 'stacked') {
               fidArrowPosition.set(0, 0, 0)
+            } else if (currentRenderMode === 'block') {
+              if (state.index >= BLOCK_SIMULATED_ENSEMBLE_COUNT) return
+              const positionOffset = state.index * 3
+              fidArrowPosition.fromArray(
+                blockLayout.simulatedPositions,
+                positionOffset,
+              )
             } else {
+              if (state.index >= BLOCK_PLANE_ENSEMBLE_COUNT) return
               const row = Math.floor(state.index / GRID_SIZE)
               const column = state.index % GRID_SIZE
               fidArrowPosition.set(
@@ -1005,7 +1406,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                 0,
               )
             }
-            if (renderModeRef.current === 'stacked') {
+            if (currentRenderMode === 'stacked') {
               fidArrowScale.set(
                 magnitude * STACKED_ARROW_WIDTH_SCALE,
                 magnitude * STACKED_ARROW_WIDTH_SCALE,
@@ -1019,13 +1420,20 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               fidArrowQuaternion,
               fidArrowScale,
             )
-            fidArrowShafts.setMatrixAt(state.index, fidArrowMatrix)
-            fidArrowHeads.setMatrixAt(state.index, fidArrowMatrix)
+            if (currentRenderMode === 'block') {
+              blockFidArrowShafts.setMatrixAt(state.index, fidArrowMatrix)
+              blockFidArrowHeads.setMatrixAt(state.index, fidArrowMatrix)
+            } else {
+              fidArrowShafts.setMatrixAt(state.index, fidArrowMatrix)
+              fidArrowHeads.setMatrixAt(state.index, fidArrowMatrix)
+            }
           })
         }
 
         fidArrowShafts.instanceMatrix.needsUpdate = true
         fidArrowHeads.instanceMatrix.needsUpdate = true
+        blockFidArrowShafts.instanceMatrix.needsUpdate = true
+        blockFidArrowHeads.instanceMatrix.needsUpdate = true
       }
 
       const sliceGraphRawHeights = new Float32Array(
@@ -1314,6 +1722,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const hideB1PulseArrows = () => {
         b1ArrowShafts.visible = false
         b1ArrowHeads.visible = false
+        blockB1ArrowShafts.visible = false
+        blockB1ArrowHeads.visible = false
         stackedB1ArrowShaft.visible = false
         stackedB1ArrowHead.visible = false
       }
@@ -1376,6 +1786,25 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           }
           b1ArrowShafts.instanceMatrix.needsUpdate = true
           b1ArrowHeads.instanceMatrix.needsUpdate = true
+          for (
+            let blockIndex = 0;
+            blockIndex < BLOCK_SIMULATED_ENSEMBLE_COUNT;
+            blockIndex += 1
+          ) {
+            b1ArrowPosition.fromArray(
+              blockLayout.simulatedPositions,
+              blockIndex * 3,
+            )
+            b1ArrowMatrix.compose(
+              b1ArrowPosition,
+              b1ArrowQuaternion,
+              b1ArrowScale,
+            )
+            blockB1ArrowShafts.setMatrixAt(blockIndex, b1ArrowMatrix)
+            blockB1ArrowHeads.setMatrixAt(blockIndex, b1ArrowMatrix)
+          }
+          blockB1ArrowShafts.instanceMatrix.needsUpdate = true
+          blockB1ArrowHeads.instanceMatrix.needsUpdate = true
           stackedB1ArrowShaft.quaternion.copy(b1ArrowQuaternion)
           stackedB1ArrowHead.quaternion.copy(b1ArrowQuaternion)
           renderedB1PulseStartedAt = visualization.startedAt
@@ -1384,9 +1813,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
         const fadeProgress = Math.max(0, (progress - 0.55) / 0.45)
         b1ArrowMaterial.opacity = 0.92 * (1 - smoothStep(fadeProgress))
+        const slice = renderModeRef.current === 'slice'
+        const block = renderModeRef.current === 'block'
         const stacked = renderModeRef.current === 'stacked'
-        b1ArrowShafts.visible = !stacked
-        b1ArrowHeads.visible = !stacked
+        b1ArrowShafts.visible = slice
+        b1ArrowHeads.visible = slice
+        blockB1ArrowShafts.visible = block
+        blockB1ArrowHeads.visible = block
         stackedB1ArrowShaft.visible = stacked
         stackedB1ArrowHead.visible = stacked
       }
@@ -1427,11 +1860,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key.toLowerCase() !== 'r') return
         focusTransitionRef.current = null
-        camera.position.copy(
-          renderModeRef.current === 'stacked'
-            ? STACKED_CAMERA_POSITION
-            : CAMERA_POSITION,
-        )
+        camera.position.copy(initialCameraPosition(renderModeRef.current))
         camera.up.copy(CAMERA_UP)
         controls.target.copy(CAMERA_TARGET)
         controls.update()
@@ -1460,6 +1889,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         fidArrowHeadGeometry.dispose()
         fidArrowMaterial.dispose()
         b1ArrowMaterial.dispose()
+        blockContextGeometry.dispose()
+        blockContextMaterial.dispose()
+        blockContextTexture.dispose()
         boundaryGeometry.dispose()
         boundaryMaterial.dispose()
         sliceGraphGeometry.dispose()
@@ -1471,6 +1903,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         cameraRef.current = null
         controlsRef.current = null
         ensemblesRef.current = null
+        blockEnsemblesRef.current = null
+        blockSourceIndicesRef.current = []
         fidArrowShaftsRef.current = null
         fidArrowHeadsRef.current = null
         modeObjectsRef.current = null

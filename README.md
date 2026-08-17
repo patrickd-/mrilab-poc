@@ -21,13 +21,13 @@ Open the URL printed by Vite. Drag to orbit the scene, scroll to zoom,
 right-drag to pan, and click a sphere to select its hydrogen ensemble. Press
 `R` or use the floating viewport control to reset the camera. In Slice View,
 vertical dragging changes elevation and horizontal dragging circles the slice
-normal, while Stacked View remains unrestricted.
+normal, while Block View and Stacked View remain unrestricted.
 
 ## Project structure
 
 - `src/components/LabScene.tsx` owns the Three.js scene, GPU-instanced 128 × 128
-  ensemble slice, smooth camera targeting, selection calculation, and render
-  loop.
+  ensemble slice, cutaway block, smooth camera targeting, selection
+  calculation, and render loop.
 - `src/models/HydrogenEnsemble.ts` defines each ensemble's intrinsic
   properties and computes field-dependent magnetic properties on demand.
 - `src/simulation/fid.ts` applies exact free evolution and coherent 90°/180°
@@ -50,6 +50,14 @@ The grid is rendered as a single `THREE.InstancedMesh` of translucent sphere
 geometry, so all 16,384 ensembles remain practical to navigate while retaining
 true 3D volumes for future internal geometry. The scene lifecycle is isolated
 in `LabScene`, while the worker owns simulation timing and signal sampling.
+
+Block View expands the logical domain to 128 × 128 × 128 voxels. A removed
+64³ corner exposes three independently simulated 64 × 64 faces, each mapped
+from a rotated copy of the slice's corresponding quadrant. Together with the
+full source plane, 28,672 colored spheres participate in simulations and can
+be selected. The other 1,806,336 voxels are rendered as one lightweight,
+faint-gray point cloud; they provide volumetric context without participating
+in selection or signal calculations.
 
 The initial non-uniform isocenter approximation uses normalized radial
 position `rho` and a 1 ppm outer variation:

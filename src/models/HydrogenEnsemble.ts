@@ -216,6 +216,7 @@ export class HydrogenEnsemble {
     readonly column: number,
     readonly row: number,
     readonly gridSize: number,
+    readonly layer: number = 0,
   ) {}
 
   get possibleSpinProjectionCount() {
@@ -341,5 +342,75 @@ export function createHydrogenEnsembles(gridSize: number) {
     const row = Math.floor(index / gridSize)
     const column = index % gridSize
     return new HydrogenEnsemble(index, column, row, gridSize)
+  })
+}
+
+/**
+ * Block View keeps the complete source slice and repeats its lower-right
+ * quadrant on the three faces exposed by the corner cutaway. The returned
+ * indices deliberately match the renderer's block instance order.
+ */
+export function blockSimulationSourceIndices(gridSize: number) {
+  const cutSize = Math.floor(gridSize / 2)
+  const indices = Array.from(
+    { length: gridSize * gridSize },
+    (_, index) => index,
+  )
+
+  for (let face = 0; face < 3; face += 1) {
+    for (let row = cutSize; row < gridSize; row += 1) {
+      for (let column = cutSize; column < gridSize; column += 1) {
+        indices.push(row * gridSize + column)
+      }
+    }
+  }
+
+  return indices
+}
+
+/**
+ * Builds independently simulated copies for Block View while preserving the
+ * source slice as the authority for material presets and sidebar selection.
+ */
+export function createBlockSimulationEnsembles(
+  sourceEnsembles: ReadonlyArray<HydrogenEnsemble>,
+) {
+  if (sourceEnsembles.length === 0) return []
+
+  const sourceIndices = blockSimulationSourceIndices(
+    sourceEnsembles[0].gridSize,
+  )
+
+  return sourceIndices.map((sourceIndex, simulationIndex) => {
+    const source = sourceEnsembles[sourceIndex]
+    const planeEnsembleCount = source.gridSize ** 2
+    if (simulationIndex < planeEnsembleCount) return source
+
+    const cutSize = Math.floor(source.gridSize / 2)
+    const faceEnsembleCount = cutSize ** 2
+    const faceIndex = Math.floor(
+      (simulationIndex - planeEnsembleCount) / faceEnsembleCount,
+    )
+    let column = source.column
+    let row = source.row
+    let layer = cutSize - 1
+
+    if (faceIndex === 1) {
+      column = cutSize - 1
+      layer = source.column
+    } else if (faceIndex === 2) {
+      row = cutSize - 1
+      layer = source.row
+    }
+
+    const copy = new HydrogenEnsemble(
+      simulationIndex,
+      column,
+      row,
+      source.gridSize,
+      layer,
+    )
+    copy.samplePreset = source.samplePreset
+    return copy
   })
 }
