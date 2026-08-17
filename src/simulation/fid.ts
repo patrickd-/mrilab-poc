@@ -8,6 +8,13 @@ import {
 
 export const FID_GRAPH_INITIAL_RANGE_MILLISECONDS = 100
 export const FID_GRAPH_MAXIMUM_WINDOW_MILLISECONDS = 5000
+const B1_MAXIMUM_FRACTIONAL_DEVIATION: Readonly<
+  Record<SupportedFieldStrengthTesla, number>
+> = {
+  1.5: 0.04,
+  3: 0.08,
+  7: 0.15,
+}
 const INTRAVOXEL_SAMPLE_OFFSETS_MILLIMETERS = [-1 / 3, 0, 1 / 3] as const
 // Equal-probability standard-normal quantiles for a deterministic 3 x 3
 // isochromat grid. Their static offsets approximate reversible T2* decay.
@@ -49,6 +56,7 @@ export interface FidEnsembleState {
   fieldVariationPpm: number
   fieldTiltAngleRadians: number
   fieldDirection: FieldDirection
+  transmitFieldScale: number
   spinPackets: ReadonlyArray<FidSpinPacketState>
 }
 
@@ -75,6 +83,29 @@ export interface FidSignalPoint {
   normalizedVoltage: number
   normalizedQuadratureVoltage: number
   normalizedLongitudinalMagnetization: number
+}
+
+export function transmitFieldScaleAt(
+  column: number,
+  row: number,
+  gridSize: number,
+  fieldStrengthTesla: SupportedFieldStrengthTesla,
+  enabled: boolean,
+) {
+  if (!enabled) return 1
+
+  const center = (gridSize - 1) / 2
+  const normalizedX = (column - center) / center
+  const normalizedY = (center - row) / center
+  // A smooth asymmetric transmit profile stands in for coil loading and
+  // wavelength effects. The polynomial is normalized to stay within ±1.
+  const profile =
+    (0.6 * normalizedX -
+      0.35 * normalizedY +
+      0.25 * normalizedX * normalizedY) /
+    1.2
+
+  return 1 + B1_MAXIMUM_FRACTIONAL_DEVIATION[fieldStrengthTesla] * profile
 }
 
 export function fidEnsembleMagnetizationStateAt(
@@ -141,14 +172,23 @@ export function fidEnsembleMagnetizationStateAt(
       )
 
       if (pulseEvent.kind === '90-y') {
-        // An instantaneous +90° rotation about the rotating-frame y-axis.
+        // An instantaneous rotation about the rotating-frame y-axis.
+        const angleRadians = (Math.PI / 2) * state.transmitFieldScale
+        const cosAngle = Math.cos(angleRadians)
+        const sinAngle = Math.sin(angleRadians)
         const previousX = packetXFraction
-        packetXFraction = packetZFraction
-        packetZFraction = -previousX
+        const previousZ = packetZFraction
+        packetXFraction = previousX * cosAngle + previousZ * sinAngle
+        packetZFraction = -previousX * sinAngle + previousZ * cosAngle
       } else {
-        // An instantaneous 180° rotation about the rotating-frame x-axis.
-        packetYFraction = -packetYFraction
-        packetZFraction = -packetZFraction
+        // An instantaneous rotation about the rotating-frame x-axis.
+        const angleRadians = Math.PI * state.transmitFieldScale
+        const cosAngle = Math.cos(angleRadians)
+        const sinAngle = Math.sin(angleRadians)
+        const previousY = packetYFraction
+        const previousZ = packetZFraction
+        packetYFraction = previousY * cosAngle - previousZ * sinAngle
+        packetZFraction = previousY * sinAngle + previousZ * cosAngle
       }
       previousTimeMilliseconds = pulseEvent.timeMilliseconds
       packetPulseCount += 1
@@ -192,6 +232,7 @@ export function createFidEnsembleStates(
   fieldStrengthTesla: SupportedFieldStrengthTesla,
   fieldUniformity: FieldUniformity,
   intravoxelDephasing = false,
+  b1Inhomogeneity = false,
 ) {
   const states: FidEnsembleState[] = []
 
@@ -283,6 +324,13 @@ export function createFidEnsembleStates(
       fieldVariationPpm: magneticProperties.fieldVariationPpm,
       fieldTiltAngleRadians: magneticProperties.tiltAngleRadians,
       fieldDirection: magneticProperties.direction,
+      transmitFieldScale: transmitFieldScaleAt(
+        ensemble.column,
+        ensemble.row,
+        ensemble.gridSize,
+        fieldStrengthTesla,
+        b1Inhomogeneity,
+      ),
       spinPackets,
     })
   })

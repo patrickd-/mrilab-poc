@@ -239,6 +239,9 @@ function App() {
   const intravoxelDephasing = enabledRealismOptions.includes(
     'intravoxel-dephasing',
   )
+  const b1Inhomogeneity = enabledRealismOptions.includes(
+    'b1-inhomogeneity',
+  )
   const magneticProperties = selectedEnsemble?.magneticProperties(
     fieldStrengthTesla,
     fieldUniformity,
@@ -285,6 +288,7 @@ function App() {
     fieldStrengthTesla,
     fieldUniformity,
     intravoxelDephasing,
+    b1Inhomogeneity,
     initialPulseKind: selectedExperiment === 'spin-echo' ? '90-y' : null,
     millisecondsPerTick: Number(simulationTimeStep),
   })

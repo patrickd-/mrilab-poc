@@ -60,13 +60,16 @@ position `rho` and a 1 ppm outer variation:
 - Arrows remain visually parallel because this angle is below display
   resolution.
 
-The top-bar `REALISM (0/2)` menu leaves both effects disabled by default.
+The top-bar realism menu leaves all effects disabled by default.
 `B0 inhomogeneity` enables the isocenter profile above. `Intravoxel
 dephasing` represents each 1 mm³ ensemble with a deterministic 3 × 3 set of
 spin packets. Their positions sample applied-gradient and B0 variation within
 the voxel, while a tissue-dependent static frequency spread supplies the
 reversible part of T2* decay. RF 180° pulses therefore refocus those static
 offsets rather than treating the shortened FID as irreversible T2 decay.
+`B1 inhomogeneity` applies a smooth transmit-field profile whose peak flip-angle
+deviation grows from 4% at 1.5 T to 15% at 7 T. RF pulses remain instantaneous,
+but excitation and refocusing angles are no longer spatially perfect.
 
 The brain T2* values use [published 1.5/3/7 T measurements](https://pubmed.ncbi.nlm.nih.gov/17459640/).
 CSF uses the 333.5 ms and 168 ms values from a [compiled 3/7 T quantitative-MRI

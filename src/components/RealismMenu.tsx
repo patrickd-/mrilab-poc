@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 
 export type RealismOptionId =
   | 'b0-inhomogeneity'
+  | 'b1-inhomogeneity'
   | 'intravoxel-dephasing'
 
 const REALISM_OPTIONS: ReadonlyArray<{
@@ -9,6 +10,7 @@ const REALISM_OPTIONS: ReadonlyArray<{
   label: string
 }> = [
   { id: 'b0-inhomogeneity', label: 'B0 inhomogeneity' },
+  { id: 'b1-inhomogeneity', label: 'B1 inhomogeneity' },
   { id: 'intravoxel-dephasing', label: 'Intravoxel dephasing' },
 ]
 
