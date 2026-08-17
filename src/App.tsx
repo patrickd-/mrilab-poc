@@ -111,13 +111,17 @@ const SLICE_GRAPH_OPTIONS: ReadonlyArray<{
 ]
 
 type TissueSamplePresetId = Exclude<SamplePresetId, 'air'>
-type SlicePresetAction = 'reset' | TissueSamplePresetId
+type SlicePresetAction =
+  | 'reset'
+  | 'phantom-3-circles'
+  | TissueSamplePresetId
 
 const SLICE_PRESET_OPTIONS: ReadonlyArray<{
   id: SlicePresetAction
   label: string
 }> = [
   { id: 'reset', label: 'Reset' },
+  { id: 'phantom-3-circles', label: 'Phantom (3 circles)' },
   { id: 'cortical-bone', label: 'Add Cortical bone' },
   {
     id: 'cerebrospinal-fluid',
@@ -133,6 +137,9 @@ const SLICE_PRESET_RADIUS: Readonly<Record<TissueSamplePresetId, number>> = {
   'gray-matter': 0.56,
   'white-matter': 0.4,
 }
+
+const PHANTOM_CIRCLE_CENTER_FRACTIONS = [0.25, 0.5, 0.75] as const
+const PHANTOM_CIRCLE_RADIUS_FRACTION = 0.125
 
 function SlicePresetMenu({
   onApply,
@@ -418,6 +425,24 @@ function App() {
     if (action === 'reset') {
       ensembles.forEach((ensemble) => {
         ensemble.samplePreset = 'air'
+      })
+    } else if (action === 'phantom-3-circles') {
+      const maximumCoordinate = GRID_SIZE - 1
+      const radiusSquared =
+        (GRID_SIZE * PHANTOM_CIRCLE_RADIUS_FRACTION) ** 2
+      const circleCenters = PHANTOM_CIRCLE_CENTER_FRACTIONS.map(
+        (fraction) => maximumCoordinate * fraction,
+      )
+
+      ensembles.forEach((ensemble) => {
+        const insideCircle = circleCenters.some((circleCenter) => {
+          const offsetX = ensemble.column - circleCenter
+          const offsetY = ensemble.row - circleCenter
+          return offsetX ** 2 + offsetY ** 2 <= radiusSquared
+        })
+        if (insideCircle) {
+          ensemble.samplePreset = 'cerebrospinal-fluid'
+        }
       })
     } else {
       const center = (GRID_SIZE - 1) / 2

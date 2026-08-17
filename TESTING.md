@@ -120,8 +120,8 @@ and the 100 ms browser-stall cap.
   states; pulse/reset routing; and time-step precision.
 - `App.test.tsx` verifies experiment selection, the dismissible ensemble view
   layered over a still-active experiment, Escape/close behavior, nested slice
-  presets and reset, camera/view controls, and propagation of B0 and realism
-  settings into scene/simulation state.
+  presets, the three-circle diagonal CSF phantom, reset, camera/view controls,
+  and propagation of B0 and realism settings into scene/simulation state.
 
 ## Deliberate unit-test boundary
 

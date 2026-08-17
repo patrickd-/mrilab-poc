@@ -69,6 +69,9 @@ The grid is rendered as a single `THREE.InstancedMesh` of translucent sphere
 geometry, so all 16,384 ensembles remain practical to navigate while retaining
 true 3D volumes for future internal geometry. The scene lifecycle is isolated
 in `LabScene`, while the worker owns simulation timing and signal sampling.
+The slice-preset menu also includes a three-circle phantom that places equal
+CSF disks at the quarter, center, and three-quarter points of the slice's
+top-left-to-bottom-right diagonal.
 
 Block View expands the logical domain to 128 × 128 × 128 voxels. A removed
 64³ corner exposes one 64 × 64 quadrant of the source slice at the block's

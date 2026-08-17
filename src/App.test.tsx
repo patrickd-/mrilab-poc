@@ -227,6 +227,29 @@ describe('App integration', () => {
     expect(screen.getByText(/K · \(22 °C\)/)).toBeTruthy()
   })
 
+  it('applies three diagonal CSF circles for the phantom preset', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Apply slice preset' }))
+    await user.click(
+      screen.getByRole('option', { name: 'Phantom (3 circles)' }),
+    )
+
+    const ensembles = mocks.sceneProps?.ensembleModels as Array<{
+      samplePreset: string
+    }>
+    const sampleAt = (column: number, row: number) =>
+      ensembles[row * 128 + column].samplePreset
+
+    expect(sampleAt(32, 32)).toBe('cerebrospinal-fluid')
+    expect(sampleAt(64, 64)).toBe('cerebrospinal-fluid')
+    expect(sampleAt(95, 95)).toBe('cerebrospinal-fluid')
+    expect(sampleAt(32, 95)).toBe('air')
+    expect(sampleAt(95, 32)).toBe('air')
+    expect(sampleAt(0, 0)).toBe('air')
+  })
+
   it('routes camera and viewport controls while clearing a stale selection', async () => {
     const user = userEvent.setup()
     render(<App />)
