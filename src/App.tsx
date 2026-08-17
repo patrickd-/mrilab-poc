@@ -16,7 +16,7 @@ import LabScene, {
 } from './components/LabScene'
 import DarkSelect from './components/DarkSelect'
 import FidExperimentPanel from './components/FidExperimentPanel'
-import GradientEncodingExperimentPanel, {
+import GradientRecalledEchoExperimentPanel, {
   type GradientChannelId,
 } from './components/GradientEncodingExperimentPanel'
 import RealismMenu, {
@@ -83,12 +83,20 @@ const B0_TESLA_VALUES: Readonly<
   '3': 3,
   '7': 7,
 }
-type ExperimentId = 'gradient-encoding' | 'ping' | 'spin-echo'
+type ExperimentId =
+  | 'gradient-encoding'
+  | 'gradient-recalled-echo'
+  | 'ping'
+  | 'spin-echo'
 
 const EXPERIMENTS: ReadonlyArray<{ id: ExperimentId; label: string }> = [
   { id: 'ping', label: 'Ping Experiment' },
   { id: 'spin-echo', label: 'Spin Echo Experiment' },
   { id: 'gradient-encoding', label: 'Gradient Encoding Experiment' },
+  {
+    id: 'gradient-recalled-echo',
+    label: 'Gradient Recalled Echo Experiment',
+  },
 ]
 const RENDER_MODE_OPTIONS: ReadonlyArray<{
   id: RenderMode
@@ -342,11 +350,11 @@ function App() {
   )
   const simulationExperimentSelected =
     selectedExperiment === 'ping' || selectedExperiment === 'spin-echo'
-  const gradientExperimentSelected =
-    selectedExperiment === 'gradient-encoding'
+  const gradientRecalledEchoExperimentSelected =
+    selectedExperiment === 'gradient-recalled-echo'
   const gradientEnsembleStates = useMemo(
     () =>
-      gradientExperimentSelected
+      gradientRecalledEchoExperimentSelected
         ? createFidEnsembleStates(
             simulationEnsembles,
             fieldStrengthTesla,
@@ -362,7 +370,7 @@ function App() {
       simulationEnsembles,
       fieldStrengthTesla,
       fieldUniformity,
-      gradientExperimentSelected,
+      gradientRecalledEchoExperimentSelected,
       intravoxelDephasing,
       tissueHeterogeneity,
     ],
@@ -381,7 +389,7 @@ function App() {
     millisecondsPerTick: Number(simulationTimeStep),
   })
   const gradientPlayback = useGradientEncodingPlayback({
-    active: gradientExperimentSelected,
+    active: gradientRecalledEchoExperimentSelected,
     durationMilliseconds: GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
   })
   const appliedPhaseEncodingPulses = gradientChannelsEnabled[
@@ -426,7 +434,7 @@ function App() {
     ],
   )
   const gradientAcquisition = useGradientAcquisition({
-    active: gradientExperimentSelected,
+    active: gradientRecalledEchoExperimentSelected,
     adcEnabled: gradientChannelsEnabled.adc,
     adcPulses,
     durationMilliseconds: GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
@@ -595,9 +603,10 @@ function App() {
           fidPulseEvents={fidSimulation.pulseEvents}
           fidSimulationTimeMilliseconds={fidSimulation.timeMilliseconds}
           gradientEncodingActive={
-            gradientExperimentSelected && gradientPlayback.status !== 'idle'
+            gradientRecalledEchoExperimentSelected &&
+            gradientPlayback.status !== 'idle'
           }
-          gradientEncodingSelected={gradientExperimentSelected}
+          gradientEncodingSelected={gradientRecalledEchoExperimentSelected}
           gradientEncodingEnsembleStates={gradientEnsembleStates}
           gradientImperfections={gradientImperfections}
           gradientEncodingTimeMilliseconds={
@@ -808,8 +817,8 @@ function App() {
               />
             )}
 
-            {selectedExperiment === 'gradient-encoding' && (
-              <GradientEncodingExperimentPanel
+            {selectedExperiment === 'gradient-recalled-echo' && (
+              <GradientRecalledEchoExperimentPanel
                 adcAcquisitionRuns={gradientAcquisition.acquisitionRuns}
                 adcPulses={adcPulses}
                 adcSignalPoints={gradientAcquisition.currentSignalPoints}

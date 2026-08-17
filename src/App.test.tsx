@@ -70,8 +70,8 @@ vi.mock('./components/GradientEncodingExperimentPanel', () => ({
   default: (props: Record<string, any>) => {
     mocks.gradientPanelProps = props
     return (
-      <div data-testid="gradient-experiment">
-        Gradient experiment view
+      <div data-testid="gradient-recalled-echo-experiment">
+        Gradient recalled echo experiment view
         <button type="button" onClick={props.onSimulationReset}>
           Reset gradient simulation
         </button>
@@ -156,14 +156,18 @@ describe('App integration', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await selectExperiment(user, 'Gradient Encoding Experiment')
-    expect(screen.getByTestId('gradient-experiment')).toBeTruthy()
+    await selectExperiment(user, 'Gradient Recalled Echo Experiment')
+    expect(
+      screen.getByTestId('gradient-recalled-echo-experiment'),
+    ).toBeTruthy()
     expect(experimentViewIsHidden()).toBe(false)
 
     await user.click(screen.getByRole('button', { name: 'Select center ensemble' }))
     expect(screen.getByText('Static nuclear properties')).toBeTruthy()
     expect(
-      screen.getByRole('button', { name: /Gradient Encoding Experiment/i }),
+      screen.getByRole('button', {
+        name: /Gradient Recalled Echo Experiment/i,
+      }),
     ).toBeTruthy()
     expect(experimentViewIsHidden()).toBe(true)
 
@@ -177,11 +181,39 @@ describe('App integration', () => {
     expect(experimentViewIsHidden()).toBe(false)
   })
 
+  it('keeps the fundamental gradient experiment separate from GRE', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(
+      screen.getByRole('button', { name: /Select Experiment/i }),
+    )
+    expect(
+      screen.getByRole('option', {
+        name: 'Gradient Recalled Echo Experiment',
+      }),
+    ).toBeTruthy()
+    await user.click(
+      screen.getByRole('option', { name: 'Gradient Encoding Experiment' }),
+    )
+
+    expect(
+      screen.getByRole('button', { name: 'Gradient Encoding Experiment' }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByTestId('gradient-recalled-echo-experiment'),
+    ).toBeNull()
+    expect(mocks.sceneProps?.gradientEncodingSelected).toBe(false)
+    expect(mocks.gradientHook.mock.calls.at(-1)?.[0]).toMatchObject({
+      active: false,
+    })
+  })
+
   it('bypasses disabled gradient channels without discarding their waveforms', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await selectExperiment(user, 'Gradient Encoding Experiment')
+    await selectExperiment(user, 'Gradient Recalled Echo Experiment')
 
     const channels = [
       ['Disable RF channel', 'gradientRfExcitationPulses', 'rfExcitationPulses'],
@@ -210,7 +242,7 @@ describe('App integration', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await selectExperiment(user, 'Gradient Encoding Experiment')
+    await selectExperiment(user, 'Gradient Recalled Echo Experiment')
     await user.click(
       screen.getByRole('button', { name: 'Reset gradient simulation' }),
     )
