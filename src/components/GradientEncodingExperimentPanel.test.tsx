@@ -3,11 +3,20 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { createHydrogenEnsembles } from '../models/HydrogenEnsemble'
+import { createFidEnsembleStates } from '../simulation/fid'
 import GradientEncodingExperimentPanel, {
   combinedSpatialFieldOffsetMilliteslaAt,
   createDefaultSpatialGradientProfiles,
   gradientStrengthMilliteslaPerMeter,
 } from './GradientEncodingExperimentPanel'
+
+const TEST_ENSEMBLE_STATES = createFidEnsembleStates(
+  createHydrogenEnsembles(2),
+  1.5,
+  'uniform',
+  { includeAirEnsembles: true },
+)
 
 function StatefulGradientEncodingExperimentPanel() {
   const defaults = createDefaultSpatialGradientProfiles(128)
@@ -18,7 +27,11 @@ function StatefulGradientEncodingExperimentPanel() {
 
   return (
     <GradientEncodingExperimentPanel
+      ensembleStates={TEST_ENSEMBLE_STATES}
       fieldOfViewMillimeters={128}
+      playbackSpeed="10"
+      playbackStatus="idle"
+      playbackTimeMilliseconds={0}
       xEnabled={xEnabled}
       xProfile={xProfile}
       yEnabled={yEnabled}
@@ -27,6 +40,10 @@ function StatefulGradientEncodingExperimentPanel() {
       onXProfileChange={setXProfile}
       onYEnabledChange={setYEnabled}
       onYProfileChange={setYProfile}
+      onPause={vi.fn()}
+      onPlaybackSpeedChange={vi.fn()}
+      onReset={vi.fn()}
+      onStart={vi.fn()}
     />
   )
 }
@@ -61,7 +78,7 @@ describe('fundamental spatial gradient model', () => {
 })
 
 describe('GradientEncodingExperimentPanel', () => {
-  it('renders two spatial endpoint editors without a redundant 2D preview', () => {
+  it('renders two spatial endpoint editors and the linked Fourier graphs', () => {
     render(<StatefulGradientEncodingExperimentPanel />)
 
     expect(screen.getByText('Frequency Encoding')).not.toBeNull()
@@ -75,7 +92,35 @@ describe('GradientEncodingExperimentPanel', () => {
         name: 'G y spatial gradient editable line',
       }),
     ).not.toBeNull()
-    expect(screen.queryByRole('img')).toBeNull()
+    expect(
+      screen.getByRole('img', { name: 'Complex signal function S of time' }),
+    ).not.toBeNull()
+    expect(
+      screen.getByRole('img', {
+        name: 'Fourier transform F of angular frequency',
+      }),
+    ).not.toBeNull()
+    expect(screen.getByText('1D Fourier Transform Projection')).not.toBeNull()
+    expect(screen.getByText(/r∥ · mm along G/)).not.toBeNull()
+  })
+
+  it('recomputes both Fourier-linked plots when a gradient is toggled', () => {
+    const { container } = render(
+      <StatefulGradientEncodingExperimentPanel />,
+    )
+    const realSignalPath = container.querySelector('.spatial-signal-real')
+    const spectrumPath = container.querySelector('.spatial-spectrum-line')
+    const initialSignal = realSignalPath?.getAttribute('d')
+    const initialSpectrum = spectrumPath?.getAttribute('d')
+
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'Enable G x spatial gradient',
+      }),
+    )
+
+    expect(realSignalPath?.getAttribute('d')).not.toBe(initialSignal)
+    expect(spectrumPath?.getAttribute('d')).not.toBe(initialSpectrum)
   })
 
   it('lets each fixed spatial endpoint move vertically by dragging', () => {

@@ -1,3 +1,5 @@
+import { PROTON_GYROMAGNETIC_RATIO } from '../models/HydrogenEnsemble'
+
 export interface SpatialGradientProfile {
   endFieldOffsetMillitesla: number
   startFieldOffsetMillitesla: number
@@ -8,28 +10,259 @@ export interface SpatialGradientProfiles {
   y: SpatialGradientProfile
 }
 
-// MRI gradient-induced phase evolves much too quickly to inspect directly.
-// This preserves the relative field offsets and their signs while mapping
-// one millitesla to one visible radian per second.
-export const SPATIAL_PHASE_VISUALIZATION_RADIANS_PER_MILLISECOND_PER_TESLA = 1
+export interface SpatialProjectionEnsemble {
+  column: number
+  equilibriumMagnetization: number
+  fieldVariationTesla: number
+  gridSize: number
+  row: number
+}
 
-export function visualizedSpatialPhaseIncrementRadians(
+export interface SpatialSignalPoint {
+  imaginary: number
+  magnitude: number
+  real: number
+  timeMilliseconds: number
+}
+
+export interface SpatialSpectrumPoint {
+  angularFrequencyRadiansPerSecond: number
+  frequencyKilohertz: number
+  magnitude: number
+}
+
+export interface SpatialFourierProjection {
+  maximumFrequencyKilohertz: number
+  signalPoints: ReadonlyArray<SpatialSignalPoint>
+  spectrumPoints: ReadonlyArray<SpatialSpectrumPoint>
+  timeWindowMilliseconds: number
+}
+
+export function spatialPhaseRadiansAt(
   fieldOffsetTesla: number,
-  elapsedRealMilliseconds: number,
+  timeMilliseconds: number,
 ) {
   return (
-    fieldOffsetTesla *
-    elapsedRealMilliseconds *
-    SPATIAL_PHASE_VISUALIZATION_RADIANS_PER_MILLISECOND_PER_TESLA
+    (PROTON_GYROMAGNETIC_RATIO *
+      fieldOffsetTesla *
+      timeMilliseconds) /
+    1000
   )
 }
 
-export const MAXIMUM_SPATIAL_GRADIENT_MILLITESLA_PER_METER = 40
-export const DEFAULT_SPATIAL_GRADIENT_FIELD_OF_VIEW_MILLIMETERS = 128
+export function projectedPositionMillimetersAtFrequency(
+  frequencyKilohertz: number,
+  centerFieldOffsetMillitesla: number,
+  effectiveGradientMilliteslaPerMeter: number,
+) {
+  if (Math.abs(effectiveGradientMilliteslaPerMeter) < 1e-12) return null
+
+  const gyromagneticRatioHertzPerTesla =
+    PROTON_GYROMAGNETIC_RATIO / (2 * Math.PI)
+  const centerFrequencyKilohertz =
+    (gyromagneticRatioHertzPerTesla *
+      centerFieldOffsetMillitesla *
+      1e-3) /
+    1000
+  const frequencyOffsetHertz =
+    (frequencyKilohertz - centerFrequencyKilohertz) * 1000
+
+  return (
+    (frequencyOffsetHertz /
+      (gyromagneticRatioHertzPerTesla *
+        effectiveGradientMilliteslaPerMeter *
+        1e-3)) *
+    1000
+  )
+}
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
 }
+
+function complexFourierTransformInPlace(
+  real: Float64Array,
+  imaginary: Float64Array,
+  inverse: boolean,
+) {
+  const length = real.length
+  if (
+    length !== imaginary.length ||
+    length < 2 ||
+    (length & (length - 1)) !== 0
+  ) {
+    throw new RangeError('Complex FFT length must be a power of two')
+  }
+
+  for (let index = 1, reversed = 0; index < length; index += 1) {
+    let bit = length >> 1
+    while (reversed & bit) {
+      reversed ^= bit
+      bit >>= 1
+    }
+    reversed ^= bit
+    if (index < reversed) {
+      ;[real[index], real[reversed]] = [real[reversed], real[index]]
+      ;[imaginary[index], imaginary[reversed]] = [
+        imaginary[reversed],
+        imaginary[index],
+      ]
+    }
+  }
+
+  for (let size = 2; size <= length; size *= 2) {
+    const angle = ((inverse ? 2 : -2) * Math.PI) / size
+    const stepReal = Math.cos(angle)
+    const stepImaginary = Math.sin(angle)
+
+    for (let offset = 0; offset < length; offset += size) {
+      let twiddleReal = 1
+      let twiddleImaginary = 0
+      for (let localIndex = 0; localIndex < size / 2; localIndex += 1) {
+        const evenIndex = offset + localIndex
+        const oddIndex = evenIndex + size / 2
+        const oddReal =
+          real[oddIndex] * twiddleReal -
+          imaginary[oddIndex] * twiddleImaginary
+        const oddImaginary =
+          real[oddIndex] * twiddleImaginary +
+          imaginary[oddIndex] * twiddleReal
+        const evenReal = real[evenIndex]
+        const evenImaginary = imaginary[evenIndex]
+
+        real[evenIndex] = evenReal + oddReal
+        imaginary[evenIndex] = evenImaginary + oddImaginary
+        real[oddIndex] = evenReal - oddReal
+        imaginary[oddIndex] = evenImaginary - oddImaginary
+
+        const nextTwiddleReal =
+          twiddleReal * stepReal - twiddleImaginary * stepImaginary
+        twiddleImaginary =
+          twiddleReal * stepImaginary + twiddleImaginary * stepReal
+        twiddleReal = nextTwiddleReal
+      }
+    }
+  }
+
+  if (inverse) {
+    for (let index = 0; index < length; index += 1) {
+      real[index] /= length
+      imaginary[index] /= length
+    }
+  }
+}
+
+export function createSpatialFourierProjection(
+  ensembles: ReadonlyArray<SpatialProjectionEnsemble>,
+  xProfile: SpatialGradientProfile | null,
+  yProfile: SpatialGradientProfile | null,
+  maximumFieldOffsetTesla: number,
+  sampleCount = 512,
+): SpatialFourierProjection {
+  if (maximumFieldOffsetTesla <= 0) {
+    throw new RangeError('Maximum field offset must be positive')
+  }
+  if (
+    sampleCount < 2 ||
+    (sampleCount & (sampleCount - 1)) !== 0
+  ) {
+    throw new RangeError('Projection sample count must be a power of two')
+  }
+
+  const maximumAngularFrequencyRadiansPerSecond =
+    PROTON_GYROMAGNETIC_RATIO * maximumFieldOffsetTesla
+  const centeredSpectrum = new Float64Array(sampleCount)
+  let totalWeight = 0
+
+  ensembles.forEach((ensemble) => {
+    const denominator = Math.max(1, ensemble.gridSize - 1)
+    const spatialFieldOffsetMillitesla =
+      (xProfile
+        ? spatialFieldOffsetMilliteslaAt(
+            xProfile,
+            ensemble.column / denominator,
+          )
+        : 0) +
+      (yProfile
+        ? spatialFieldOffsetMilliteslaAt(
+            yProfile,
+            1 - ensemble.row / denominator,
+          )
+        : 0)
+    const fieldOffsetTesla =
+      ensemble.fieldVariationTesla +
+      spatialFieldOffsetMillitesla * 1e-3
+    const angularFrequencyRadiansPerSecond =
+      PROTON_GYROMAGNETIC_RATIO * fieldOffsetTesla
+    const weight = Math.max(0, ensemble.equilibriumMagnetization)
+    const continuousBin = clamp(
+      (angularFrequencyRadiansPerSecond /
+        maximumAngularFrequencyRadiansPerSecond) *
+        (sampleCount / 2) +
+        sampleCount / 2,
+      0,
+      sampleCount - 1,
+    )
+    const lowerBin = Math.floor(continuousBin)
+    const upperBin = Math.min(sampleCount - 1, lowerBin + 1)
+    const upperWeight = continuousBin - lowerBin
+
+    centeredSpectrum[lowerBin] += weight * (1 - upperWeight)
+    centeredSpectrum[upperBin] += weight * upperWeight
+    totalWeight += weight
+  })
+
+  if (totalWeight > 0) {
+    for (let index = 0; index < sampleCount; index += 1) {
+      centeredSpectrum[index] /= totalWeight
+    }
+  }
+
+  const signalReal = new Float64Array(sampleCount)
+  const signalImaginary = new Float64Array(sampleCount)
+  for (let index = 0; index < sampleCount; index += 1) {
+    signalReal[index] =
+      centeredSpectrum[(index + sampleCount / 2) % sampleCount]
+  }
+  complexFourierTransformInPlace(signalReal, signalImaginary, false)
+
+  const timeStepSeconds =
+    Math.PI / maximumAngularFrequencyRadiansPerSecond
+  const signalPoints = Array.from({ length: sampleCount }, (_, index) => ({
+    imaginary: signalImaginary[index],
+    magnitude: Math.hypot(signalReal[index], signalImaginary[index]),
+    real: signalReal[index],
+    timeMilliseconds: index * timeStepSeconds * 1000,
+  }))
+  const maximumSpectrumMagnitude = Math.max(...centeredSpectrum, 1e-30)
+  const spectrumPoints = Array.from(
+    { length: sampleCount },
+    (_, index) => {
+      const normalizedFrequency =
+        (index - sampleCount / 2) / (sampleCount / 2)
+      const angularFrequencyRadiansPerSecond =
+        normalizedFrequency * maximumAngularFrequencyRadiansPerSecond
+      return {
+        angularFrequencyRadiansPerSecond,
+        frequencyKilohertz:
+          angularFrequencyRadiansPerSecond / (2 * Math.PI * 1000),
+        magnitude: centeredSpectrum[index] / maximumSpectrumMagnitude,
+      }
+    },
+  )
+
+  return {
+    maximumFrequencyKilohertz:
+      maximumAngularFrequencyRadiansPerSecond / (2 * Math.PI * 1000),
+    signalPoints,
+    spectrumPoints,
+    timeWindowMilliseconds:
+      (sampleCount - 1) * timeStepSeconds * 1000,
+  }
+}
+
+export const MAXIMUM_SPATIAL_GRADIENT_MILLITESLA_PER_METER = 40
+export const DEFAULT_SPATIAL_GRADIENT_FIELD_OF_VIEW_MILLIMETERS = 128
 
 export function maximumEndpointFieldOffsetMillitesla(
   fieldOfViewMillimeters: number,

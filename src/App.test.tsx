@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   gradientHook: vi.fn(),
   gradientReset: vi.fn(),
   fidHook: vi.fn(),
+  spatialGradientHook: vi.fn(),
   gradientPanelProps: null as Record<string, any> | null,
   resetCamera: vi.fn(),
   sceneProps: null as Record<string, unknown> | null,
@@ -56,6 +57,10 @@ vi.mock('./hooks/useGradientEncodingPlayback', () => ({
   useGradientEncodingPlayback: mocks.gradientHook,
 }))
 
+vi.mock('./hooks/useSpatialGradientPlayback', () => ({
+  useSpatialGradientPlayback: mocks.spatialGradientHook,
+}))
+
 vi.mock('./components/FidExperimentPanel', () => ({
   default: () => <div data-testid="ping-experiment">Ping experiment view</div>,
 }))
@@ -75,6 +80,9 @@ vi.mock('./components/GradientEncodingExperimentPanel', () => ({
         onClick={() => props.onXEnabledChange(false)}
       >
         Disable fundamental Gx
+      </button>
+      <button type="button" onClick={props.onStart}>
+        Start fundamental playback
       </button>
     </div>
   ),
@@ -152,6 +160,15 @@ describe('App integration', () => {
       status: 'idle',
       timeMilliseconds: 0,
     })
+    mocks.spatialGradientHook.mockReset().mockReturnValue({
+      pause: vi.fn(),
+      reset: vi.fn(),
+      setSpeed: vi.fn(),
+      speed: '10',
+      start: vi.fn(),
+      status: 'idle',
+      timeMilliseconds: 0.0125,
+    })
     mocks.gradientReset.mockReset()
   })
 
@@ -227,6 +244,7 @@ describe('App integration', () => {
     expect(mocks.sceneProps).toMatchObject({
       spatialGradientActive: true,
       spatialGradientEnsembleStates: expect.any(Array),
+      spatialGradientTimeMilliseconds: 0.0125,
       spatialGradientXEnabled: true,
       spatialGradientXProfile: {
         endFieldOffsetMillitesla: 1.28,
@@ -241,6 +259,9 @@ describe('App integration', () => {
     expect(
       mocks.sceneProps?.spatialGradientEnsembleStates,
     ).toHaveLength(128 * 128)
+    expect(mocks.spatialGradientHook.mock.calls.at(-1)?.[0]).toEqual({
+      active: true,
+    })
 
     await user.click(screen.getByRole('button', { name: 'Slice 3D graph' }))
     await user.click(

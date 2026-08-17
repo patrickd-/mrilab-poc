@@ -920,6 +920,133 @@ a:focus-visible {
   gap: 14px;
 }
 
+.fundamental-gradient-section {
+  border-bottom: 1px solid var(--line);
+}
+
+.spatial-gradient-playback-controls .gradient-playback-actions {
+  grid-template-columns: auto minmax(110px, 1fr) auto;
+}
+
+.spatial-projection-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.spatial-projection-graph-shell {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: #080b0e;
+}
+
+.spatial-projection-graph-shell > header {
+  display: flex;
+  min-height: 39px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.spatial-projection-graph-shell > header strong {
+  color: var(--white);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.spatial-projection-legend {
+  display: flex;
+  gap: 12px;
+}
+
+.spatial-projection-legend span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.spatial-projection-legend span::before {
+  width: 8px;
+  height: 2px;
+  content: '';
+  background: currentColor;
+}
+
+.spatial-projection-legend .signal-real {
+  color: var(--coral);
+}
+
+.spatial-projection-legend .signal-imaginary {
+  color: var(--cyan);
+}
+
+.spatial-projection-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.spatial-projection-grid line {
+  stroke: rgba(244, 245, 241, 0.105);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.spatial-projection-axis-labels {
+  fill: #727a7f;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+}
+
+.spatial-projection-axis-labels .axis-title {
+  fill: #92989c;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.spatial-projection-axis-labels .spatial-position-label {
+  fill: var(--green);
+  font-size: 7px;
+}
+
+.spatial-signal-real,
+.spatial-signal-imaginary,
+.spatial-spectrum-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.spatial-signal-real {
+  stroke: var(--coral);
+  stroke-width: 1.65;
+}
+
+.spatial-signal-imaginary {
+  stroke: var(--cyan);
+  stroke-width: 1.35;
+}
+
+.spatial-spectrum-fill {
+  fill: rgba(166, 242, 106, 0.1);
+  stroke: none;
+}
+
+.spatial-spectrum-line {
+  stroke: var(--green);
+  stroke-width: 1.7;
+}
+
 .spatial-gradient-input {
   min-width: 0;
 }

@@ -1,15 +1,25 @@
 import {
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import type { FidEnsembleState } from '../simulation/fid'
 import {
+  createSpatialFourierProjection,
   createDefaultSpatialGradientProfiles,
   gradientStrengthMilliteslaPerMeter,
   maximumEndpointFieldOffsetMillitesla,
+  projectedPositionMillimetersAtFrequency,
+  type SpatialFourierProjection,
   type SpatialGradientProfile,
 } from '../simulation/spatialGradient'
+import type {
+  SpatialGradientPlaybackSpeed,
+  SpatialGradientPlaybackStatus,
+} from '../hooks/useSpatialGradientPlayback'
+import DarkSelect from './DarkSelect'
 
 export {
   combinedSpatialFieldOffsetMilliteslaAt,
@@ -21,11 +31,19 @@ type GradientAxis = 'x' | 'y'
 type GradientEndpoint = 'start' | 'end'
 
 interface GradientEncodingExperimentPanelProps {
+  ensembleStates: ReadonlyArray<FidEnsembleState>
   fieldOfViewMillimeters: number
+  onPause: () => void
+  onPlaybackSpeedChange: (speed: SpatialGradientPlaybackSpeed) => void
+  onReset: () => void
+  onStart: () => void
   onXEnabledChange: (enabled: boolean) => void
   onXProfileChange: (profile: SpatialGradientProfile) => void
   onYEnabledChange: (enabled: boolean) => void
   onYProfileChange: (profile: SpatialGradientProfile) => void
+  playbackSpeed: SpatialGradientPlaybackSpeed
+  playbackStatus: SpatialGradientPlaybackStatus
+  playbackTimeMilliseconds: number
   xEnabled: boolean
   xProfile: SpatialGradientProfile
   yEnabled: boolean
@@ -57,6 +75,23 @@ const GRAPH = {
   width: 460,
 }
 const KEYBOARD_FIELD_STEP_MILLITESLA = 0.08
+const PROJECTION_GRAPH = {
+  bottom: 56,
+  height: 244,
+  left: 58,
+  right: 18,
+  top: 18,
+  width: 460,
+}
+const SPATIAL_PLAYBACK_SPEED_OPTIONS: ReadonlyArray<{
+  id: SpatialGradientPlaybackSpeed
+  label: string
+}> = [
+  { id: '5', label: '5 µs/s' },
+  { id: '10', label: '10 µs/s' },
+  { id: '25', label: '25 µs/s' },
+  { id: '50', label: '50 µs/s' },
+]
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
@@ -66,6 +101,281 @@ function formatFieldOffset(value: number) {
   const normalizedValue = Math.abs(value) < 0.005 ? 0 : value
   const sign = normalizedValue > 0 ? '+' : normalizedValue < 0 ? '−' : ''
   return `${sign}${Math.abs(normalizedValue).toFixed(2)}`
+}
+
+function pathFromPoints(
+  points: ReadonlyArray<{ x: number; y: number }>,
+) {
+  return points
+    .map(
+      (point, index) =>
+        `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`,
+    )
+    .join(' ')
+}
+
+function SignalFunctionGraph({
+  projection,
+}: {
+  projection: SpatialFourierProjection
+}) {
+  const plotWidth =
+    PROJECTION_GRAPH.width -
+    PROJECTION_GRAPH.left -
+    PROJECTION_GRAPH.right
+  const plotHeight =
+    PROJECTION_GRAPH.height -
+    PROJECTION_GRAPH.top -
+    PROJECTION_GRAPH.bottom
+  const baselineY = PROJECTION_GRAPH.top + plotHeight / 2
+  const graphX = (timeMilliseconds: number) =>
+    PROJECTION_GRAPH.left +
+    (timeMilliseconds / projection.timeWindowMilliseconds) * plotWidth
+  const graphY = (value: number) =>
+    PROJECTION_GRAPH.top + ((1 - value) / 2) * plotHeight
+  const { imaginaryPath, realPath } = useMemo(
+    () => ({
+      imaginaryPath: pathFromPoints(
+        projection.signalPoints.map((point) => ({
+          x: graphX(point.timeMilliseconds),
+          y: graphY(point.imaginary),
+        })),
+      ),
+      realPath: pathFromPoints(
+        projection.signalPoints.map((point) => ({
+          x: graphX(point.timeMilliseconds),
+          y: graphY(point.real),
+        })),
+      ),
+    }),
+    [projection],
+  )
+
+  return (
+    <div className="spatial-projection-graph-shell">
+      <header>
+        <strong className="formula">S(t)</strong>
+        <div className="spatial-projection-legend">
+          <span className="signal-real">Re S</span>
+          <span className="signal-imaginary">Im S</span>
+        </div>
+      </header>
+      <svg
+        className="spatial-projection-graph"
+        viewBox={`0 0 ${PROJECTION_GRAPH.width} ${PROJECTION_GRAPH.height}`}
+        role="img"
+        aria-label="Complex signal function S of time"
+      >
+        <g className="spatial-projection-grid" aria-hidden="true">
+          {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
+            <line
+              key={`time-${fraction}`}
+              x1={PROJECTION_GRAPH.left + fraction * plotWidth}
+              y1={PROJECTION_GRAPH.top}
+              x2={PROJECTION_GRAPH.left + fraction * plotWidth}
+              y2={PROJECTION_GRAPH.top + plotHeight}
+            />
+          ))}
+          {[-1, 0, 1].map((value) => (
+            <line
+              key={`signal-${value}`}
+              x1={PROJECTION_GRAPH.left}
+              y1={graphY(value)}
+              x2={PROJECTION_GRAPH.left + plotWidth}
+              y2={graphY(value)}
+            />
+          ))}
+        </g>
+        <g className="spatial-projection-axis-labels" aria-hidden="true">
+          {[-1, 0, 1].map((value) => (
+            <text
+              key={`signal-label-${value}`}
+              x={PROJECTION_GRAPH.left - 9}
+              y={graphY(value) + 3}
+              textAnchor="end"
+            >
+              {value > 0 ? '+1' : value === 0 ? '0' : '−1'}
+            </text>
+          ))}
+          {[0, 0.5, 1].map((fraction) => (
+            <text
+              key={`time-label-${fraction}`}
+              x={PROJECTION_GRAPH.left + fraction * plotWidth}
+              y={PROJECTION_GRAPH.top + plotHeight + 19}
+              textAnchor="middle"
+            >
+              {(fraction * projection.timeWindowMilliseconds).toFixed(2)}
+            </text>
+          ))}
+          <text
+            className="axis-title"
+            x={PROJECTION_GRAPH.left + plotWidth / 2}
+            y={PROJECTION_GRAPH.height - 3}
+            textAnchor="middle"
+          >
+            t · ms
+          </text>
+          <text
+            className="axis-title"
+            textAnchor="middle"
+            transform={`translate(14 ${baselineY}) rotate(-90)`}
+          >
+            normalized signal
+          </text>
+        </g>
+        <path className="spatial-signal-real" d={realPath} />
+        <path className="spatial-signal-imaginary" d={imaginaryPath} />
+      </svg>
+    </div>
+  )
+}
+
+function FourierSpectrumGraph({
+  centerFieldOffsetMillitesla,
+  effectiveGradientMilliteslaPerMeter,
+  projection,
+}: {
+  centerFieldOffsetMillitesla: number
+  effectiveGradientMilliteslaPerMeter: number
+  projection: SpatialFourierProjection
+}) {
+  const plotWidth =
+    PROJECTION_GRAPH.width -
+    PROJECTION_GRAPH.left -
+    PROJECTION_GRAPH.right
+  const plotHeight =
+    PROJECTION_GRAPH.height -
+    PROJECTION_GRAPH.top -
+    PROJECTION_GRAPH.bottom
+  const graphX = (frequencyKilohertz: number) =>
+    PROJECTION_GRAPH.left +
+    ((frequencyKilohertz + projection.maximumFrequencyKilohertz) /
+      (2 * projection.maximumFrequencyKilohertz)) *
+      plotWidth
+  const graphY = (magnitude: number) =>
+    PROJECTION_GRAPH.top + (1 - magnitude) * plotHeight
+  const spectrumPath = useMemo(
+    () =>
+      pathFromPoints(
+        projection.spectrumPoints.map((point) => ({
+          x: graphX(point.frequencyKilohertz),
+          y: graphY(point.magnitude),
+        })),
+      ),
+    [projection],
+  )
+  const fillPath = `${spectrumPath} L ${(
+    PROJECTION_GRAPH.left + plotWidth
+  ).toFixed(2)} ${(PROJECTION_GRAPH.top + plotHeight).toFixed(
+    2,
+  )} L ${PROJECTION_GRAPH.left.toFixed(2)} ${(
+    PROJECTION_GRAPH.top + plotHeight
+  ).toFixed(2)} Z`
+  const frequencyTicks = [-1, 0, 1].map((fraction) => {
+    const frequencyKilohertz =
+      fraction * projection.maximumFrequencyKilohertz
+    return {
+      frequencyKilohertz,
+      fraction,
+      positionMillimeters: projectedPositionMillimetersAtFrequency(
+        frequencyKilohertz,
+        centerFieldOffsetMillitesla,
+        effectiveGradientMilliteslaPerMeter,
+      ),
+    }
+  })
+
+  return (
+    <div className="spatial-projection-graph-shell">
+      <header>
+        <strong className="formula">F(ω)</strong>
+        <span>1D frequency projection</span>
+      </header>
+      <svg
+        className="spatial-projection-graph"
+        viewBox={`0 0 ${PROJECTION_GRAPH.width} ${PROJECTION_GRAPH.height}`}
+        role="img"
+        aria-label="Fourier transform F of angular frequency"
+      >
+        <g className="spatial-projection-grid" aria-hidden="true">
+          {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
+            <line
+              key={`frequency-${fraction}`}
+              x1={PROJECTION_GRAPH.left + fraction * plotWidth}
+              y1={PROJECTION_GRAPH.top}
+              x2={PROJECTION_GRAPH.left + fraction * plotWidth}
+              y2={PROJECTION_GRAPH.top + plotHeight}
+            />
+          ))}
+          {[0, 0.5, 1].map((magnitude) => (
+            <line
+              key={`magnitude-${magnitude}`}
+              x1={PROJECTION_GRAPH.left}
+              y1={graphY(magnitude)}
+              x2={PROJECTION_GRAPH.left + plotWidth}
+              y2={graphY(magnitude)}
+            />
+          ))}
+        </g>
+        <g className="spatial-projection-axis-labels" aria-hidden="true">
+          {[0, 0.5, 1].map((magnitude) => (
+            <text
+              key={`magnitude-label-${magnitude}`}
+              x={PROJECTION_GRAPH.left - 9}
+              y={graphY(magnitude) + 3}
+              textAnchor="end"
+            >
+              {magnitude.toFixed(1)}
+            </text>
+          ))}
+          {frequencyTicks.map(
+            ({ frequencyKilohertz, fraction, positionMillimeters }) => (
+              <g key={`frequency-label-${fraction}`}>
+                <text
+                  x={graphX(frequencyKilohertz)}
+                  y={PROJECTION_GRAPH.top + plotHeight + 17}
+                  textAnchor="middle"
+                >
+                  {frequencyKilohertz.toFixed(0)} kHz
+                </text>
+                <text
+                  className="spatial-position-label"
+                  x={graphX(frequencyKilohertz)}
+                  y={PROJECTION_GRAPH.top + plotHeight + 31}
+                  textAnchor="middle"
+                >
+                  {positionMillimeters === null
+                    ? 'not encoded'
+                    : `${positionMillimeters.toFixed(
+                        Math.abs(positionMillimeters) >= 100 ? 0 : 1,
+                      )} mm`}
+                </text>
+              </g>
+            ),
+          )}
+          <text
+            className="axis-title"
+            x={PROJECTION_GRAPH.left + plotWidth / 2}
+            y={PROJECTION_GRAPH.height - 3}
+            textAnchor="middle"
+          >
+            ω / 2π · kHz   /   r∥ · mm along G
+          </text>
+          <text
+            className="axis-title"
+            textAnchor="middle"
+            transform={`translate(14 ${
+              PROJECTION_GRAPH.top + plotHeight / 2
+            }) rotate(-90)`}
+          >
+            relative magnitude
+          </text>
+        </g>
+        <path className="spatial-spectrum-fill" d={fillPath} />
+        <path className="spatial-spectrum-line" d={spectrumPath} />
+      </svg>
+    </div>
+  )
 }
 
 function updateEndpoint(
@@ -395,11 +705,19 @@ function SpatialGradientGraph({
 }
 
 function GradientEncodingExperimentPanel({
+  ensembleStates,
   fieldOfViewMillimeters,
+  onPause,
+  onPlaybackSpeedChange,
+  onReset,
+  onStart,
   onXEnabledChange,
   onXProfileChange,
   onYEnabledChange,
   onYProfileChange,
+  playbackSpeed,
+  playbackStatus,
+  playbackTimeMilliseconds,
   xEnabled,
   xProfile,
   yEnabled,
@@ -411,46 +729,163 @@ function GradientEncodingExperimentPanel({
   const maximumFieldOffset = maximumEndpointFieldOffsetMillitesla(
     fieldOfViewMillimeters,
   )
+  const xGradientStrength = xEnabled
+    ? gradientStrengthMilliteslaPerMeter(xProfile, fieldOfViewMillimeters)
+    : 0
+  const yGradientStrength = yEnabled
+    ? gradientStrengthMilliteslaPerMeter(yProfile, fieldOfViewMillimeters)
+    : 0
+  const effectiveGradientStrength = Math.hypot(
+    xGradientStrength,
+    yGradientStrength,
+  )
+  const centerFieldOffsetMillitesla =
+    (xEnabled
+      ? (xProfile.startFieldOffsetMillitesla +
+          xProfile.endFieldOffsetMillitesla) /
+        2
+      : 0) +
+    (yEnabled
+      ? (yProfile.startFieldOffsetMillitesla +
+          yProfile.endFieldOffsetMillitesla) /
+        2
+      : 0)
+  const projection = useMemo(
+    () =>
+      createSpatialFourierProjection(
+        ensembleStates,
+        xEnabled ? xProfile : null,
+        yEnabled ? yProfile : null,
+        maximumFieldOffset * 2 * 1e-3 * 1.02,
+      ),
+    [
+      ensembleStates,
+      maximumFieldOffset,
+      xEnabled,
+      xProfile,
+      yEnabled,
+      yProfile,
+    ],
+  )
 
   return (
-    <section className="fundamental-gradient-section">
-      <div className="section-heading">
-        <div>
-          <span className="section-index">01</span>
-          <h2>Frequency Encoding</h2>
+    <>
+      <div className="gradient-playback-controls gradient-playback-controls-top spatial-gradient-playback-controls">
+        <div className="gradient-playback-actions">
+          <button
+            className="fid-control-button primary transport"
+            type="button"
+            title={
+              playbackStatus === 'running'
+                ? 'Pause experiment'
+                : 'Play experiment'
+            }
+            aria-label={
+              playbackStatus === 'running'
+                ? 'Pause spatial gradient experiment'
+                : playbackStatus === 'paused'
+                  ? 'Resume spatial gradient experiment'
+                  : 'Start spatial gradient experiment'
+            }
+            onClick={playbackStatus === 'running' ? onPause : onStart}
+          >
+            <span aria-hidden="true">
+              {playbackStatus === 'running' ? '❚❚' : '▶'}
+            </span>
+          </button>
+          <DarkSelect
+            className="gradient-playback-speed-select"
+            ariaLabel="Spatial gradient experiment playback speed"
+            value={playbackSpeed}
+            options={SPATIAL_PLAYBACK_SPEED_OPTIONS}
+            onChange={onPlaybackSpeedChange}
+          />
+          <button
+            className="fid-control-button"
+            type="button"
+            disabled={
+              playbackStatus === 'idle' && playbackTimeMilliseconds === 0
+            }
+            onClick={onReset}
+          >
+            Reset
+          </button>
+        </div>
+        <div className="gradient-playback-meta">
+          <span className={`fid-status ${playbackStatus}`}>
+            {playbackStatus}
+          </span>
+          <span>Ideal 90° transverse state</span>
+          <strong>t = {playbackTimeMilliseconds.toFixed(4)} ms</strong>
         </div>
       </div>
 
-      <p className="gradient-input-instructions">
-        Drag either endpoint to define the linear ΔB₀ profile across each
-        spatial axis. The line slope is the applied gradient strength; the
-        enabled G<sub>x</sub> and G<sub>y</sub> profiles are summed directly
-        in the 3D magnetic-field and frequency surfaces.
-      </p>
+      <section className="fundamental-gradient-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">01</span>
+            <h2>Frequency Encoding</h2>
+          </div>
+        </div>
 
-      <div className="spatial-gradient-stack">
-        <SpatialGradientGraph
-          axis="x"
-          enabled={xEnabled}
-          fieldOfViewMillimeters={fieldOfViewMillimeters}
-          maximumFieldOffsetMillitesla={maximumFieldOffset}
-          profile={xProfile}
-          onChange={onXProfileChange}
-          onEnabledChange={onXEnabledChange}
-          onReset={() => onXProfileChange(defaults.x)}
-        />
-        <SpatialGradientGraph
-          axis="y"
-          enabled={yEnabled}
-          fieldOfViewMillimeters={fieldOfViewMillimeters}
-          maximumFieldOffsetMillitesla={maximumFieldOffset}
-          profile={yProfile}
-          onChange={onYProfileChange}
-          onEnabledChange={onYEnabledChange}
-          onReset={() => onYProfileChange(defaults.y)}
-        />
-      </div>
-    </section>
+        <p className="gradient-input-instructions">
+          Drag either endpoint to define the linear ΔB₀ profile across each
+          spatial axis. The line slope is the applied gradient strength; the
+          enabled G<sub>x</sub> and G<sub>y</sub> profiles are summed directly
+          in the 3D magnetic-field and frequency surfaces.
+        </p>
+
+        <div className="spatial-gradient-stack">
+          <SpatialGradientGraph
+            axis="x"
+            enabled={xEnabled}
+            fieldOfViewMillimeters={fieldOfViewMillimeters}
+            maximumFieldOffsetMillitesla={maximumFieldOffset}
+            profile={xProfile}
+            onChange={onXProfileChange}
+            onEnabledChange={onXEnabledChange}
+            onReset={() => onXProfileChange(defaults.x)}
+          />
+          <SpatialGradientGraph
+            axis="y"
+            enabled={yEnabled}
+            fieldOfViewMillimeters={fieldOfViewMillimeters}
+            maximumFieldOffsetMillitesla={maximumFieldOffset}
+            profile={yProfile}
+            onChange={onYProfileChange}
+            onEnabledChange={onYEnabledChange}
+            onReset={() => onYProfileChange(defaults.y)}
+          />
+        </div>
+      </section>
+
+      <section className="fundamental-gradient-section spatial-projection-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">02</span>
+            <h2>1D Fourier Transform Projection</h2>
+          </div>
+        </div>
+
+        <p className="gradient-input-instructions">
+          Every ensemble contributes to the complex received signal according
+          to its proton-weighted magnetization and gradient-shifted frequency.
+          F(ω) is the corresponding one-dimensional projection along the
+          combined G<sub>x</sub> and G<sub>y</sub> direction.
+        </p>
+
+        <div className="spatial-projection-stack">
+          <SignalFunctionGraph projection={projection} />
+          <FourierSpectrumGraph
+            centerFieldOffsetMillitesla={centerFieldOffsetMillitesla}
+            effectiveGradientMilliteslaPerMeter={
+              effectiveGradientStrength
+            }
+            projection={projection}
+          />
+        </div>
+      </section>
+    </>
   )
 }
 

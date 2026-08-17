@@ -34,9 +34,9 @@ import {
   type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
 import {
+  spatialPhaseRadiansAt,
   spatialGradientProfileHasField,
   type SpatialGradientProfile,
-  visualizedSpatialPhaseIncrementRadians,
 } from '../simulation/spatialGradient'
 import {
   amplitudeHeight,
@@ -94,6 +94,8 @@ const FID_FIELD_VARIATION_PALETTE = [
 ] as const
 const FOCUS_DURATION = 650
 const SLOWED_LAB_PRECESSION_RADIANS_PER_MILLISECOND = (2 * Math.PI) / 180
+const SLOWED_SPATIAL_LAB_PRECESSION_RADIANS_PER_MILLISECOND =
+  (2 * Math.PI) / 0.05
 
 interface FocusTransition {
   fromCamera: THREE.Vector3
@@ -150,6 +152,7 @@ interface LabSceneProps {
   gradientSliceSelectionPulses: ReadonlyArray<GradientPulse>
   spatialGradientActive: boolean
   spatialGradientEnsembleStates: ReadonlyArray<FidEnsembleState>
+  spatialGradientTimeMilliseconds: number
   spatialGradientXEnabled: boolean
   spatialGradientXProfile: SpatialGradientProfile
   spatialGradientYEnabled: boolean
@@ -202,6 +205,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientSliceSelectionPulses,
       spatialGradientActive,
       spatialGradientEnsembleStates,
+      spatialGradientTimeMilliseconds,
       spatialGradientXEnabled,
       spatialGradientXProfile,
       spatialGradientYEnabled,
@@ -278,12 +282,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const spatialGradientRef = useRef({
       active: spatialGradientActive,
       states: spatialGradientEnsembleStates,
+      timeMilliseconds: spatialGradientTimeMilliseconds,
       xEnabled: spatialGradientXEnabled,
       xProfile: spatialGradientXProfile,
       yEnabled: spatialGradientYEnabled,
       yProfile: spatialGradientYProfile,
     })
-    const spatialGradientResetRevisionRef = useRef(0)
+    const spatialGradientFieldRevisionRef = useRef(0)
     const fidArrowsDirtyRef = useRef(true)
     const sliceGraphDirtyRef = useRef(true)
     const renderedFidStatesRef = useRef<ReadonlyArray<FidEnsembleState>>([])
@@ -328,14 +333,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       }
       sliceGraphDirtyRef.current = true
       if (spatialGradientRef.current.active) {
-        spatialGradientResetRevisionRef.current += 1
+        spatialGradientFieldRevisionRef.current += 1
         fidArrowsDirtyRef.current = true
       }
     }, [fieldStrengthTesla, fieldUniformity])
 
     useEffect(() => {
       const previous = spatialGradientRef.current
-      const profileChanged =
+      const fieldChanged =
         previous.xEnabled !== spatialGradientXEnabled ||
         previous.yEnabled !== spatialGradientYEnabled ||
         previous.xProfile.startFieldOffsetMillitesla !==
@@ -346,28 +351,35 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           spatialGradientYProfile.startFieldOffsetMillitesla ||
         previous.yProfile.endFieldOffsetMillitesla !==
           spatialGradientYProfile.endFieldOffsetMillitesla
-      const shouldResetPhase =
-        spatialGradientActive &&
-        (!previous.active ||
-          previous.states !== spatialGradientEnsembleStates ||
-          profileChanged)
+      const activeChanged = previous.active !== spatialGradientActive
+      const statesChanged =
+        previous.states !== spatialGradientEnsembleStates
+      const timeChanged =
+        previous.timeMilliseconds !== spatialGradientTimeMilliseconds
 
       spatialGradientRef.current = {
         active: spatialGradientActive,
         states: spatialGradientEnsembleStates,
+        timeMilliseconds: spatialGradientTimeMilliseconds,
         xEnabled: spatialGradientXEnabled,
         xProfile: spatialGradientXProfile,
         yEnabled: spatialGradientYEnabled,
         yProfile: spatialGradientYProfile,
       }
-      if (shouldResetPhase) {
-        spatialGradientResetRevisionRef.current += 1
+      if (fieldChanged || activeChanged) {
+        spatialGradientFieldRevisionRef.current += 1
+        sliceGraphDirtyRef.current = true
+      } else if (
+        statesChanged ||
+        (timeChanged && sliceGraphModeRef.current === 'phase')
+      ) {
+        sliceGraphDirtyRef.current = true
       }
       fidArrowsDirtyRef.current = true
-      sliceGraphDirtyRef.current = true
     }, [
       spatialGradientActive,
       spatialGradientEnsembleStates,
+      spatialGradientTimeMilliseconds,
       spatialGradientXEnabled,
       spatialGradientXProfile,
       spatialGradientYEnabled,
@@ -1222,25 +1234,17 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       let renderedB1PulseStartedAt = -1
       let renderedB1ReferenceFrame: ReferenceFrame | null = null
       let renderedGradientRfPulseKey: string | null = null
-      const spatialGradientPhases = new Float64Array(
-        SLICE_ENSEMBLE_COUNT,
-      )
       const spatialGradientFieldOffsetsTesla = new Float64Array(
         SLICE_ENSEMBLE_COUNT,
       )
-      let spatialGradientElapsedMilliseconds = 0
-      let spatialGradientLastFrameTime: number | null = null
-      let renderedSpatialGradientResetRevision = -1
+      let renderedSpatialGradientFieldRevision = -1
 
-      const updateSpatialGradientPhases = (time: number) => {
+      const updateSpatialGradientField = () => {
         const spatialGradient = spatialGradientRef.current
-        if (!spatialGradient.active) {
-          spatialGradientLastFrameTime = null
-          return
-        }
+        if (!spatialGradient.active) return
 
-        const resetRevision = spatialGradientResetRevisionRef.current
-        if (renderedSpatialGradientResetRevision !== resetRevision) {
+        const fieldRevision = spatialGradientFieldRevisionRef.current
+        if (renderedSpatialGradientFieldRevision !== fieldRevision) {
           const magneticField = sliceMagneticField(
             staticFieldOffsetsTeslaRef.current,
             GRID_SIZE,
@@ -1252,32 +1256,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           spatialGradientFieldOffsetsTesla.set(
             magneticField.fieldOffsetsTesla,
           )
-          spatialGradientPhases.fill(0)
-          spatialGradientElapsedMilliseconds = 0
-          spatialGradientLastFrameTime = time
-          renderedSpatialGradientResetRevision = resetRevision
-        } else if (spatialGradientLastFrameTime !== null) {
-          const elapsedMilliseconds = Math.min(
-            50,
-            Math.max(0, time - spatialGradientLastFrameTime),
-          )
-          spatialGradient.states.forEach((state) => {
-            const fieldIndex = state.row * GRID_SIZE + state.column
-            spatialGradientPhases[state.index] +=
-              visualizedSpatialPhaseIncrementRadians(
-                spatialGradientFieldOffsetsTesla[fieldIndex],
-                elapsedMilliseconds,
-              )
-          })
-          spatialGradientElapsedMilliseconds += elapsedMilliseconds
-          spatialGradientLastFrameTime = time
-        } else {
-          spatialGradientLastFrameTime = time
-        }
-
-        fidArrowsDirtyRef.current = true
-        if (sliceGraphModeRef.current === 'phase') {
-          sliceGraphDirtyRef.current = true
+          renderedSpatialGradientFieldRevision = fieldRevision
         }
       }
 
@@ -1377,7 +1356,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             ? gradientAnimation.states
             : fidAnimation.states
         const timeMilliseconds = renderingSpatialGradient
-          ? spatialGradientElapsedMilliseconds
+          ? spatialGradient.timeMilliseconds
           : renderingGradientEncoding
             ? gradientAnimation.timeMilliseconds
             : fidAnimation.timeMilliseconds
@@ -1399,7 +1378,12 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                   transverseFraction: 1,
                   longitudinalFraction: 0,
                   precessionPhaseRadians:
-                    spatialGradientPhases[state.index],
+                    spatialPhaseRadiansAt(
+                      spatialGradientFieldOffsetsTesla[
+                        state.row * GRID_SIZE + state.column
+                      ],
+                      timeMilliseconds,
+                    ),
                 }
               : renderingGradientEncoding
                 ? gradientEnsembleMagnetizationStateAt(
@@ -1426,7 +1410,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
             const referenceFramePhase =
               referenceFrameRef.current === 'laboratory-slowed'
-                ? SLOWED_LAB_PRECESSION_RADIANS_PER_MILLISECOND *
+                ? (renderingSpatialGradient
+                    ? SLOWED_SPATIAL_LAB_PRECESSION_RADIANS_PER_MILLISECOND
+                    : SLOWED_LAB_PRECESSION_RADIANS_PER_MILLISECOND) *
                   timeMilliseconds
                 : 0
             const phase =
@@ -1541,7 +1527,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             ? gradientAnimation.states
             : fidAnimation.states
         const timeMilliseconds = renderingSpatialGradient
-          ? spatialGradientElapsedMilliseconds
+          ? spatialGradient.timeMilliseconds
           : renderingGradientEncoding
             ? gradientAnimation.timeMilliseconds
             : fidAnimation.timeMilliseconds
@@ -1665,7 +1651,10 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             } else if (graphMode === 'phase') {
               let phaseRadians = 0
               if (renderingSpatialGradient) {
-                phaseRadians = spatialGradientPhases[index]
+                phaseRadians = spatialPhaseRadiansAt(
+                  spatialGradientFieldOffsetsTesla[index],
+                  timeMilliseconds,
+                )
               } else if (
                 simulationActive &&
                 renderingGradientEncoding
@@ -1991,7 +1980,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           if (progress === 1) focusTransitionRef.current = null
         }
 
-        updateSpatialGradientPhases(time)
+        updateSpatialGradientField()
         updateFidArrows()
         updateSliceGraph()
         controls.update()

@@ -30,6 +30,7 @@ import SpinEchoExperimentPanel from './components/SpinEchoExperimentPanel'
 import { useFidSimulation } from './hooks/useFidSimulation'
 import { useGradientAcquisition } from './hooks/useGradientAcquisition'
 import { useGradientEncodingPlayback } from './hooks/useGradientEncodingPlayback'
+import { useSpatialGradientPlayback } from './hooks/useSpatialGradientPlayback'
 import {
   createBlockSimulationEnsembles,
   createHydrogenEnsembles,
@@ -70,7 +71,7 @@ const B0_OPTIONS: ReadonlyArray<{ id: B0Tesla; label: string }> = [
 // LabScene owns a long-lived Three.js animation loop. Bump this key whenever
 // the data contract consumed inside that loop changes so Vite hot reload does
 // not leave an already-mounted scene running an incompatible closure.
-const LAB_SCENE_RUNTIME_VERSION = 'idealized-spatial-gradient-phase-v1'
+const LAB_SCENE_RUNTIME_VERSION = 'recomputed-spatial-gradient-phase-v2'
 const EMPTY_GRADIENT_PULSES: ReadonlyArray<GradientPulse> = []
 const DEFAULT_GRADIENT_CHANNELS_ENABLED: Readonly<
   Record<GradientChannelId, boolean>
@@ -417,6 +418,9 @@ function App() {
       tissueHeterogeneity,
     ],
   )
+  const spatialGradientPlayback = useSpatialGradientPlayback({
+    active: spatialGradientExperimentSelected,
+  })
   const fidSimulation = useFidSimulation({
     active: simulationExperimentSelected,
     ensembles: simulationEnsembles,
@@ -661,6 +665,9 @@ function App() {
           gradientSliceSelectionPulses={appliedSliceSelectionPulses}
           spatialGradientActive={spatialGradientExperimentSelected}
           spatialGradientEnsembleStates={spatialGradientEnsembleStates}
+          spatialGradientTimeMilliseconds={
+            spatialGradientPlayback.timeMilliseconds
+          }
           spatialGradientXEnabled={spatialGradientXEnabled}
           spatialGradientXProfile={spatialGradientXProfile}
           spatialGradientYEnabled={spatialGradientYEnabled}
@@ -872,11 +879,21 @@ function App() {
 
             {selectedExperiment === 'gradient-encoding' && (
               <GradientEncodingExperimentPanel
+                ensembleStates={spatialGradientEnsembleStates}
                 fieldOfViewMillimeters={GRID_SIZE}
+                playbackSpeed={spatialGradientPlayback.speed}
+                playbackStatus={spatialGradientPlayback.status}
+                playbackTimeMilliseconds={
+                  spatialGradientPlayback.timeMilliseconds
+                }
                 xEnabled={spatialGradientXEnabled}
                 xProfile={spatialGradientXProfile}
                 yEnabled={spatialGradientYEnabled}
                 yProfile={spatialGradientYProfile}
+                onPause={spatialGradientPlayback.pause}
+                onPlaybackSpeedChange={spatialGradientPlayback.setSpeed}
+                onReset={spatialGradientPlayback.reset}
+                onStart={spatialGradientPlayback.start}
                 onXEnabledChange={setSpatialGradientXEnabled}
                 onXProfileChange={setSpatialGradientXProfile}
                 onYEnabledChange={setSpatialGradientYEnabled}
