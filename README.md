@@ -52,14 +52,13 @@ true 3D volumes for future internal geometry. The scene lifecycle is isolated
 in `LabScene`, while the worker owns simulation timing and signal sampling.
 
 Block View expands the logical domain to 128 × 128 × 128 voxels. A removed
-64³ corner exposes one quadrant of the full source slice at the block's
-mid-plane. Two rotated copies of that 64 × 64 quadrant form the other cut
-faces, so all three exposed faces are simulated without double-counting their
-horizontal face. In total, 24,576 colored spheres participate in simulations
-and can be selected. Only exposed, non-simulated shell voxels are rendered as
-a lightweight, faint-gray point cloud; the block interior is omitted. They
-provide volumetric context without participating in selection or signal
-calculations.
+64³ corner exposes one 64 × 64 quadrant of the source slice at the block's
+mid-plane. Two rotated copies of that quadrant form the other cut faces. Block
+View renders and simulates only these three exposed faces—12,288 colored
+spheres—while Slice View retains the complete 128 × 128 source plane. Only
+exposed, non-simulated shell voxels are rendered as a lightweight, faint-gray
+point cloud; the block interior is omitted. They provide volumetric context
+without participating in selection or signal calculations.
 
 The initial non-uniform isocenter approximation uses normalized radial
 position `rho` and a 1 ppm outer variation:

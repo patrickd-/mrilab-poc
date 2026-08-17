@@ -36,11 +36,11 @@ export const GRID_SIZE = 128
 const GRID_SPACING = 0.42
 const SPHERE_RADIUS = 0.198
 const GRID_OFFSET = ((GRID_SIZE - 1) * GRID_SPACING) / 2
+const SLICE_ENSEMBLE_COUNT = GRID_SIZE * GRID_SIZE
 const BLOCK_CUT_SIZE = GRID_SIZE / 2
-const BLOCK_PLANE_ENSEMBLE_COUNT = GRID_SIZE * GRID_SIZE
 const BLOCK_FACE_ENSEMBLE_COUNT = BLOCK_CUT_SIZE * BLOCK_CUT_SIZE
 const BLOCK_SIMULATED_ENSEMBLE_COUNT =
-  BLOCK_PLANE_ENSEMBLE_COUNT + 2 * BLOCK_FACE_ENSEMBLE_COUNT
+  3 * BLOCK_FACE_ENSEMBLE_COUNT
 const SLICE_GRAPH_BASE_HEIGHT = 10
 const SLICE_GRAPH_HEIGHT = 5.6
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
@@ -167,8 +167,9 @@ function createBlockLayout(): BlockLayout {
   }
 
   let simulatedIndex = 0
-  for (let row = 0; row < GRID_SIZE; row += 1) {
-    for (let column = 0; column < GRID_SIZE; column += 1) {
+  // Horizontal face: the source slice quadrant exposed by the cutaway.
+  for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
+    for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
       setSimulatedPosition(
         simulatedIndex,
         column * GRID_SPACING - GRID_OFFSET,
@@ -179,8 +180,7 @@ function createBlockLayout(): BlockLayout {
     }
   }
 
-  // The plane's lower-right quadrant is already the horizontal cut face.
-  // Rotate that quadrant onto the two remaining vertical cut faces.
+  // Rotate the same source quadrant onto the two vertical cut faces.
   for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
     for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
       const y = GRID_OFFSET - row * GRID_SPACING
@@ -206,7 +206,10 @@ function createBlockLayout(): BlockLayout {
           column >= BLOCK_CUT_SIZE &&
           row >= BLOCK_CUT_SIZE &&
           layer >= BLOCK_CUT_SIZE
-        const onSourcePlane = layer === BLOCK_CUT_SIZE - 1
+        const onHorizontalCutFace =
+          layer === BLOCK_CUT_SIZE - 1 &&
+          column >= BLOCK_CUT_SIZE &&
+          row >= BLOCK_CUT_SIZE
         const onVerticalXCutFace =
           column === BLOCK_CUT_SIZE - 1 &&
           row >= BLOCK_CUT_SIZE &&
@@ -225,7 +228,7 @@ function createBlockLayout(): BlockLayout {
 
         if (
           inRemovedCorner ||
-          onSourcePlane ||
+          onHorizontalCutFace ||
           onVerticalXCutFace ||
           onVerticalYCutFace ||
           !onOuterSurface
@@ -1225,7 +1228,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       let renderedB1ReferenceFrame: ReferenceFrame | null = null
 
       const hideFidArrow = (index: number) => {
-        if (index < BLOCK_PLANE_ENSEMBLE_COUNT) {
+        if (index < SLICE_ENSEMBLE_COUNT) {
           fidArrowShafts.setMatrixAt(index, hiddenMatrix)
           fidArrowHeads.setMatrixAt(index, hiddenMatrix)
         }
@@ -1277,7 +1280,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               0.84,
             ),
           )
-          if (state.index < BLOCK_PLANE_ENSEMBLE_COUNT) {
+          if (state.index < SLICE_ENSEMBLE_COUNT) {
             fidArrowShafts.setColorAt(state.index, fidArrowColor)
             fidArrowHeads.setColorAt(state.index, fidArrowColor)
           }
@@ -1383,7 +1386,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                 positionOffset,
               )
             } else {
-              if (state.index >= BLOCK_PLANE_ENSEMBLE_COUNT) return
+              if (state.index >= SLICE_ENSEMBLE_COUNT) return
               const row = Math.floor(state.index / GRID_SIZE)
               const column = state.index % GRID_SIZE
               fidArrowPosition.set(
