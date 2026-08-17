@@ -43,6 +43,12 @@ const BLOCK_SIMULATED_ENSEMBLE_COUNT =
   3 * BLOCK_FACE_ENSEMBLE_COUNT
 const SLICE_GRAPH_BASE_HEIGHT = 10
 const SLICE_GRAPH_HEIGHT = 5.6
+const SLICE_HALF_WIDTH_METERS = ((GRID_SIZE - 1) / 2) * 1e-3
+const FULL_SCALE_GRADIENT_FREQUENCY_OFFSET_HERTZ =
+  (PROTON_GYROMAGNETIC_RATIO *
+    MAXIMUM_GRADIENT_TESLA_PER_METER *
+    SLICE_HALF_WIDTH_METERS) /
+  (2 * Math.PI)
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
 const SAMPLE_SPHERE_COLORS: Readonly<Record<SamplePresetId, THREE.Color>> = {
   air: new THREE.Color('#526c78'),
@@ -1585,8 +1591,10 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             let normalizedHeight = 0.5
 
             if (graphMode === 'frequency-laboratory') {
-              // B0 determines the dominant laboratory-frame height. A
-              // locally auto-ranged offset keeps ppm structure visible.
+              // B0 determines the laboratory-frame baseline. Gradient
+              // encoding uses a fixed full-gradient scale so changing a
+              // pulse's amplitude visibly changes the surface slope. Other
+              // experiments retain local auto-ranging for ppm-scale detail.
               const nominalHeight =
                 0.18 + 0.56 * (fieldStrengthTeslaRef.current / 7)
               const localHeightRange = Math.min(
@@ -1594,20 +1602,34 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                 nominalHeight - 0.04,
                 0.96 - nominalHeight,
               )
+              const frequencyHeightScaleHertz = renderingGradientEncoding
+                ? FULL_SCALE_GRADIENT_FREQUENCY_OFFSET_HERTZ
+                : maximumAbsoluteFrequencyOffsetHertz
               normalizedHeight =
-                maximumAbsoluteFrequencyOffsetHertz > 1e-9
+                frequencyHeightScaleHertz > 1e-9
                   ? nominalHeight +
                     localHeightRange *
-                      (frequencyOffsetHertz /
-                        maximumAbsoluteFrequencyOffsetHertz)
+                      THREE.MathUtils.clamp(
+                        frequencyOffsetHertz /
+                          frequencyHeightScaleHertz,
+                        -1,
+                        1,
+                      )
                   : nominalHeight
             } else if (graphMode === 'frequency-rotating') {
+              const frequencyHeightScaleHertz = renderingGradientEncoding
+                ? FULL_SCALE_GRADIENT_FREQUENCY_OFFSET_HERTZ
+                : maximumAbsoluteFrequencyOffsetHertz
               normalizedHeight =
-                maximumAbsoluteFrequencyOffsetHertz > 1e-9
+                frequencyHeightScaleHertz > 1e-9
                   ? 0.5 +
                     0.46 *
-                      (frequencyOffsetHertz /
-                        maximumAbsoluteFrequencyOffsetHertz)
+                      THREE.MathUtils.clamp(
+                        frequencyOffsetHertz /
+                          frequencyHeightScaleHertz,
+                        -1,
+                        1,
+                      )
                   : 0.5
             } else if (graphMode === 'phase') {
               let phaseRadians = 0

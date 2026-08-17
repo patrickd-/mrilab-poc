@@ -39,7 +39,12 @@ normal, while Block View and Stacked View remain unrestricted.
   its RF-gated sequence is paced for inspection by
   `src/hooks/useGradientEncodingPlayback.ts`.
 - Slice View can overlay a translucent, spatially smoothed 3D surface for
-  laboratory/rotating-frame frequency, phase, or transverse amplitude.
+  laboratory/rotating-frame frequency, phase, or transverse amplitude. During
+  Gradient Encoding the frequency surfaces use a fixed 2.704 kHz full-gradient
+  edge scale, so G_PE tilts only the phase axis, G_RO tilts only the readout
+  axis, and changing pulse amplitude changes slope proportionally. Other
+  experiments retain local frequency auto-ranging to expose ppm-scale B0
+  structure.
 - `src/components/FidExperimentPanel.tsx`,
   `src/components/SpinEchoExperimentPanel.tsx`, and
   `src/components/GradientEncodingExperimentPanel.tsx` contain the experiment
