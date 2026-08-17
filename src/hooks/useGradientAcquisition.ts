@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  ADC_DWELL_TIME_MILLISECONDS,
   adcGateActiveAt,
   type GradientPulse,
   type GradientSignalPoint,
 } from '../simulation/gradientEncoding'
 import type { GradientPlaybackStatus } from './useGradientEncodingPlayback'
 
-export const ADC_DWELL_TIME_MILLISECONDS = 0.02
+export { ADC_DWELL_TIME_MILLISECONDS } from '../simulation/gradientEncoding'
 
 export interface GradientAcquisitionRun {
   id: number

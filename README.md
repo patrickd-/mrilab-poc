@@ -23,6 +23,17 @@ Run the deterministic simulation tests with:
 npm test
 ```
 
+Calibrate the editable gradients against the same k-space integrator used by
+the simulation with:
+
+```bash
+npm run calibrate:gradients
+```
+
+The report compares the current pulse amplitudes with a Cartesian matrix sized
+for the rendered grid. Optional flags include `--grid-size=64`,
+`--voxel-mm=2`, `--adc-dwell-ms=0.1`, `--imperfections`, and `--json`.
+
 The automated suite also covers workers, playback hooks, graph editing,
 renderer-independent 3D surface math, and app-level UX. Run coverage with
 `npm run test:coverage`; see [TESTING.md](TESTING.md) for the full test matrix
