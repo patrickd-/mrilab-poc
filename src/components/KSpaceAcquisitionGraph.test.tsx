@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import type { GradientSignalPoint } from '../simulation/gradientEncoding'
 import KSpaceAcquisitionGraph from './KSpaceAcquisitionGraph'
 
@@ -43,8 +43,10 @@ function renderGraph(
       encodingStartTimeMilliseconds={6.8}
       gradientImperfections={false}
       gridSize={128}
+      onReconstructionVoxelSizeChange={() => {}}
       phaseEncodingPulses={phaseEncodingPulses}
       readoutPulses={readoutPulses}
+      reconstructionVoxelSizeMillimeters={1}
       status="idle"
       {...overrides}
     />,
@@ -83,8 +85,10 @@ describe('KSpaceAcquisitionGraph', () => {
         encodingStartTimeMilliseconds={6.8}
         gradientImperfections={false}
         gridSize={128}
+        onReconstructionVoxelSizeChange={() => {}}
         phaseEncodingPulses={phaseEncodingPulses}
         readoutPulses={readoutPulses}
+        reconstructionVoxelSizeMillimeters={1}
         status="running"
       />,
     )
@@ -133,7 +137,62 @@ describe('KSpaceAcquisitionGraph', () => {
     expect(support?.getAttribute('data-k-min')).toBe('-500')
     expect(support?.getAttribute('data-k-max-exclusive')).toBe('500')
     expect(Number(support?.getAttribute('width'))).toBeGreaterThan(0)
-    expect(screen.getByText(/128 × 128 Nyquist support/i)).not.toBeNull()
+    expect(screen.getByText(/±0\.50 cycles\/mm/i)).not.toBeNull()
+  })
+
+  it('previews a square resize while dragging and commits only on release', () => {
+    const onVoxelSizeChange = vi.fn()
+    const { container } = renderGraph({
+      onReconstructionVoxelSizeChange: onVoxelSizeChange,
+    })
+    const graph = container.querySelector<SVGSVGElement>(
+      '.k-space-acquisition-graph',
+    )!
+    vi.spyOn(graph, 'getBoundingClientRect').mockReturnValue({
+      bottom: 378,
+      height: 378,
+      left: 0,
+      right: 460,
+      top: 0,
+      width: 460,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    const handle = screen.getAllByRole('slider', {
+      name: /reconstruction nyquist extent/i,
+    })[1]
+    Object.defineProperty(handle, 'setPointerCapture', {
+      value: vi.fn(),
+    })
+
+    fireEvent.pointerDown(handle, {
+      clientX: 250,
+      clientY: 143,
+      pointerId: 7,
+    })
+    fireEvent.pointerMove(graph, {
+      clientX: 275,
+      clientY: 118,
+      pointerId: 7,
+    })
+
+    expect(onVoxelSizeChange).not.toHaveBeenCalled()
+    expect(
+      Number(
+        container
+          .querySelector('.k-space-reconstruction-support')
+          ?.getAttribute('data-k-max-exclusive'),
+      ),
+    ).toBeCloseTo(1000, 8)
+
+    fireEvent.pointerUp(graph, {
+      clientX: 275,
+      clientY: 118,
+      pointerId: 7,
+    })
+    expect(onVoxelSizeChange).toHaveBeenCalledTimes(1)
+    expect(onVoxelSizeChange).toHaveBeenCalledWith(0.5)
   })
 
   it('renders a single ADC sample as a grayscale point', () => {

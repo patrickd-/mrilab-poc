@@ -1,4 +1,10 @@
-import { useMemo } from 'react'
+import {
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import {
   ADC_DWELL_TIME_MILLISECONDS,
   type GradientAcquisitionRun,
@@ -18,8 +24,10 @@ interface KSpaceAcquisitionGraphProps {
   encodingStartTimeMilliseconds: number
   gradientImperfections: boolean
   gridSize: number
+  onReconstructionVoxelSizeChange: (voxelSizeMillimeters: number) => void
   phaseEncodingPulses: ReadonlyArray<GradientPulse>
   readoutPulses: ReadonlyArray<GradientPulse>
+  reconstructionVoxelSizeMillimeters: number
   status: GradientPlaybackStatus
 }
 
@@ -32,6 +40,12 @@ const GRAPH = {
 }
 const AXIS_SAMPLE_COUNT = 160
 const MINIMUM_EXTENT_CYCLES_PER_METER = 500
+const MINIMUM_NYQUIST_CYCLES_PER_METER = 50
+const KEYBOARD_NYQUIST_STEP_CYCLES_PER_METER = 50
+
+interface SupportDragState {
+  pointerId: number
+}
 
 function niceSymmetricExtent(maximumAbsoluteValue: number) {
   const boundedMaximum = Math.max(
@@ -73,11 +87,27 @@ function KSpaceAcquisitionGraph({
   encodingStartTimeMilliseconds,
   gradientImperfections,
   gridSize,
+  onReconstructionVoxelSizeChange,
   phaseEncodingPulses,
   readoutPulses,
+  reconstructionVoxelSizeMillimeters,
   status,
 }: KSpaceAcquisitionGraphProps) {
-  const reconstructionSupport = cartesianKSpaceBoundsForGrid(gridSize)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const supportDragRef = useRef<SupportDragState | null>(null)
+  const draftVoxelSizeRef = useRef<number | null>(null)
+  const [draftVoxelSizeMillimeters, setDraftVoxelSizeMillimeters] =
+    useState<number | null>(null)
+  const controlledReconstructionSupport = cartesianKSpaceBoundsForGrid(
+    gridSize,
+    reconstructionVoxelSizeMillimeters,
+  )
+  const displayedVoxelSizeMillimeters =
+    draftVoxelSizeMillimeters ?? reconstructionVoxelSizeMillimeters
+  const reconstructionSupport = cartesianKSpaceBoundsForGrid(
+    gridSize,
+    displayedVoxelSizeMillimeters,
+  )
   const { extent, maximumMagnitude, points, segments } = useMemo(() => {
     const points = acquisitionRuns.flatMap((run) => run.points)
     const plannedPoints = Array.from(
@@ -106,6 +136,9 @@ function KSpaceAcquisitionGraph({
     const maximumKSpaceCoordinate = Math.max(
       Math.abs(currentKxCyclesPerMeter),
       Math.abs(currentKyCyclesPerMeter),
+      Math.abs(
+        controlledReconstructionSupport.upperEdgeExclusiveCyclesPerMeter,
+      ),
       ...plannedPoints.flatMap((point) => [
         Math.abs(point.kxCyclesPerMeter),
         Math.abs(point.kyCyclesPerMeter),
@@ -153,6 +186,7 @@ function KSpaceAcquisitionGraph({
     acquisitionRuns,
     currentKxCyclesPerMeter,
     currentKyCyclesPerMeter,
+    controlledReconstructionSupport.upperEdgeExclusiveCyclesPerMeter,
     durationMilliseconds,
     encodingStartTimeMilliseconds,
     gradientImperfections,
@@ -168,6 +202,96 @@ function KSpaceAcquisitionGraph({
   const cursorX = xForKx(currentKxCyclesPerMeter)
   const cursorY = yForKy(currentKyCyclesPerMeter)
   const latestPoint = points[points.length - 1]
+  const nyquistCyclesPerMeter =
+    reconstructionSupport.upperEdgeExclusiveCyclesPerMeter
+  const fieldOfViewMillimeters =
+    gridSize * displayedVoxelSizeMillimeters
+
+  const voxelSizeForNyquist = (requestedNyquistCyclesPerMeter: number) =>
+    (Math.ceil(gridSize / 2) * 1000) /
+    (gridSize * requestedNyquistCyclesPerMeter)
+
+  const nyquistAtPointer = (clientX: number, clientY: number) => {
+    const bounds = svgRef.current?.getBoundingClientRect()
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return nyquistCyclesPerMeter
+    }
+    const svgX = ((clientX - bounds.left) / bounds.width) * GRAPH.width
+    const svgY = ((clientY - bounds.top) / bounds.height) * GRAPH.height
+    const kxCyclesPerMeter =
+      ((svgX - GRAPH.left) / GRAPH.size) * 2 * extent - extent
+    const kyCyclesPerMeter =
+      extent - ((svgY - GRAPH.top) / GRAPH.size) * 2 * extent
+    return Math.min(
+      extent,
+      Math.max(
+        MINIMUM_NYQUIST_CYCLES_PER_METER,
+        Math.abs(kxCyclesPerMeter),
+        Math.abs(kyCyclesPerMeter),
+      ),
+    )
+  }
+
+  const updateDraftSupport = (nyquist: number) => {
+    const nextVoxelSize = voxelSizeForNyquist(nyquist)
+    draftVoxelSizeRef.current = nextVoxelSize
+    setDraftVoxelSizeMillimeters(nextVoxelSize)
+  }
+
+  const beginSupportDrag = (
+    event: ReactPointerEvent<SVGCircleElement>,
+  ) => {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    supportDragRef.current = { pointerId: event.pointerId }
+    updateDraftSupport(nyquistAtPointer(event.clientX, event.clientY))
+  }
+
+  const continueSupportDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (supportDragRef.current?.pointerId !== event.pointerId) return
+    updateDraftSupport(nyquistAtPointer(event.clientX, event.clientY))
+  }
+
+  const endSupportDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (supportDragRef.current?.pointerId !== event.pointerId) return
+    supportDragRef.current = null
+    const nextVoxelSize = draftVoxelSizeRef.current
+    draftVoxelSizeRef.current = null
+    setDraftVoxelSizeMillimeters(null)
+    if (nextVoxelSize !== null) {
+      onReconstructionVoxelSizeChange(nextVoxelSize)
+    }
+  }
+
+  const cancelSupportDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (supportDragRef.current?.pointerId !== event.pointerId) return
+    supportDragRef.current = null
+    draftVoxelSizeRef.current = null
+    setDraftVoxelSizeMillimeters(null)
+  }
+
+  const handleSupportKeyDown = (
+    event: ReactKeyboardEvent<SVGCircleElement>,
+  ) => {
+    let requestedNyquist = nyquistCyclesPerMeter
+    if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
+      requestedNyquist += KEYBOARD_NYQUIST_STEP_CYCLES_PER_METER
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') {
+      requestedNyquist -= KEYBOARD_NYQUIST_STEP_CYCLES_PER_METER
+    } else if (event.key === 'Home') {
+      requestedNyquist = 500
+    } else if (event.key === 'End') {
+      requestedNyquist = extent
+    } else {
+      return
+    }
+    event.preventDefault()
+    onReconstructionVoxelSizeChange(
+      voxelSizeForNyquist(
+        Math.max(MINIMUM_NYQUIST_CYCLES_PER_METER, requestedNyquist),
+      ),
+    )
+  }
 
   return (
     <div className="k-space-acquisition-shell">
@@ -176,17 +300,34 @@ function KSpaceAcquisitionGraph({
           <strong>K-space trajectory</strong>
           <span>ADC-weighted complex signal</span>
         </div>
-        <small>
-          k<sub>x</sub> {formatKSpaceAxisValue(currentKxCyclesPerMeter)} · k
-          <sub>y</sub> {formatKSpaceAxisValue(currentKyCyclesPerMeter)} cycles/mm
-        </small>
+        <div className="k-space-acquisition-meta">
+          <small>
+            k<sub>x</sub> {formatKSpaceAxisValue(currentKxCyclesPerMeter)} · k
+            <sub>y</sub> {formatKSpaceAxisValue(currentKyCyclesPerMeter)}{' '}
+            cycles/mm
+          </small>
+          <button
+            className="gradient-input-reset"
+            type="button"
+            disabled={reconstructionVoxelSizeMillimeters === 1}
+            title="Reset reconstruction support"
+            aria-label="Reset reconstruction support"
+            onClick={() => onReconstructionVoxelSizeChange(1)}
+          >
+            Reset support
+          </button>
+        </div>
       </header>
 
       <svg
+        ref={svgRef}
         className="k-space-acquisition-graph"
         viewBox={`0 0 ${GRAPH.width} ${GRAPH.height}`}
         role="img"
         aria-label={`K-space trajectory with ${points.length} ADC-acquired complex signal samples; cursor at kx ${formatKSpaceAxisValue(currentKxCyclesPerMeter)} and ky ${formatKSpaceAxisValue(currentKyCyclesPerMeter)} cycles per millimeter`}
+        onPointerMove={continueSupportDrag}
+        onPointerUp={endSupportDrag}
+        onPointerCancel={cancelSupportDrag}
       >
         <rect
           className="k-space-reconstruction-support"
@@ -216,6 +357,53 @@ function KSpaceAcquisitionGraph({
             outside this square alias into it
           </title>
         </rect>
+        <g className="k-space-reconstruction-handles">
+          {[
+            [
+              reconstructionSupport.minimumKCyclesPerMeter,
+              reconstructionSupport.upperEdgeExclusiveCyclesPerMeter,
+            ],
+            [
+              reconstructionSupport.upperEdgeExclusiveCyclesPerMeter,
+              reconstructionSupport.upperEdgeExclusiveCyclesPerMeter,
+            ],
+            [
+              reconstructionSupport.minimumKCyclesPerMeter,
+              reconstructionSupport.minimumKCyclesPerMeter,
+            ],
+            [
+              reconstructionSupport.upperEdgeExclusiveCyclesPerMeter,
+              reconstructionSupport.minimumKCyclesPerMeter,
+            ],
+          ].map(([kx, ky], index) => (
+            <g key={index}>
+              <circle
+                className="k-space-reconstruction-grip"
+                cx={xForKx(kx)}
+                cy={yForKy(ky)}
+                r="3"
+                aria-hidden="true"
+              />
+              <circle
+                className="k-space-reconstruction-hit"
+                cx={xForKx(kx)}
+                cy={yForKy(ky)}
+                r="10"
+                role="slider"
+                tabIndex={0}
+                aria-label="Reconstruction Nyquist extent"
+                aria-valuemin={MINIMUM_NYQUIST_CYCLES_PER_METER / 1000}
+                aria-valuemax={extent / 1000}
+                aria-valuenow={nyquistCyclesPerMeter / 1000}
+                aria-valuetext={`plus or minus ${formatKSpaceAxisValue(
+                  nyquistCyclesPerMeter,
+                )} cycles per millimeter`}
+                onPointerDown={beginSupportDrag}
+                onKeyDown={handleSupportKeyDown}
+              />
+            </g>
+          ))}
+        </g>
         <g className="k-space-acquisition-grid" aria-hidden="true">
           {[-1, -0.5, 0, 0.5, 1].map((fraction) => (
             <g key={fraction}>
@@ -344,7 +532,11 @@ function KSpaceAcquisitionGraph({
           </div>
           <div className="k-space-reconstruction-key">
             <i />
-            <span>{gridSize} × {gridSize} Nyquist support</span>
+            <span>
+              ±{formatKSpaceAxisValue(nyquistCyclesPerMeter)} cycles/mm ·{' '}
+              {displayedVoxelSizeMillimeters.toFixed(3)} mm/px ·{' '}
+              {fieldOfViewMillimeters.toFixed(1)} mm FOV
+            </span>
           </div>
         </div>
         <strong>

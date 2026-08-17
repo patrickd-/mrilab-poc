@@ -128,6 +128,7 @@ const GRAPH = {
 const MINIMUM_PULSE_DURATION = 0.025
 const KEYBOARD_TIME_STEP = 0.01
 const KEYBOARD_AMPLITUDE_STEP = 0.05
+const DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS = 1
 const PHASE_ENCODING_REFERENCE_LEVELS = [
   -1,
   -5 / 7,
@@ -766,6 +767,8 @@ function GradientEncodingExperimentPanel({
   transmitFrequencyBand,
 }: GradientEncodingExperimentPanelProps) {
   const [timingGuideTime, setTimingGuideTime] = useState<number | null>(null)
+  const [reconstructionVoxelSizeMillimeters, setReconstructionVoxelSize] =
+    useState(DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS)
   const playheadTime =
     status === 'idle'
       ? null
@@ -844,6 +847,10 @@ function GradientEncodingExperimentPanel({
     gradientImperfections,
     encodingStartTimeMilliseconds,
   )
+  const resetSimulationAndReconstruction = () => {
+    setReconstructionVoxelSize(DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS)
+    onSimulationReset()
+  }
 
   return (
     <>
@@ -881,7 +888,7 @@ function GradientEncodingExperimentPanel({
             disabled={
               status === 'idle' && adcAcquisitionRuns.length === 0
             }
-            onClick={onSimulationReset}
+            onClick={resetSimulationAndReconstruction}
           >
             Reset
           </button>
@@ -1084,7 +1091,10 @@ function GradientEncodingExperimentPanel({
           {ADC_DWELL_TIME_MILLISECONDS.toFixed(2)} ms while the gate is high.
           The k-space cursor follows the integrated G<sub>RO</sub> and G
           <sub>PE</sub> moments continuously; only ADC samples leave a trace,
-          with brightness showing relative signal magnitude.
+          with brightness showing relative signal magnitude. Drag any corner
+          of the green Nyquist square to change the reconstruction voxel size
+          and FOV. The retained complex samples are reconstructed once when
+          the drag ends.
         </p>
 
         <div className="gradient-timing-diagram">
@@ -1119,6 +1129,10 @@ function GradientEncodingExperimentPanel({
             encodingStartTimeMilliseconds={encodingStartTimeMilliseconds}
             gradientImperfections={gradientImperfections}
             gridSize={gridSize}
+            reconstructionVoxelSizeMillimeters={
+              reconstructionVoxelSizeMillimeters
+            }
+            onReconstructionVoxelSizeChange={setReconstructionVoxelSize}
             phaseEncodingPulses={
               enabledChannels['phase-encoding']
                 ? phaseEncodingPulses
@@ -1150,6 +1164,7 @@ function GradientEncodingExperimentPanel({
         <InverseFourierReconstruction
           acquisitionRuns={adcAcquisitionRuns}
           gridSize={gridSize}
+          voxelSizeMillimeters={reconstructionVoxelSizeMillimeters}
         />
       </section>
     </>

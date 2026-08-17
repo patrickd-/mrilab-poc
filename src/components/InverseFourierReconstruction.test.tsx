@@ -80,7 +80,11 @@ describe('inverse Fourier reconstruction', () => {
 
     try {
       const { rerender } = render(
-        <InverseFourierReconstruction acquisitionRuns={[]} gridSize={3} />,
+        <InverseFourierReconstruction
+          acquisitionRuns={[]}
+          gridSize={3}
+          voxelSizeMillimeters={1}
+        />,
       )
       expect(images[0].data[0]).toBe(0)
 
@@ -90,6 +94,7 @@ describe('inverse Fourier reconstruction', () => {
             { id: 0, points: [point(0, 1, 0)] },
           ]}
           gridSize={3}
+          voxelSizeMillimeters={1}
         />,
       )
       expect(
@@ -119,6 +124,7 @@ describe('inverse Fourier reconstruction', () => {
             },
           ]}
           gridSize={3}
+          voxelSizeMillimeters={1}
         />,
       )
       expect(
@@ -132,11 +138,42 @@ describe('inverse Fourier reconstruction', () => {
         }),
       ).not.toBeNull()
 
+      const oneMillimeterImage = images[2].data.slice()
       rerender(
-        <InverseFourierReconstruction acquisitionRuns={[]} gridSize={3} />,
+        <InverseFourierReconstruction
+          acquisitionRuns={[
+            { id: 0, points: [point(0, 1, 0)] },
+            {
+              id: 1,
+              points: [
+                point(
+                  1000 / 3,
+                  Math.cos((2 * Math.PI) / 3),
+                  Math.sin((2 * Math.PI) / 3),
+                ),
+              ],
+            },
+          ]}
+          gridSize={3}
+          voxelSizeMillimeters={0.5}
+        />,
       )
-      expect(images[3].data[0]).toBe(0)
-      expect(putImageData).toHaveBeenCalledTimes(4)
+      expect(images[3].data).not.toEqual(oneMillimeterImage)
+      expect(
+        screen.getByRole('img', {
+          name: /at 0\.500 millimeter voxels/i,
+        }),
+      ).not.toBeNull()
+
+      rerender(
+        <InverseFourierReconstruction
+          acquisitionRuns={[]}
+          gridSize={3}
+          voxelSizeMillimeters={1}
+        />,
+      )
+      expect(images[4].data[0]).toBe(0)
+      expect(putImageData).toHaveBeenCalledTimes(5)
     } finally {
       getContext.mockRestore()
     }

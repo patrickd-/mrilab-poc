@@ -1628,6 +1628,22 @@ a:focus-visible {
   font-size: 0.7em;
 }
 
+.k-space-acquisition-shell > header .k-space-acquisition-meta {
+  display: flex;
+  max-width: 58%;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.k-space-acquisition-meta .gradient-input-reset {
+  width: auto;
+}
+
+.k-space-acquisition-meta .gradient-input-reset:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
 .k-space-acquisition-graph {
   display: block;
   width: 100%;
@@ -1636,8 +1652,35 @@ a:focus-visible {
 
 .k-space-reconstruction-support {
   fill: rgba(145, 230, 179, 0.09);
+  pointer-events: none;
   stroke: rgba(145, 230, 179, 0.46);
   stroke-dasharray: 4 3;
+  stroke-width: 1;
+}
+
+.k-space-acquisition-grid,
+.k-space-acquisition-axis,
+.k-space-acquired-trace {
+  pointer-events: none;
+}
+
+.k-space-reconstruction-grip {
+  fill: var(--green);
+  pointer-events: none;
+  stroke: #080b0e;
+  stroke-width: 1;
+}
+
+.k-space-reconstruction-hit {
+  fill: transparent;
+  cursor: nwse-resize;
+  outline: none;
+  touch-action: none;
+}
+
+.k-space-reconstruction-hit:focus-visible {
+  fill: rgba(145, 230, 179, 0.16);
+  stroke: var(--green);
   stroke-width: 1;
 }
 

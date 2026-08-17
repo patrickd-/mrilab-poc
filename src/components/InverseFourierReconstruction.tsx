@@ -5,6 +5,7 @@ import type { GradientSignalPoint } from '../simulation/gradientEncoding'
 interface InverseFourierReconstructionProps {
   acquisitionRuns: ReadonlyArray<GradientAcquisitionRun>
   gridSize: number
+  voxelSizeMillimeters: number
 }
 
 interface ReconstructionAccumulator {
@@ -12,15 +13,20 @@ interface ReconstructionAccumulator {
   imaginary: Float64Array
   processedPointCounts: Map<number, number>
   real: Float64Array
+  voxelSizeMillimeters: number
 }
 
-function createAccumulator(gridSize: number): ReconstructionAccumulator {
+function createAccumulator(
+  gridSize: number,
+  voxelSizeMillimeters: number,
+): ReconstructionAccumulator {
   const pixelCount = gridSize * gridSize
   return {
     gridSize,
     imaginary: new Float64Array(pixelCount),
     processedPointCounts: new Map(),
     real: new Float64Array(pixelCount),
+    voxelSizeMillimeters,
   }
 }
 
@@ -33,6 +39,7 @@ export function accumulateInverseFourierSamples(
   imaginary: Float64Array,
   gridSize: number,
   points: ReadonlyArray<GradientSignalPoint>,
+  voxelSizeMillimeters = 1,
 ) {
   const expectedLength = gridSize * gridSize
   if (real.length !== expectedLength || imaginary.length !== expectedLength) {
@@ -40,20 +47,21 @@ export function accumulateInverseFourierSamples(
   }
 
   const gridCenter = (gridSize - 1) / 2
+  const voxelSizeMeters = voxelSizeMillimeters * 1e-3
   points.forEach((point) => {
     const signalReal = point.normalizedInPhaseSignal
     const signalImaginary = point.normalizedQuadratureSignal
     const phaseStepX =
-      2 * Math.PI * point.kxCyclesPerMeter * 1e-3
+      2 * Math.PI * point.kxCyclesPerMeter * voxelSizeMeters
     const cosineStepX = Math.cos(phaseStepX)
     const sineStepX = Math.sin(phaseStepX)
 
     for (let row = 0; row < gridSize; row += 1) {
-      const positionYMeters = (gridCenter - row) * 1e-3
+      const positionYMeters = (gridCenter - row) * voxelSizeMeters
       const rowStartPhase =
         2 *
         Math.PI *
-        (point.kxCyclesPerMeter * -gridCenter * 1e-3 +
+        (point.kxCyclesPerMeter * -gridCenter * voxelSizeMeters +
           point.kyCyclesPerMeter * positionYMeters)
       let cosine = Math.cos(rowStartPhase)
       let sine = Math.sin(rowStartPhase)
@@ -78,8 +86,10 @@ function accumulatorNeedsRebuild(
   accumulator: ReconstructionAccumulator,
   acquisitionRuns: ReadonlyArray<GradientAcquisitionRun>,
   gridSize: number,
+  voxelSizeMillimeters: number,
 ) {
   if (accumulator.gridSize !== gridSize) return true
+  if (accumulator.voxelSizeMillimeters !== voxelSizeMillimeters) return true
   const currentRunIds = new Set(acquisitionRuns.map((run) => run.id))
   for (const runId of accumulator.processedPointCounts.keys()) {
     if (!currentRunIds.has(runId)) return true
@@ -128,10 +138,11 @@ function paintMagnitudeImage(
 function InverseFourierReconstruction({
   acquisitionRuns,
   gridSize,
+  voxelSizeMillimeters,
 }: InverseFourierReconstructionProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const accumulatorRef = useRef<ReconstructionAccumulator>(
-    createAccumulator(gridSize),
+    createAccumulator(gridSize, voxelSizeMillimeters),
   )
   const sampleCount = acquisitionRuns.reduce(
     (count, run) => count + run.points.length,
@@ -161,9 +172,13 @@ function InverseFourierReconstruction({
         accumulatorRef.current,
         acquisitionRuns,
         gridSize,
+        voxelSizeMillimeters,
       )
     ) {
-      accumulatorRef.current = createAccumulator(gridSize)
+      accumulatorRef.current = createAccumulator(
+        gridSize,
+        voxelSizeMillimeters,
+      )
     }
     const accumulator = accumulatorRef.current
 
@@ -176,11 +191,14 @@ function InverseFourierReconstruction({
         accumulator.imaginary,
         gridSize,
         newPoints,
+        voxelSizeMillimeters,
       )
       accumulator.processedPointCounts.set(run.id, run.points.length)
     })
     paintMagnitudeImage(context, accumulator)
-  }, [acquisitionRuns, gridSize])
+  }, [acquisitionRuns, gridSize, voxelSizeMillimeters])
+
+  const fieldOfViewMillimeters = gridSize * voxelSizeMillimeters
 
   return (
     <figure className="inverse-fourier-reconstruction">
@@ -191,7 +209,8 @@ function InverseFourierReconstruction({
         </div>
         <small>
           {acquisitionLabel} · {sampleCount} sample
-          {sampleCount === 1 ? '' : 's'}
+          {sampleCount === 1 ? '' : 's'} ·{' '}
+          {fieldOfViewMillimeters.toFixed(1)} mm FOV
         </small>
       </figcaption>
       <canvas
@@ -199,13 +218,15 @@ function InverseFourierReconstruction({
         width={gridSize}
         height={gridSize}
         role="img"
-        aria-label={`Partial MRI magnitude reconstruction from ${acquisitionLabel} and ${sampleLabel}`}
+        aria-label={`Partial MRI magnitude reconstruction from ${acquisitionLabel} and ${sampleLabel} at ${voxelSizeMillimeters.toFixed(3)} millimeter voxels`}
       />
       <footer>
         <span>0</span>
         <i aria-hidden="true" />
         <span>Relative magnitude</span>
-        <strong>Current peak normalized to 1</strong>
+        <strong>
+          {voxelSizeMillimeters.toFixed(3)} mm/px · current peak 1
+        </strong>
       </footer>
     </figure>
   )
