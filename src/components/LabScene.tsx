@@ -13,7 +13,6 @@ import type {
   SupportedFieldStrengthTesla,
 } from '../models/HydrogenEnsemble'
 import {
-  blockSimulationSourceIndices,
   fieldProfileAt,
   NON_UNIFORM_FIELD_MODEL,
   PROTON_GYROMAGNETIC_RATIO,
@@ -32,16 +31,23 @@ import {
   type GradientPulse,
   type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
+import {
+  amplitudeHeight,
+  createBlockLayout,
+  laboratoryFrequencyHeight,
+  phaseHeight,
+  rotatingFrequencyHeight,
+  sliceFrequencyField,
+  smoothGridValues,
+} from './sceneMath'
 
 export const GRID_SIZE = 128
 const GRID_SPACING = 0.42
 const SPHERE_RADIUS = 0.198
 const GRID_OFFSET = ((GRID_SIZE - 1) * GRID_SPACING) / 2
 const SLICE_ENSEMBLE_COUNT = GRID_SIZE * GRID_SIZE
-const BLOCK_CUT_SIZE = GRID_SIZE / 2
-const BLOCK_FACE_ENSEMBLE_COUNT = BLOCK_CUT_SIZE * BLOCK_CUT_SIZE
 const BLOCK_SIMULATED_ENSEMBLE_COUNT =
-  3 * BLOCK_FACE_ENSEMBLE_COUNT
+  3 * (GRID_SIZE / 2) ** 2
 const SLICE_GRAPH_BASE_HEIGHT = 10
 const SLICE_GRAPH_HEIGHT = 5.6
 const SLICE_HALF_WIDTH_METERS = ((GRID_SIZE - 1) / 2) * 1e-3
@@ -148,118 +154,6 @@ function gridPosition(column: number, row: number) {
     GRID_OFFSET - row * GRID_SPACING,
     0,
   )
-}
-
-interface BlockLayout {
-  contextPositions: Float32Array
-  simulatedPositions: Float32Array
-  sourceIndices: number[]
-}
-
-function createBlockLayout(): BlockLayout {
-  const sourceIndices = blockSimulationSourceIndices(GRID_SIZE)
-  const simulatedPositions = new Float32Array(
-    BLOCK_SIMULATED_ENSEMBLE_COUNT * 3,
-  )
-  const cutBoundary =
-    (BLOCK_CUT_SIZE - 1) * GRID_SPACING - GRID_OFFSET
-
-  const setSimulatedPosition = (
-    index: number,
-    x: number,
-    y: number,
-    z: number,
-  ) => {
-    const offset = index * 3
-    simulatedPositions[offset] = x
-    simulatedPositions[offset + 1] = y
-    simulatedPositions[offset + 2] = z
-  }
-
-  let simulatedIndex = 0
-  // Horizontal face: the source slice quadrant exposed by the cutaway.
-  for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
-    for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
-      setSimulatedPosition(
-        simulatedIndex,
-        column * GRID_SPACING - GRID_OFFSET,
-        GRID_OFFSET - row * GRID_SPACING,
-        0,
-      )
-      simulatedIndex += 1
-    }
-  }
-
-  // Rotate the same source quadrant onto the two vertical cut faces.
-  for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
-    for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
-      const y = GRID_OFFSET - row * GRID_SPACING
-      const z = column * GRID_SPACING - GRID_OFFSET
-      setSimulatedPosition(simulatedIndex, cutBoundary, y, z)
-      simulatedIndex += 1
-    }
-  }
-  for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
-    for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
-      const x = column * GRID_SPACING - GRID_OFFSET
-      const z = row * GRID_SPACING - GRID_OFFSET
-      setSimulatedPosition(simulatedIndex, x, -cutBoundary, z)
-      simulatedIndex += 1
-    }
-  }
-
-  const contextPositionValues: number[] = []
-  for (let layer = 0; layer < GRID_SIZE; layer += 1) {
-    for (let row = 0; row < GRID_SIZE; row += 1) {
-      for (let column = 0; column < GRID_SIZE; column += 1) {
-        const inRemovedCorner =
-          column >= BLOCK_CUT_SIZE &&
-          row >= BLOCK_CUT_SIZE &&
-          layer >= BLOCK_CUT_SIZE
-        const onHorizontalCutFace =
-          layer === BLOCK_CUT_SIZE - 1 &&
-          column >= BLOCK_CUT_SIZE &&
-          row >= BLOCK_CUT_SIZE
-        const onVerticalXCutFace =
-          column === BLOCK_CUT_SIZE - 1 &&
-          row >= BLOCK_CUT_SIZE &&
-          layer >= BLOCK_CUT_SIZE
-        const onVerticalYCutFace =
-          row === BLOCK_CUT_SIZE - 1 &&
-          column >= BLOCK_CUT_SIZE &&
-          layer >= BLOCK_CUT_SIZE
-        const onOuterSurface =
-          column === 0 ||
-          column === GRID_SIZE - 1 ||
-          row === 0 ||
-          row === GRID_SIZE - 1 ||
-          layer === 0 ||
-          layer === GRID_SIZE - 1
-
-        if (
-          inRemovedCorner ||
-          onHorizontalCutFace ||
-          onVerticalXCutFace ||
-          onVerticalYCutFace ||
-          !onOuterSurface
-        ) {
-          continue
-        }
-
-        contextPositionValues.push(
-          column * GRID_SPACING - GRID_OFFSET,
-          GRID_OFFSET - row * GRID_SPACING,
-          layer * GRID_SPACING - GRID_OFFSET,
-        )
-      }
-    }
-  }
-
-  return {
-    contextPositions: new Float32Array(contextPositionValues),
-    simulatedPositions,
-    sourceIndices,
-  }
 }
 
 function initialCameraPosition(renderMode: RenderMode) {
@@ -830,7 +724,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         stackedB1ArrowHead,
       )
 
-      const blockLayout = createBlockLayout()
+      const blockLayout = createBlockLayout(GRID_SIZE, GRID_SPACING)
       blockSourceIndicesRef.current = blockLayout.sourceIndices
       const blockEnsembles = new THREE.InstancedMesh(
         sphereGeometry,
@@ -1454,9 +1348,6 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const sliceGraphRawHeights = new Float32Array(
         GRID_SIZE * GRID_SIZE,
       )
-      const sliceGraphSmoothedHeights = new Float32Array(
-        GRID_SIZE * GRID_SIZE,
-      )
       const sliceGraphFrequencyOffsets = new Float64Array(
         GRID_SIZE * GRID_SIZE,
       )
@@ -1466,40 +1357,6 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const sliceGraphMiddleColor = new THREE.Color('#9b70ff')
       const sliceGraphHighColor = new THREE.Color('#ffcf66')
       const sliceGraphColor = new THREE.Color()
-
-      const smoothSliceGraphHeights = () => {
-        for (let row = 0; row < GRID_SIZE; row += 1) {
-          for (let column = 0; column < GRID_SIZE; column += 1) {
-            let weightedHeight = 0
-            let totalWeight = 0
-
-            for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
-              const sampleRow = row + rowOffset
-              if (sampleRow < 0 || sampleRow >= GRID_SIZE) continue
-
-              for (
-                let columnOffset = -1;
-                columnOffset <= 1;
-                columnOffset += 1
-              ) {
-                const sampleColumn = column + columnOffset
-                if (sampleColumn < 0 || sampleColumn >= GRID_SIZE) continue
-                const weight =
-                  (rowOffset === 0 ? 2 : 1) *
-                  (columnOffset === 0 ? 2 : 1)
-                weightedHeight +=
-                  sliceGraphRawHeights[
-                    sampleRow * GRID_SIZE + sampleColumn
-                  ] * weight
-                totalWeight += weight
-              }
-            }
-
-            sliceGraphSmoothedHeights[row * GRID_SIZE + column] =
-              weightedHeight / totalWeight
-          }
-        }
-      }
 
       const updateSliceGraph = () => {
         if (!sliceGraphDirtyRef.current) return
@@ -1558,30 +1415,17 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           graphMode === 'frequency-laboratory' ||
           graphMode === 'frequency-rotating'
         ) {
-          for (let row = 0; row < GRID_SIZE; row += 1) {
-            for (let column = 0; column < GRID_SIZE; column += 1) {
-              const index = row * GRID_SIZE + column
-              const positionXMeters =
-                (column - (GRID_SIZE - 1) / 2) * 1e-3
-              const positionYMeters =
-                ((GRID_SIZE - 1) / 2 - row) * 1e-3
-              const gradientFieldTesla =
-                MAXIMUM_GRADIENT_TESLA_PER_METER *
-                (positionXMeters * readoutAmplitude +
-                  positionYMeters * phaseEncodingAmplitude)
-              const gradientFrequencyHertz =
-                (PROTON_GYROMAGNETIC_RATIO * gradientFieldTesla) /
-                (2 * Math.PI)
-              const frequencyOffsetHertz =
-                staticFieldFrequencyOffsetsRef.current[index] +
-                gradientFrequencyHertz
-              sliceGraphFrequencyOffsets[index] = frequencyOffsetHertz
-              maximumAbsoluteFrequencyOffsetHertz = Math.max(
-                maximumAbsoluteFrequencyOffsetHertz,
-                Math.abs(frequencyOffsetHertz),
-              )
-            }
-          }
+          const frequencyField = sliceFrequencyField(
+            staticFieldFrequencyOffsetsRef.current,
+            GRID_SIZE,
+            phaseEncodingAmplitude,
+            readoutAmplitude,
+          )
+          sliceGraphFrequencyOffsets.set(
+            frequencyField.frequencyOffsetsHertz,
+          )
+          maximumAbsoluteFrequencyOffsetHertz =
+            frequencyField.maximumAbsoluteFrequencyOffsetHertz
         }
 
         for (let row = 0; row < GRID_SIZE; row += 1) {
@@ -1596,42 +1440,22 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               // encoding uses a fixed full-gradient scale so changing a
               // pulse's amplitude visibly changes the surface slope. Other
               // experiments retain local auto-ranging for ppm-scale detail.
-              const nominalHeight =
-                0.18 + 0.56 * (fieldStrengthTeslaRef.current / 7)
-              const localHeightRange = Math.min(
-                0.34,
-                nominalHeight - 0.04,
-                0.96 - nominalHeight,
-              )
               const frequencyHeightScaleHertz = renderingGradientEncoding
                 ? FULL_SCALE_GRADIENT_FREQUENCY_OFFSET_HERTZ
                 : maximumAbsoluteFrequencyOffsetHertz
-              normalizedHeight =
-                frequencyHeightScaleHertz > 1e-9
-                  ? nominalHeight +
-                    localHeightRange *
-                      THREE.MathUtils.clamp(
-                        frequencyOffsetHertz /
-                          frequencyHeightScaleHertz,
-                        -1,
-                        1,
-                      )
-                  : nominalHeight
+              normalizedHeight = laboratoryFrequencyHeight(
+                fieldStrengthTeslaRef.current,
+                frequencyOffsetHertz,
+                frequencyHeightScaleHertz,
+              )
             } else if (graphMode === 'frequency-rotating') {
               const frequencyHeightScaleHertz = renderingGradientEncoding
                 ? FULL_SCALE_GRADIENT_FREQUENCY_OFFSET_HERTZ
                 : maximumAbsoluteFrequencyOffsetHertz
-              normalizedHeight =
-                frequencyHeightScaleHertz > 1e-9
-                  ? 0.5 +
-                    0.46 *
-                      THREE.MathUtils.clamp(
-                        frequencyOffsetHertz /
-                          frequencyHeightScaleHertz,
-                        -1,
-                        1,
-                      )
-                  : 0.5
+              normalizedHeight = rotatingFrequencyHeight(
+                frequencyOffsetHertz,
+                frequencyHeightScaleHertz,
+              )
             } else if (graphMode === 'phase') {
               let phaseRadians = 0
               if (simulationActive && renderingGradientEncoding) {
@@ -1677,8 +1501,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
               // A monotonic soft limit preserves continuous phase ramps
               // without introducing cliffs each time phase crosses ±pi.
-              normalizedHeight =
-                0.5 + Math.atan(phaseRadians / (4 * Math.PI)) / Math.PI
+              normalizedHeight = phaseHeight(phaseRadians)
             } else if (graphMode === 'amplitude') {
               const state = sliceGraphStateLookup[index]
               if (
@@ -1703,12 +1526,10 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                       timeMilliseconds,
                       fidAnimation.pulseEvents,
                     )
-                normalizedHeight = THREE.MathUtils.clamp(
-                  (state.equilibriumMagnetization /
-                    maximumEquilibriumMagnetization) *
-                    magnetizationState.transverseFraction,
-                  0,
-                  1,
+                normalizedHeight = amplitudeHeight(
+                  state.equilibriumMagnetization,
+                  maximumEquilibriumMagnetization,
+                  magnetizationState.transverseFraction,
                 )
               } else {
                 normalizedHeight = 0
@@ -1719,7 +1540,10 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           }
         }
 
-        smoothSliceGraphHeights()
+        const sliceGraphSmoothedHeights = smoothGridValues(
+          sliceGraphRawHeights,
+          GRID_SIZE,
+        )
 
         for (
           let index = 0;

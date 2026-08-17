@@ -23,6 +23,11 @@ Run the deterministic simulation tests with:
 npm test
 ```
 
+The automated suite also covers workers, playback hooks, graph editing,
+renderer-independent 3D surface math, and app-level UX. Run coverage with
+`npm run test:coverage`; see [TESTING.md](TESTING.md) for the full test matrix
+and the deliberate WebGL/browser boundary.
+
 Open the URL printed by Vite. Drag to orbit the scene, scroll to zoom,
 right-drag to pan, and click a sphere to select its hydrogen ensemble. Press
 `R` or use the floating viewport control to reset the camera. In Slice View,

@@ -10,7 +10,7 @@ interface SpinEchoExperimentPanelProps {
   timeStepMilliseconds: number
 }
 
-interface EchoTiming {
+export interface EchoTiming {
   pulseTimeMilliseconds: number
   previousPeakTimeMilliseconds: number
   echoTimeMilliseconds: number
@@ -21,7 +21,7 @@ interface EchoPeak extends EchoTiming {
   magnitude: number
 }
 
-interface MeasuredDecayPeak {
+export interface MeasuredDecayPeak {
   peakTimeMilliseconds: number
   magnitude: number
   kind: 'excitation' | 'echo'
@@ -42,7 +42,7 @@ function formatTime(timeMilliseconds: number) {
     : timeMilliseconds.toFixed(2)
 }
 
-function echoTimingsFor(pulseEvents: ReadonlyArray<RfPulseEvent>) {
+export function echoTimingsFor(pulseEvents: ReadonlyArray<RfPulseEvent>) {
   const initialPulse = pulseEvents.find((pulse) => pulse.kind === '90-y')
   if (!initialPulse) return []
 
@@ -77,7 +77,7 @@ function echoTimingsFor(pulseEvents: ReadonlyArray<RfPulseEvent>) {
   return echoTimings
 }
 
-function signalMagnitudeNear(
+export function signalMagnitudeNear(
   points: ReadonlyArray<FidSignalPoint>,
   targetTimeMilliseconds: number,
   toleranceMilliseconds: number,
@@ -118,7 +118,7 @@ function signalMagnitudeNear(
   return bestMagnitude < 0 ? null : bestMagnitude
 }
 
-function fitEchoDecay(decayPeaks: ReadonlyArray<MeasuredDecayPeak>) {
+export function fitEchoDecay(decayPeaks: ReadonlyArray<MeasuredDecayPeak>) {
   if (decayPeaks.length < 2) return null
 
   const validPeaks = decayPeaks.filter((peak) => peak.magnitude > 1e-8)

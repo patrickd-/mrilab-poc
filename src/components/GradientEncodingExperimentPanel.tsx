@@ -20,7 +20,7 @@ import {
 import DarkSelect from './DarkSelect'
 import SliceSelectionMappingGraph from './SliceSelectionMappingGraph'
 
-type PulseHandle = 'left' | 'right' | 'top'
+export type PulseHandle = 'left' | 'right' | 'top'
 
 interface DragState {
   handle: PulseHandle
@@ -122,7 +122,7 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
-function updatePulses(
+export function updatePulses(
   initialPulses: ReadonlyArray<GradientPulse>,
   pulseIndex: number,
   handle: PulseHandle,
