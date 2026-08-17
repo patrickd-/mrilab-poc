@@ -25,17 +25,23 @@ type GradientEndpoint = 'start' | 'end'
 
 interface GradientEncodingExperimentPanelProps {
   fieldOfViewMillimeters: number
+  onXEnabledChange: (enabled: boolean) => void
   onXProfileChange: (profile: SpatialGradientProfile) => void
+  onYEnabledChange: (enabled: boolean) => void
   onYProfileChange: (profile: SpatialGradientProfile) => void
+  xEnabled: boolean
   xProfile: SpatialGradientProfile
+  yEnabled: boolean
   yProfile: SpatialGradientProfile
 }
 
 interface SpatialGradientGraphProps {
   axis: GradientAxis
+  enabled: boolean
   fieldOfViewMillimeters: number
   maximumFieldOffsetMillitesla: number
   onChange: (profile: SpatialGradientProfile) => void
+  onEnabledChange: (enabled: boolean) => void
   onReset: () => void
   profile: SpatialGradientProfile
 }
@@ -55,6 +61,10 @@ const GRAPH = {
 }
 const KEYBOARD_FIELD_STEP_MILLITESLA = 0.08
 const PREVIEW_SIZE = 128
+const ZERO_SPATIAL_GRADIENT_PROFILE: SpatialGradientProfile = {
+  endFieldOffsetMillitesla: 0,
+  startFieldOffsetMillitesla: 0,
+}
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
@@ -157,9 +167,11 @@ function updateEndpoint(
 
 function SpatialGradientGraph({
   axis,
+  enabled,
   fieldOfViewMillimeters,
   maximumFieldOffsetMillitesla,
   onChange,
+  onEnabledChange,
   onReset,
   profile,
 }: SpatialGradientGraphProps) {
@@ -268,20 +280,37 @@ function SpatialGradientGraph({
   )
 
   return (
-    <div className={`gradient-input spatial-gradient-input gradient-input-g${axis}`}>
+    <div
+      className={`gradient-input spatial-gradient-input gradient-input-g${axis}${
+        enabled ? '' : ' disabled'
+      }`}
+    >
       <header className="gradient-input-heading">
         <strong className="formula">
           G<sub>{axis}</sub>
         </strong>
         <span>{axisLabel}-axis field profile</span>
-        <button
-          className="gradient-input-reset"
-          type="button"
-          aria-label={`Reset G ${axis} spatial gradient`}
-          onClick={onReset}
-        >
-          Reset
-        </button>
+        <div className="gradient-input-actions">
+          <label className="gradient-channel-toggle">
+            <input
+              type="checkbox"
+              checked={enabled}
+              aria-label={`Enable G ${axis} spatial gradient`}
+              onChange={(event) =>
+                onEnabledChange(event.currentTarget.checked)
+              }
+            />
+            <span>On</span>
+          </label>
+          <button
+            className="gradient-input-reset"
+            type="button"
+            aria-label={`Reset G ${axis} spatial gradient`}
+            onClick={onReset}
+          >
+            Reset
+          </button>
+        </div>
       </header>
 
       <svg
@@ -534,9 +563,13 @@ function GradientHeightmap({
 
 function GradientEncodingExperimentPanel({
   fieldOfViewMillimeters,
+  onXEnabledChange,
   onXProfileChange,
+  onYEnabledChange,
   onYProfileChange,
+  xEnabled,
   xProfile,
+  yEnabled,
   yProfile,
 }: GradientEncodingExperimentPanelProps) {
   const defaults = createDefaultSpatialGradientProfiles(
@@ -565,25 +598,33 @@ function GradientEncodingExperimentPanel({
       <div className="spatial-gradient-stack">
         <SpatialGradientGraph
           axis="x"
+          enabled={xEnabled}
           fieldOfViewMillimeters={fieldOfViewMillimeters}
           maximumFieldOffsetMillitesla={maximumFieldOffset}
           profile={xProfile}
           onChange={onXProfileChange}
+          onEnabledChange={onXEnabledChange}
           onReset={() => onXProfileChange(defaults.x)}
         />
         <SpatialGradientGraph
           axis="y"
+          enabled={yEnabled}
           fieldOfViewMillimeters={fieldOfViewMillimeters}
           maximumFieldOffsetMillitesla={maximumFieldOffset}
           profile={yProfile}
           onChange={onYProfileChange}
+          onEnabledChange={onYEnabledChange}
           onReset={() => onYProfileChange(defaults.y)}
         />
         <GradientHeightmap
           displayMagnitudeMillitesla={maximumFieldOffset * 2}
           fieldOfViewMillimeters={fieldOfViewMillimeters}
-          xProfile={xProfile}
-          yProfile={yProfile}
+          xProfile={
+            xEnabled ? xProfile : ZERO_SPATIAL_GRADIENT_PROFILE
+          }
+          yProfile={
+            yEnabled ? yProfile : ZERO_SPATIAL_GRADIENT_PROFILE
+          }
         />
       </div>
     </section>

@@ -314,6 +314,10 @@ function App() {
     useState<SpatialGradientProfile>(defaultSpatialGradientProfiles.x)
   const [spatialGradientYProfile, setSpatialGradientYProfile] =
     useState<SpatialGradientProfile>(defaultSpatialGradientProfiles.y)
+  const [spatialGradientXEnabled, setSpatialGradientXEnabled] =
+    useState(true)
+  const [spatialGradientYEnabled, setSpatialGradientYEnabled] =
+    useState(true)
   const [
     gradientAcquisitionResetRevision,
     setGradientAcquisitionResetRevision,
@@ -634,7 +638,9 @@ function App() {
           gradientTransmitFrequencyBand={transmitFrequencyBand}
           gradientSliceSelectionPulses={appliedSliceSelectionPulses}
           spatialGradientActive={spatialGradientExperimentSelected}
+          spatialGradientXEnabled={spatialGradientXEnabled}
           spatialGradientXProfile={spatialGradientXProfile}
+          spatialGradientYEnabled={spatialGradientYEnabled}
           spatialGradientYProfile={spatialGradientYProfile}
           referenceFrame={referenceFrame}
           renderMode={renderMode}
@@ -839,9 +845,13 @@ function App() {
             {selectedExperiment === 'gradient-encoding' && (
               <GradientEncodingExperimentPanel
                 fieldOfViewMillimeters={GRID_SIZE}
+                xEnabled={spatialGradientXEnabled}
                 xProfile={spatialGradientXProfile}
+                yEnabled={spatialGradientYEnabled}
                 yProfile={spatialGradientYProfile}
+                onXEnabledChange={setSpatialGradientXEnabled}
                 onXProfileChange={setSpatialGradientXProfile}
+                onYEnabledChange={setSpatialGradientYEnabled}
                 onYProfileChange={setSpatialGradientYProfile}
               />
             )}

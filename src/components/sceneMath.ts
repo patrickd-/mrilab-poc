@@ -166,6 +166,14 @@ export interface SliceMagneticField {
   maximumAbsoluteFieldOffsetTesla: number
 }
 
+export function larmorFrequencyOffsetHertzFromFieldOffsetTesla(
+  fieldOffsetTesla: number,
+) {
+  return (
+    (PROTON_GYROMAGNETIC_RATIO * fieldOffsetTesla) / (2 * Math.PI)
+  )
+}
+
 /**
  * Adds static B0 variation, active GRE gradients, and optional fundamental
  * spatial profiles into one longitudinal field offset for every ensemble.

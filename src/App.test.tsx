@@ -67,9 +67,15 @@ vi.mock('./components/SpinEchoExperimentPanel', () => ({
 }))
 
 vi.mock('./components/GradientEncodingExperimentPanel', () => ({
-  default: () => (
+  default: (props: Record<string, any>) => (
     <div data-testid="fundamental-gradient-experiment">
       Fundamental gradient experiment view
+      <button
+        type="button"
+        onClick={() => props.onXEnabledChange(false)}
+      >
+        Disable fundamental Gx
+      </button>
     </div>
   ),
 }))
@@ -220,6 +226,7 @@ describe('App integration', () => {
     })
     expect(mocks.sceneProps).toMatchObject({
       spatialGradientActive: true,
+      spatialGradientXEnabled: true,
       spatialGradientXProfile: {
         endFieldOffsetMillitesla: 1.28,
         startFieldOffsetMillitesla: -1.28,
@@ -228,6 +235,7 @@ describe('App integration', () => {
         endFieldOffsetMillitesla: 0,
         startFieldOffsetMillitesla: 0,
       },
+      spatialGradientYEnabled: true,
     })
 
     await user.click(screen.getByRole('button', { name: 'Slice 3D graph' }))
@@ -235,6 +243,11 @@ describe('App integration', () => {
       screen.getByRole('option', { name: '3D Magnetic Field' }),
     )
     expect(mocks.sceneProps?.sliceGraphMode).toBe('magnetic-field')
+
+    await user.click(
+      screen.getByRole('button', { name: 'Disable fundamental Gx' }),
+    )
+    expect(mocks.sceneProps?.spatialGradientXEnabled).toBe(false)
   })
 
   it('bypasses disabled gradient channels without discarding their waveforms', async () => {

@@ -12,15 +12,21 @@ import GradientEncodingExperimentPanel, {
 
 function StatefulGradientEncodingExperimentPanel() {
   const defaults = createDefaultSpatialGradientProfiles(128)
+  const [xEnabled, setXEnabled] = useState(true)
   const [xProfile, setXProfile] = useState(defaults.x)
+  const [yEnabled, setYEnabled] = useState(true)
   const [yProfile, setYProfile] = useState(defaults.y)
 
   return (
     <GradientEncodingExperimentPanel
       fieldOfViewMillimeters={128}
+      xEnabled={xEnabled}
       xProfile={xProfile}
+      yEnabled={yEnabled}
       yProfile={yProfile}
+      onXEnabledChange={setXEnabled}
       onXProfileChange={setXProfile}
+      onYEnabledChange={setYEnabled}
       onYProfileChange={setYProfile}
     />
   )
@@ -238,6 +244,42 @@ describe('GradientEncodingExperimentPanel', () => {
         screen.getByRole('button', { name: 'Reset G y spatial gradient' }),
       )
       expect(Number(endHandle.getAttribute('aria-valuenow'))).toBe(0)
+    } finally {
+      getContext.mockRestore()
+    }
+  })
+
+  it('disables an axis contribution without discarding its profile', () => {
+    const { getContext, images } = mockCanvasContext()
+
+    try {
+      render(<StatefulGradientEncodingExperimentPanel />)
+      const xToggle = screen.getByRole('checkbox', {
+        name: 'Enable G x spatial gradient',
+      })
+      const xGraph = screen.getByRole('group', {
+        name: 'G x spatial gradient editable line',
+      })
+      const xStartHandle = screen.getByRole('slider', {
+        name: 'G x gradient 0 millimeter endpoint',
+      })
+
+      expect((xToggle as HTMLInputElement).checked).toBe(true)
+      expect(xStartHandle.getAttribute('aria-valuenow')).toBe('-1.28')
+      fireEvent.click(xToggle)
+
+      expect((xToggle as HTMLInputElement).checked).toBe(false)
+      expect(
+        xGraph.closest('.gradient-input')?.classList.contains('disabled'),
+      ).toBe(true)
+      expect(xStartHandle.getAttribute('aria-valuenow')).toBe('-1.28')
+      const disabledPreview = images.at(-1)?.data
+      expect(disabledPreview?.[0]).toBe(128)
+      expect(disabledPreview?.at(-4)).toBe(128)
+
+      fireEvent.click(xToggle)
+      expect((xToggle as HTMLInputElement).checked).toBe(true)
+      expect(xStartHandle.getAttribute('aria-valuenow')).toBe('-1.28')
     } finally {
       getContext.mockRestore()
     }

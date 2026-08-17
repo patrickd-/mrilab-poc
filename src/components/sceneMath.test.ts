@@ -5,6 +5,7 @@ import {
   amplitudeHeight,
   createBlockLayout,
   laboratoryFrequencyHeight,
+  larmorFrequencyOffsetHertzFromFieldOffsetTesla,
   magneticFieldHeight,
   phaseHeight,
   rotatingFrequencyHeight,
@@ -172,6 +173,16 @@ describe('slice magnetic-field surface', () => {
   it('rejects static field offsets with the wrong dimensions', () => {
     expect(() => sliceMagneticField([0], 2, 0, 0)).toThrow(RangeError)
   })
+
+  it('converts the same field surface directly into Larmor frequency', () => {
+    expect(larmorFrequencyOffsetHertzFromFieldOffsetTesla(1e-3)).toBeCloseTo(
+      (PROTON_GYROMAGNETIC_RATIO * 1e-3) / (2 * Math.PI),
+      10,
+    )
+    expect(larmorFrequencyOffsetHertzFromFieldOffsetTesla(-1e-3)).toBeLessThan(
+      0,
+    )
+  })
 })
 
 describe('slice graph height mappings', () => {
@@ -189,6 +200,26 @@ describe('slice graph height mappings', () => {
     )
     expect(magneticFieldHeight(3, -0.005, 0.005)).toBeLessThan(
       baseline,
+    )
+  })
+
+  it('gives magnetic field and laboratory frequency identical geometry', () => {
+    const fieldOffsetTesla = 0.0017
+    const fieldScaleTesla = 0.00512
+    const frequencyOffsetHertz =
+      larmorFrequencyOffsetHertzFromFieldOffsetTesla(fieldOffsetTesla)
+    const frequencyScaleHertz =
+      larmorFrequencyOffsetHertzFromFieldOffsetTesla(fieldScaleTesla)
+
+    expect(
+      magneticFieldHeight(1.5, fieldOffsetTesla, fieldScaleTesla),
+    ).toBeCloseTo(
+      laboratoryFrequencyHeight(
+        1.5,
+        frequencyOffsetHertz,
+        frequencyScaleHertz,
+      ),
+      12,
     )
   })
 

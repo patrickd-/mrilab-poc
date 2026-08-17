@@ -58,6 +58,15 @@ export function spatialFieldOffsetMilliteslaAt(
   )
 }
 
+export function spatialGradientProfileHasField(
+  profile: SpatialGradientProfile,
+) {
+  return (
+    Math.abs(profile.startFieldOffsetMillitesla) > 1e-12 ||
+    Math.abs(profile.endFieldOffsetMillitesla) > 1e-12
+  )
+}
+
 export function combinedSpatialFieldOffsetMilliteslaAt(
   xProfile: SpatialGradientProfile,
   yProfile: SpatialGradientProfile,
