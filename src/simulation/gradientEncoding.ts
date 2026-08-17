@@ -148,7 +148,7 @@ export function appliedGradientAmplitudeAt(
   }, 0)
 }
 
-function gradientAreaSecondsAt(
+export function gradientAreaSecondsAt(
   pulses: ReadonlyArray<GradientPulse>,
   timeMilliseconds: number,
   durationMilliseconds: number,
@@ -180,6 +180,24 @@ function gradientAreaSecondsAt(
   }, 0)
 
   return areaMilliseconds / 1000
+}
+
+export function gradientSpatialFrequencyCyclesPerMeterAt(
+  pulses: ReadonlyArray<GradientPulse>,
+  timeMilliseconds: number,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  imperfections = false,
+) {
+  return (
+    (PROTON_GYROMAGNETIC_RATIO / (2 * Math.PI)) *
+    MAXIMUM_GRADIENT_TESLA_PER_METER *
+    gradientAreaSecondsAt(
+      pulses,
+      timeMilliseconds,
+      durationMilliseconds,
+      imperfections,
+    )
+  )
 }
 
 export function gradientPhaseRadiansAt(

@@ -106,6 +106,16 @@ phase encoding begins; G_SS then reverses for half of the G_PE interval, while
 readout prephasing leads into a positive lobe with the same duration as the RF
 pulse.
 
+The Encoding Accumulation section derives a live k-space trajectory from the
+integrated G_PE and G_RO moments. Each completed sequence retains its acquired
+readout path, while the eight default phase-encoding levels remain visible as
+planned lines. Replaying an already acquired k_y line counts as another
+acquisition but not as additional spatial information. A normalized
+phase-encoding point-spread function uses the distinct accumulated k_y values
+to show the progression from no y localization toward increasingly narrow
+spatial discrimination. Resetting the sequence clears this acquisition
+history.
+
 The brain T2* values use [published 1.5/3/7 T measurements](https://pubmed.ncbi.nlm.nih.gov/17459640/).
 CSF uses the 333.5 ms and 168 ms values from a [compiled 3/7 T quantitative-MRI
 table](https://cris.maastrichtuniversity.nl/ws/files/32795321/c6050.pdf); its
