@@ -240,6 +240,8 @@ function App() {
   const [rfExcitationPulses, setRfExcitationPulses] = useState<
     GradientPulse[]
   >(() => copyGradientPulses(DEFAULT_RF_EXCITATION_PULSES))
+  const [rfFrequencyOffsetKilohertz, setRfFrequencyOffsetKilohertz] =
+    useState(0)
   const [sliceSelectionPulses, setSliceSelectionPulses] = useState<
     GradientPulse[]
   >(() => copyGradientPulses(DEFAULT_SLICE_SELECTION_PULSES))
@@ -461,6 +463,7 @@ function App() {
           gradientPhaseEncodingPulses={phaseEncodingPulses}
           gradientReadoutPulses={readoutPulses}
           gradientRfExcitationPulses={rfExcitationPulses}
+          gradientRfFrequencyOffsetKilohertz={rfFrequencyOffsetKilohertz}
           gradientSliceSelectionPulses={sliceSelectionPulses}
           referenceFrame={referenceFrame}
           renderMode={renderMode}
@@ -671,17 +674,22 @@ function App() {
                 phaseEncodingPulses={phaseEncodingPulses}
                 readoutPulses={readoutPulses}
                 rfExcitationPulses={rfExcitationPulses}
+                rfFrequencyOffsetKilohertz={rfFrequencyOffsetKilohertz}
                 sliceSelectionPulses={sliceSelectionPulses}
                 speed={gradientPlayback.speed}
                 status={gradientPlayback.status}
                 timeMilliseconds={gradientPlayback.timeMilliseconds}
                 onPause={gradientPlayback.pause}
                 onRfExcitationPulsesChange={setRfExcitationPulses}
-                onRfExcitationReset={() =>
+                onRfExcitationFrequencyChange={
+                  setRfFrequencyOffsetKilohertz
+                }
+                onRfExcitationReset={() => {
                   setRfExcitationPulses(
                     copyGradientPulses(DEFAULT_RF_EXCITATION_PULSES),
                   )
-                }
+                  setRfFrequencyOffsetKilohertz(0)
+                }}
                 onPhaseEncodingPulsesChange={setPhaseEncodingPulses}
                 onPhaseEncodingReset={() =>
                   setPhaseEncodingPulses(

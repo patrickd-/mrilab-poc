@@ -1039,6 +1039,17 @@ a:focus-visible {
   letter-spacing: 0.04em;
 }
 
+.rf-b1-amplitude-label {
+  fill: var(--coral);
+}
+
+.rf-frequency-axis-label {
+  fill: var(--yellow);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+}
+
 .gradient-reference-waveforms {
   fill: none;
   stroke: rgba(244, 245, 241, 0.27);
@@ -1074,6 +1085,10 @@ a:focus-visible {
   pointer-events: none;
 }
 
+.gradient-input-rf .gradient-waveform {
+  stroke: var(--coral);
+}
+
 .gradient-applied-waveform {
   fill: none;
   stroke: var(--yellow);
@@ -1083,6 +1098,54 @@ a:focus-visible {
   stroke-width: 1.35;
   opacity: 0.9;
   pointer-events: none;
+}
+
+.rf-frequency-bar {
+  stroke: var(--yellow);
+  stroke-linecap: square;
+  stroke-width: 1.8;
+  pointer-events: none;
+}
+
+.rf-frequency-grip {
+  fill: var(--black);
+  stroke: var(--yellow);
+  stroke-width: 1.4;
+  pointer-events: none;
+}
+
+.rf-frequency-value {
+  fill: var(--yellow);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.rf-frequency-hit {
+  stroke: transparent;
+  stroke-width: 15;
+  cursor: ns-resize;
+  pointer-events: stroke;
+}
+
+.rf-frequency-control:hover .rf-frequency-bar,
+.rf-frequency-control:has(.rf-frequency-hit.active) .rf-frequency-bar,
+.rf-frequency-control:has(.rf-frequency-hit:focus-visible)
+  .rf-frequency-bar {
+  stroke: var(--white);
+  stroke-width: 2.3;
+}
+
+.rf-frequency-control:hover .rf-frequency-grip,
+.rf-frequency-control:has(.rf-frequency-hit.active) .rf-frequency-grip,
+.rf-frequency-control:has(.rf-frequency-hit:focus-visible)
+  .rf-frequency-grip {
+  stroke: var(--white);
+}
+
+.rf-frequency-hit:focus {
+  outline: none;
 }
 
 .gradient-handle-stroke {

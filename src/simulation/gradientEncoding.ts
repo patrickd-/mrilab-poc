@@ -12,6 +12,7 @@ export interface GradientPulse {
 
 export const GRADIENT_SEQUENCE_DURATION_MILLISECONDS = 20
 export const MAXIMUM_GRADIENT_TESLA_PER_METER = 1e-3
+export const MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ = 2
 const GRADIENT_FAST_RESPONSE_TIME_MILLISECONDS = 0.04
 const GRADIENT_EDDY_RESPONSE_TIME_MILLISECONDS = 0.8
 const GRADIENT_EDDY_RESPONSE_FRACTION = 0.04
@@ -243,6 +244,7 @@ export function sliceSelectionExcitationScaleAt(
   layer: number,
   gridSize: number,
   excitationPulse: GradientPulse,
+  rfFrequencyOffsetKilohertz: number,
   sliceSelectionPulses: ReadonlyArray<GradientPulse>,
   durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
   gradientImperfections = false,
@@ -257,23 +259,36 @@ export function sliceSelectionExcitationScaleAt(
     gradientImperfections,
   )
 
-  // The RF waveform is treated as an ideal hard spatial passband. At the
-  // default G_SS amplitude it selects the single virtual 1 mm isocenter
-  // plane used by Slice View; reducing G_SS widens the selected slab.
-  if (Math.abs(sliceGradientAmplitude) < 1e-6) return 1
+  // The RF waveform is treated as an ideal hard spatial passband. Its carrier
+  // offset chooses the center through delta-f = gamma-bar * G_SS * z, while
+  // reducing G_SS widens the selected slab.
+  if (Math.abs(sliceGradientAmplitude) < 1e-6) {
+    return Math.abs(rfFrequencyOffsetKilohertz) < 1e-9 ? 1 : 0
+  }
 
   const halfThicknessLayers =
     (DEFAULT_SLICE_HALF_THICKNESS_LAYERS *
       DEFAULT_SLICE_SELECTION_AMPLITUDE) /
     Math.abs(sliceGradientAmplitude)
   const gridCenter = (gridSize - 1) / 2
-  return Math.abs(layer - gridCenter) <= halfThicknessLayers ? 1 : 0
+  const gradientTeslaPerMeter =
+    MAXIMUM_GRADIENT_TESLA_PER_METER * sliceGradientAmplitude
+  const protonGyromagneticRatioHertzPerTesla =
+    PROTON_GYROMAGNETIC_RATIO / (2 * Math.PI)
+  const targetOffsetLayers =
+    (rfFrequencyOffsetKilohertz * 1000) /
+    (protonGyromagneticRatioHertzPerTesla *
+      gradientTeslaPerMeter *
+      1e-3)
+  const targetLayer = gridCenter + targetOffsetLayers
+  return Math.abs(layer - targetLayer) <= halfThicknessLayers ? 1 : 0
 }
 
 export function gradientEnsembleMagnetizationStateAt(
   state: FidEnsembleState,
   timeMilliseconds: number,
   rfExcitationPulses: ReadonlyArray<GradientPulse>,
+  rfFrequencyOffsetKilohertz: number,
   sliceSelectionPulses: ReadonlyArray<GradientPulse>,
   phaseEncodingPulses: ReadonlyArray<GradientPulse>,
   readoutPulses: ReadonlyArray<GradientPulse>,
@@ -288,7 +303,7 @@ export function gradientEnsembleMagnetizationStateAt(
     .reverse()
     .find(
       (pulse) =>
-        pulse.end * durationMilliseconds <=
+        pulse.start * durationMilliseconds <=
         boundedTimeMilliseconds + Number.EPSILON * durationMilliseconds * 8,
     )
 
@@ -309,14 +324,47 @@ export function gradientEnsembleMagnetizationStateAt(
     state.layer,
     state.gridSize,
     excitationPulse,
+    rfFrequencyOffsetKilohertz,
     sliceSelectionPulses,
     durationMilliseconds,
     gradientImperfections,
   )
-  const flipAngleRadians =
-    excitationPulse.amplitude * (Math.PI / 2) * sliceExcitationScale
+  const excitationStartMilliseconds =
+    excitationPulse.start * durationMilliseconds
   const excitationEndMilliseconds =
     excitationPulse.end * durationMilliseconds
+  const excitationProgress = Math.min(
+    1,
+    Math.max(
+      0,
+      (boundedTimeMilliseconds - excitationStartMilliseconds) /
+        Math.max(
+          Number.EPSILON,
+          excitationEndMilliseconds - excitationStartMilliseconds,
+        ),
+    ),
+  )
+  const flipAngleRadians =
+    excitationPulse.amplitude *
+    (Math.PI / 2) *
+    sliceExcitationScale *
+    excitationProgress
+
+  if (excitationProgress < 1) {
+    const transverseFraction = Math.sin(flipAngleRadians)
+    const longitudinalFraction = Math.cos(flipAngleRadians)
+    return {
+      excited: Math.abs(transverseFraction) > 1e-6,
+      xFraction: transverseFraction,
+      yFraction: 0,
+      zFraction: longitudinalFraction,
+      transverseFraction: Math.abs(transverseFraction),
+      longitudinalFraction,
+      precessionPhaseRadians: transverseFraction < 0 ? Math.PI : 0,
+      flipAngleRadians,
+    }
+  }
+
   const effectiveExcitationTimeMilliseconds =
     ((excitationPulse.start + excitationPulse.end) / 2) *
     durationMilliseconds

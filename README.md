@@ -95,12 +95,16 @@ simulation path use the same local values, and T2* is constrained not to exceed
 T2.
 
 The Gradient Encoding timing diagram shares one 20 ms clock across editable RF,
-G_SS, G_PE, and G_RO rows. Its default idealized hard RF/G_SS passband excites
-the 1 mm isocenter plane represented by Slice View. In Block View this makes
-the selected horizontal mid-plane distinguishable from the two orthogonal
-context faces. RF ends as phase encoding begins; G_SS then reverses for half
-of the G_PE interval, while readout prephasing leads into a positive lobe with
-the same duration as the RF pulse.
+G_SS, G_PE, and G_RO rows. The RF row exposes a coral relative-B1 amplitude and
+a yellow carrier-frequency offset in kHz. The carrier offset moves the selected
+slice along G_SS, while G_SS amplitude changes the idealized hard passband's
+thickness. Its defaults excite the 1 mm isocenter plane represented by Slice
+View. Magnetization rotates progressively throughout the RF interval rather
+than jumping at its end. In Block View this makes the selected horizontal
+mid-plane distinguishable from the two orthogonal context faces. RF ends as
+phase encoding begins; G_SS then reverses for half of the G_PE interval, while
+readout prephasing leads into a positive lobe with the same duration as the RF
+pulse.
 
 The brain T2* values use [published 1.5/3/7 T measurements](https://pubmed.ncbi.nlm.nih.gov/17459640/).
 CSF uses the 333.5 ms and 168 ms values from a [compiled 3/7 T quantitative-MRI

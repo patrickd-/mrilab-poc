@@ -126,6 +126,7 @@ interface LabSceneProps {
   gradientPhaseEncodingPulses: ReadonlyArray<GradientPulse>
   gradientReadoutPulses: ReadonlyArray<GradientPulse>
   gradientRfExcitationPulses: ReadonlyArray<GradientPulse>
+  gradientRfFrequencyOffsetKilohertz: number
   gradientSliceSelectionPulses: ReadonlyArray<GradientPulse>
   referenceFrame: ReferenceFrame
   renderMode: RenderMode
@@ -283,6 +284,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientPhaseEncodingPulses,
       gradientReadoutPulses,
       gradientRfExcitationPulses,
+      gradientRfFrequencyOffsetKilohertz,
       gradientSliceSelectionPulses,
       referenceFrame,
       renderMode,
@@ -344,6 +346,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       phaseEncodingPulses: gradientPhaseEncodingPulses,
       readoutPulses: gradientReadoutPulses,
       rfExcitationPulses: gradientRfExcitationPulses,
+      rfFrequencyOffsetKilohertz: gradientRfFrequencyOffsetKilohertz,
       sliceSelectionPulses: gradientSliceSelectionPulses,
       imperfections: gradientImperfections,
       states: gradientEncodingEnsembleStates,
@@ -491,6 +494,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         phaseEncodingPulses: gradientPhaseEncodingPulses,
         readoutPulses: gradientReadoutPulses,
         rfExcitationPulses: gradientRfExcitationPulses,
+        rfFrequencyOffsetKilohertz: gradientRfFrequencyOffsetKilohertz,
         sliceSelectionPulses: gradientSliceSelectionPulses,
         imperfections: gradientImperfections,
         states: gradientEncodingEnsembleStates,
@@ -507,6 +511,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientPhaseEncodingPulses,
       gradientReadoutPulses,
       gradientRfExcitationPulses,
+      gradientRfFrequencyOffsetKilohertz,
       gradientSliceSelectionPulses,
     ])
 
@@ -1346,6 +1351,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                   state,
                   timeMilliseconds,
                   gradientAnimation.rfExcitationPulses,
+                  gradientAnimation.rfFrequencyOffsetKilohertz,
                   gradientAnimation.sliceSelectionPulses,
                   gradientAnimation.phaseEncodingPulses,
                   gradientAnimation.readoutPulses,
@@ -1612,6 +1618,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                       state,
                       timeMilliseconds,
                       gradientAnimation.rfExcitationPulses,
+                      gradientAnimation.rfFrequencyOffsetKilohertz,
                       gradientAnimation.sliceSelectionPulses,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,
@@ -1661,6 +1668,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                       state,
                       timeMilliseconds,
                       gradientAnimation.rfExcitationPulses,
+                      gradientAnimation.rfFrequencyOffsetKilohertz,
                       gradientAnimation.sliceSelectionPulses,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,
