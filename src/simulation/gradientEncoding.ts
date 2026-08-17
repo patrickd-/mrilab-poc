@@ -340,8 +340,19 @@ export function sliceSelectionExcitationScaleAt(
     transmitFrequencyBand.lowerAngularFrequencyKilradiansPerSecond,
     transmitFrequencyBand.upperAngularFrequencyKilradiansPerSecond,
   )
-  return mappedAngularFrequency > lowerAngularFrequency &&
-    mappedAngularFrequency < upperAngularFrequency
+  const maximumAngularFrequency =
+    maximumSliceMappingAngularFrequencyKilradiansPerSecond(gridSize)
+  const edgeTolerance = maximumAngularFrequency * 1e-12
+  const lowerBoundarySelected =
+    lowerAngularFrequency <= edgeTolerance
+      ? mappedAngularFrequency >= -edgeTolerance
+      : mappedAngularFrequency > lowerAngularFrequency + edgeTolerance
+  const upperBoundarySelected =
+    upperAngularFrequency >= maximumAngularFrequency - edgeTolerance
+      ? mappedAngularFrequency <= maximumAngularFrequency + edgeTolerance
+      : mappedAngularFrequency < upperAngularFrequency - edgeTolerance
+
+  return lowerBoundarySelected && upperBoundarySelected
     ? 1
     : 0
 }

@@ -17,6 +17,12 @@ To expose Vite from a container, run:
 npm run dev -- --host 0.0.0.0
 ```
 
+Run the deterministic simulation tests with:
+
+```bash
+npm test
+```
+
 Open the URL printed by Vite. Drag to orbit the scene, scroll to zoom,
 right-drag to pan, and click a sphere to select its hydrogen ensemble. Press
 `R` or use the floating viewport control to reset the camera. In Slice View,

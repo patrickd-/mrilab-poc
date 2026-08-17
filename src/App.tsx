@@ -48,6 +48,10 @@ const B0_OPTIONS: ReadonlyArray<{ id: B0Tesla; label: string }> = [
   { id: '3', label: '3' },
   { id: '7', label: '7' },
 ]
+// LabScene owns a long-lived Three.js animation loop. Bump this key whenever
+// the data contract consumed inside that loop changes so Vite hot reload does
+// not leave an already-mounted scene running an incompatible closure.
+const LAB_SCENE_RUNTIME_VERSION = 'transmit-band-v1'
 const B0_TESLA_VALUES: Readonly<
   Record<B0Tesla, SupportedFieldStrengthTesla>
 > = {
@@ -444,6 +448,7 @@ function App() {
         }
       >
         <LabScene
+          key={LAB_SCENE_RUNTIME_VERSION}
           ref={sceneRef}
           ensembleModels={ensembles}
           ensembleRevision={ensembleRevision}

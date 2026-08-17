@@ -237,6 +237,10 @@ function SliceSelectionMappingGraph({
     } else if (event.key === 'ArrowDown') {
       nextFrequency -=
         KEYBOARD_FREQUENCY_STEP_KILORADIANS_PER_SECOND
+    } else if (event.key === 'Home') {
+      nextFrequency = 0
+    } else if (event.key === 'End') {
+      nextFrequency = maximumAngularFrequency
     } else {
       return
     }
