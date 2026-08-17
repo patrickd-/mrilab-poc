@@ -329,6 +329,73 @@ function KSpaceAcquisitionGraph({
         onPointerUp={endSupportDrag}
         onPointerCancel={cancelSupportDrag}
       >
+        <g className="k-space-acquisition-grid" aria-hidden="true">
+          {[-1, -0.5, 0, 0.5, 1].map((fraction) => (
+            <g key={fraction}>
+              <line
+                x1={xForKx(fraction * extent)}
+                y1={GRAPH.top}
+                x2={xForKx(fraction * extent)}
+                y2={GRAPH.top + GRAPH.size}
+              />
+              <line
+                x1={GRAPH.left}
+                y1={yForKy(fraction * extent)}
+                x2={GRAPH.left + GRAPH.size}
+                y2={yForKy(fraction * extent)}
+              />
+            </g>
+          ))}
+        </g>
+        <line
+          className="k-space-acquisition-axis"
+          x1={GRAPH.left}
+          y1={yForKy(0)}
+          x2={GRAPH.left + GRAPH.size}
+          y2={yForKy(0)}
+          aria-hidden="true"
+        />
+        <line
+          className="k-space-acquisition-axis"
+          x1={xForKx(0)}
+          y1={GRAPH.top}
+          x2={xForKx(0)}
+          y2={GRAPH.top + GRAPH.size}
+          aria-hidden="true"
+        />
+
+        <g className="k-space-acquired-trace" aria-hidden="true">
+          {segments.map((segment, index) => (
+            <line
+              key={index}
+              x1={xForKx(segment.from.kxCyclesPerMeter)}
+              y1={yForKy(segment.from.kyCyclesPerMeter)}
+              x2={xForKx(segment.to.kxCyclesPerMeter)}
+              y2={yForKy(segment.to.kyCyclesPerMeter)}
+              stroke={grayscaleForSignal(
+                segment.magnitude,
+                maximumMagnitude,
+              )}
+            />
+          ))}
+          {acquisitionRuns.flatMap((run) =>
+            run.points.length === 1
+              ? [
+                  <circle
+                    key={run.id}
+                    cx={xForKx(run.points[0].kxCyclesPerMeter)}
+                    cy={yForKy(run.points[0].kyCyclesPerMeter)}
+                    r="1.6"
+                    fill={grayscaleForSignal(
+                      run.points[0].normalizedMagnitude,
+                      maximumMagnitude,
+                    )}
+                  />,
+                ]
+              : [],
+          )}
+        </g>
+
         <rect
           className="k-space-reconstruction-support"
           x={xForKx(reconstructionSupport.minimumKCyclesPerMeter)}
@@ -403,72 +470,6 @@ function KSpaceAcquisitionGraph({
               />
             </g>
           ))}
-        </g>
-        <g className="k-space-acquisition-grid" aria-hidden="true">
-          {[-1, -0.5, 0, 0.5, 1].map((fraction) => (
-            <g key={fraction}>
-              <line
-                x1={xForKx(fraction * extent)}
-                y1={GRAPH.top}
-                x2={xForKx(fraction * extent)}
-                y2={GRAPH.top + GRAPH.size}
-              />
-              <line
-                x1={GRAPH.left}
-                y1={yForKy(fraction * extent)}
-                x2={GRAPH.left + GRAPH.size}
-                y2={yForKy(fraction * extent)}
-              />
-            </g>
-          ))}
-        </g>
-        <line
-          className="k-space-acquisition-axis"
-          x1={GRAPH.left}
-          y1={yForKy(0)}
-          x2={GRAPH.left + GRAPH.size}
-          y2={yForKy(0)}
-          aria-hidden="true"
-        />
-        <line
-          className="k-space-acquisition-axis"
-          x1={xForKx(0)}
-          y1={GRAPH.top}
-          x2={xForKx(0)}
-          y2={GRAPH.top + GRAPH.size}
-          aria-hidden="true"
-        />
-
-        <g className="k-space-acquired-trace" aria-hidden="true">
-          {segments.map((segment, index) => (
-            <line
-              key={index}
-              x1={xForKx(segment.from.kxCyclesPerMeter)}
-              y1={yForKy(segment.from.kyCyclesPerMeter)}
-              x2={xForKx(segment.to.kxCyclesPerMeter)}
-              y2={yForKy(segment.to.kyCyclesPerMeter)}
-              stroke={grayscaleForSignal(
-                segment.magnitude,
-                maximumMagnitude,
-              )}
-            />
-          ))}
-          {acquisitionRuns.flatMap((run) =>
-            run.points.length === 1
-              ? [
-                  <circle
-                    key={run.id}
-                    cx={xForKx(run.points[0].kxCyclesPerMeter)}
-                    cy={yForKy(run.points[0].kyCyclesPerMeter)}
-                    r="1.6"
-                    fill={grayscaleForSignal(
-                      run.points[0].normalizedMagnitude,
-                      maximumMagnitude,
-                    )}
-                  />,
-                ]
-              : [],
-          )}
         </g>
 
         <g

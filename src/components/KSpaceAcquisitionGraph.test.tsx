@@ -140,6 +140,35 @@ describe('KSpaceAcquisitionGraph', () => {
     expect(screen.getByText(/±0\.50 cycles\/mm/i)).not.toBeNull()
   })
 
+  it('paints the trajectory below the reconstruction support and cursor', () => {
+    const { container } = renderGraph({
+      acquisitionRuns: [
+        {
+          id: 0,
+          points: [
+            signalPoint(10, -500, 0, 0.5),
+            signalPoint(10.02, 500, 0, 0.5),
+          ],
+        },
+      ],
+    })
+    const graph = container.querySelector('.k-space-acquisition-graph')!
+    const grid = graph.querySelector('.k-space-acquisition-grid')!
+    const trace = graph.querySelector('.k-space-acquired-trace')!
+    const support = graph.querySelector('.k-space-reconstruction-support')!
+    const cursor = graph.querySelector('.k-space-cursor')!
+
+    expect(grid.compareDocumentPosition(trace)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    expect(trace.compareDocumentPosition(support)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    expect(support.compareDocumentPosition(cursor)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  })
+
   it('previews a square resize while dragging and commits only on release', () => {
     const onVoxelSizeChange = vi.fn()
     const { container } = renderGraph({
