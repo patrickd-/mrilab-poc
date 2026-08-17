@@ -40,7 +40,7 @@ const BLOCK_CUT_SIZE = GRID_SIZE / 2
 const BLOCK_PLANE_ENSEMBLE_COUNT = GRID_SIZE * GRID_SIZE
 const BLOCK_FACE_ENSEMBLE_COUNT = BLOCK_CUT_SIZE * BLOCK_CUT_SIZE
 const BLOCK_SIMULATED_ENSEMBLE_COUNT =
-  BLOCK_PLANE_ENSEMBLE_COUNT + 3 * BLOCK_FACE_ENSEMBLE_COUNT
+  BLOCK_PLANE_ENSEMBLE_COUNT + 2 * BLOCK_FACE_ENSEMBLE_COUNT
 const SLICE_GRAPH_BASE_HEIGHT = 10
 const SLICE_GRAPH_HEIGHT = 5.6
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
@@ -173,21 +173,14 @@ function createBlockLayout(): BlockLayout {
         simulatedIndex,
         column * GRID_SPACING - GRID_OFFSET,
         GRID_OFFSET - row * GRID_SPACING,
-        -GRID_OFFSET,
+        cutBoundary,
       )
       simulatedIndex += 1
     }
   }
 
-  // The same source quadrant is rotated onto each exposed cut face.
-  for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
-    for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
-      const x = column * GRID_SPACING - GRID_OFFSET
-      const y = GRID_OFFSET - row * GRID_SPACING
-      setSimulatedPosition(simulatedIndex, x, y, cutBoundary)
-      simulatedIndex += 1
-    }
-  }
+  // The plane's lower-right quadrant is already the horizontal cut face.
+  // Rotate that quadrant onto the two remaining vertical cut faces.
   for (let row = BLOCK_CUT_SIZE; row < GRID_SIZE; row += 1) {
     for (let column = BLOCK_CUT_SIZE; column < GRID_SIZE; column += 1) {
       const y = GRID_OFFSET - row * GRID_SPACING
@@ -213,11 +206,7 @@ function createBlockLayout(): BlockLayout {
           column >= BLOCK_CUT_SIZE &&
           row >= BLOCK_CUT_SIZE &&
           layer >= BLOCK_CUT_SIZE
-        const onSourcePlane = layer === 0
-        const onHorizontalCutFace =
-          layer === BLOCK_CUT_SIZE - 1 &&
-          column >= BLOCK_CUT_SIZE &&
-          row >= BLOCK_CUT_SIZE
+        const onSourcePlane = layer === BLOCK_CUT_SIZE - 1
         const onVerticalXCutFace =
           column === BLOCK_CUT_SIZE - 1 &&
           row >= BLOCK_CUT_SIZE &&
@@ -237,7 +226,6 @@ function createBlockLayout(): BlockLayout {
         if (
           inRemovedCorner ||
           onSourcePlane ||
-          onHorizontalCutFace ||
           onVerticalXCutFace ||
           onVerticalYCutFace ||
           !onOuterSurface

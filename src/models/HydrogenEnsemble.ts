@@ -346,9 +346,10 @@ export function createHydrogenEnsembles(gridSize: number) {
 }
 
 /**
- * Block View keeps the complete source slice and repeats its lower-right
- * quadrant on the three faces exposed by the corner cutaway. The returned
- * indices deliberately match the renderer's block instance order.
+ * Block View places the complete source slice on the central plane. Its
+ * lower-right quadrant is the horizontal cut face, while two additional
+ * copies form the vertical cut faces. The returned indices deliberately
+ * match the renderer's block instance order.
  */
 export function blockSimulationSourceIndices(gridSize: number) {
   const cutSize = Math.floor(gridSize / 2)
@@ -357,7 +358,7 @@ export function blockSimulationSourceIndices(gridSize: number) {
     (_, index) => index,
   )
 
-  for (let face = 0; face < 3; face += 1) {
+  for (let face = 0; face < 2; face += 1) {
     for (let row = cutSize; row < gridSize; row += 1) {
       for (let column = cutSize; column < gridSize; column += 1) {
         indices.push(row * gridSize + column)
@@ -384,23 +385,23 @@ export function createBlockSimulationEnsembles(
   return sourceIndices.map((sourceIndex, simulationIndex) => {
     const source = sourceEnsembles[sourceIndex]
     const planeEnsembleCount = source.gridSize ** 2
-    if (simulationIndex < planeEnsembleCount) return source
-
     const cutSize = Math.floor(source.gridSize / 2)
     const faceEnsembleCount = cutSize ** 2
-    const faceIndex = Math.floor(
-      (simulationIndex - planeEnsembleCount) / faceEnsembleCount,
-    )
     let column = source.column
     let row = source.row
     let layer = cutSize - 1
 
-    if (faceIndex === 1) {
-      column = cutSize - 1
-      layer = source.column
-    } else if (faceIndex === 2) {
-      row = cutSize - 1
-      layer = source.row
+    if (simulationIndex >= planeEnsembleCount) {
+      const faceIndex = Math.floor(
+        (simulationIndex - planeEnsembleCount) / faceEnsembleCount,
+      )
+      if (faceIndex === 0) {
+        column = cutSize - 1
+        layer = source.column
+      } else {
+        row = cutSize - 1
+        layer = source.row
+      }
     }
 
     const copy = new HydrogenEnsemble(
