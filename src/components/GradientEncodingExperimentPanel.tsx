@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -19,10 +18,6 @@ import {
   type GradientPulse,
 } from '../simulation/gradientEncoding'
 import DarkSelect from './DarkSelect'
-import EncodingAccumulation, {
-  createEncodingAcquisition,
-  type EncodingAcquisition,
-} from './EncodingAccumulation'
 
 type PulseHandle = 'left' | 'right' | 'top'
 
@@ -750,45 +745,10 @@ function GradientEncodingExperimentPanel({
   timeMilliseconds,
 }: GradientEncodingExperimentPanelProps) {
   const [timingGuideTime, setTimingGuideTime] = useState<number | null>(null)
-  const [encodingAcquisitions, setEncodingAcquisitions] = useState<
-    EncodingAcquisition[]
-  >([])
-  const previousStatusRef = useRef(status)
-  const nextAcquisitionIdRef = useRef(1)
   const playheadTime =
     status === 'idle'
       ? null
       : clamp(timeMilliseconds / durationMilliseconds, 0, 1)
-
-  useEffect(() => {
-    const previousStatus = previousStatusRef.current
-    previousStatusRef.current = status
-    if (status !== 'complete' || previousStatus === 'complete') return
-
-    const acquisition = createEncodingAcquisition(
-      nextAcquisitionIdRef.current,
-      phaseEncodingPulses,
-      readoutPulses,
-      durationMilliseconds,
-      gradientImperfections,
-    )
-    if (!acquisition) return
-
-    nextAcquisitionIdRef.current += 1
-    setEncodingAcquisitions((current) => [...current, acquisition])
-  }, [
-    durationMilliseconds,
-    gradientImperfections,
-    phaseEncodingPulses,
-    readoutPulses,
-    status,
-  ])
-
-  const resetSimulationAndEncoding = () => {
-    setEncodingAcquisitions([])
-    nextAcquisitionIdRef.current = 1
-    onSimulationReset()
-  }
 
   return (
     <>
@@ -824,7 +784,7 @@ function GradientEncodingExperimentPanel({
             className="fid-control-button"
             type="button"
             disabled={status === 'idle'}
-            onClick={resetSimulationAndEncoding}
+            onClick={onSimulationReset}
           >
             Reset
           </button>
@@ -936,34 +896,6 @@ function GradientEncodingExperimentPanel({
             onReset={onReadoutReset}
           />
         </div>
-      </section>
-
-      <section className="gradient-accumulation-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-index">03</span>
-            <h2>Encoding Accumulation</h2>
-          </div>
-        </div>
-
-        <p className="gradient-input-instructions">
-          Each completed sequence adds its readout trajectory at the configured
-          k<sub>y</sub>. Change G<sub>PE</sub> between replays to acquire new
-          phase-encoding information. Reset clears the acquisition history.
-        </p>
-
-        <EncodingAccumulation
-          acquisitions={encodingAcquisitions}
-          durationMilliseconds={durationMilliseconds}
-          gradientImperfections={gradientImperfections}
-          phaseEncodingPulses={phaseEncodingPulses}
-          phaseEncodingReferenceWaveforms={
-            PHASE_ENCODING_REFERENCE_WAVEFORMS
-          }
-          readoutPulses={readoutPulses}
-          status={status}
-          timeMilliseconds={timeMilliseconds}
-        />
       </section>
     </>
   )

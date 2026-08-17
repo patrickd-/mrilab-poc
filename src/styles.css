@@ -878,21 +878,25 @@ a:focus-visible {
 }
 
 .fid-simulation-controls {
+  position: sticky;
+  z-index: 20;
+  top: 0;
   padding: 24px 30px;
   border-bottom: 1px solid var(--line);
+  background: rgba(13, 16, 20, 0.97);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
 }
 
 .fid-experiment-section,
 .t1-relaxation-section,
 .spin-echo-section,
 .gradient-slice-selection-section,
-.gradient-encoding-section,
-.gradient-accumulation-section {
+.gradient-encoding-section {
   padding: 30px;
 }
 
-.gradient-slice-selection-section,
-.gradient-encoding-section {
+.gradient-slice-selection-section {
   border-bottom: 1px solid var(--line);
 }
 
@@ -909,166 +913,6 @@ a:focus-visible {
 .gradient-timing-diagram {
   display: grid;
   gap: 14px;
-}
-
-.encoding-accumulation-visualizations {
-  display: grid;
-  gap: 14px;
-}
-
-.encoding-accumulation-card {
-  min-width: 0;
-  border: 1px solid var(--line);
-  background: rgba(7, 9, 12, 0.52);
-}
-
-.encoding-accumulation-card > header {
-  display: flex;
-  min-height: 48px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 13px;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.encoding-accumulation-card > header div {
-  display: grid;
-  gap: 3px;
-}
-
-.encoding-accumulation-card > header strong {
-  color: var(--white);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 14px;
-  font-weight: 400;
-}
-
-.encoding-accumulation-card > header span,
-.encoding-accumulation-card > header small {
-  color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 7px;
-  letter-spacing: 0.05em;
-  line-height: 1.45;
-  text-transform: uppercase;
-}
-
-.encoding-accumulation-card > header small {
-  max-width: 48%;
-  text-align: right;
-}
-
-.k-space-coverage-graph,
-.phase-encoding-psf-graph {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.encoding-graph-grid line {
-  stroke: var(--line-soft);
-  stroke-width: 1;
-}
-
-.encoding-graph-axis {
-  stroke: rgba(244, 245, 241, 0.28);
-  stroke-width: 1;
-}
-
-.encoding-axis-value,
-.encoding-axis-label,
-.encoding-empty-label {
-  fill: var(--muted);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 7px;
-  letter-spacing: 0.04em;
-}
-
-.encoding-axis-label {
-  font-size: 8px;
-  text-transform: uppercase;
-}
-
-.encoding-empty-label {
-  font-size: 8px;
-  text-transform: uppercase;
-}
-
-.k-space-planned-lines,
-.k-space-acquired-lines,
-.k-space-active-line {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.k-space-planned-lines {
-  stroke: rgba(244, 245, 241, 0.25);
-  stroke-dasharray: 3 4;
-  stroke-width: 1;
-}
-
-.k-space-acquired-lines {
-  stroke: var(--cyan);
-  stroke-width: 2;
-}
-
-.k-space-active-line {
-  stroke: var(--coral);
-  stroke-width: 2.2;
-}
-
-.k-space-active-line circle {
-  fill: var(--coral);
-  stroke: var(--black);
-  stroke-width: 1.2;
-}
-
-.encoding-coverage-legend {
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-  padding: 0 12px 12px;
-  color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 7px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.encoding-coverage-legend span::before {
-  content: '';
-  display: inline-block;
-  width: 13px;
-  margin-right: 5px;
-  border-top: 2px solid currentColor;
-  vertical-align: 2px;
-}
-
-.encoding-coverage-legend .planned {
-  color: rgba(244, 245, 241, 0.46);
-}
-
-.encoding-coverage-legend .acquired {
-  color: var(--cyan);
-}
-
-.encoding-coverage-legend .active {
-  color: var(--coral);
-}
-
-.phase-encoding-psf-fill {
-  fill: rgba(125, 215, 240, 0.09);
-  stroke: none;
-}
-
-.phase-encoding-psf-line {
-  fill: none;
-  stroke: var(--cyan);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
 }
 
 .gradient-input {
@@ -1367,10 +1211,16 @@ a:focus-visible {
 }
 
 .gradient-playback-controls-top {
+  position: sticky;
+  z-index: 20;
+  top: 0;
   margin: 0;
   padding: 24px 30px;
   border-top: 0;
   border-bottom: 1px solid var(--line);
+  background: rgba(13, 16, 20, 0.97);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
 }
 
 .gradient-playback-actions {
@@ -1829,8 +1679,7 @@ a:focus-visible {
   .spin-echo-section,
   .gradient-playback-controls-top,
   .gradient-slice-selection-section,
-  .gradient-encoding-section,
-  .gradient-accumulation-section {
+  .gradient-encoding-section {
     padding-right: 20px;
     padding-left: 20px;
   }
