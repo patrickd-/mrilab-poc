@@ -55,7 +55,7 @@ a:focus-visible {
 }
 
 .global-toolbar {
-  z-index: 4;
+  z-index: 50;
   display: flex;
   grid-column: 1 / -1;
   align-items: center;
