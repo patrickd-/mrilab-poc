@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import GradientEncodingExperimentPanel, {
   combinedSpatialFieldOffsetMilliteslaAt,
@@ -8,6 +9,22 @@ import GradientEncodingExperimentPanel, {
   createGradientHeightmap,
   gradientStrengthMilliteslaPerMeter,
 } from './GradientEncodingExperimentPanel'
+
+function StatefulGradientEncodingExperimentPanel() {
+  const defaults = createDefaultSpatialGradientProfiles(128)
+  const [xProfile, setXProfile] = useState(defaults.x)
+  const [yProfile, setYProfile] = useState(defaults.y)
+
+  return (
+    <GradientEncodingExperimentPanel
+      fieldOfViewMillimeters={128}
+      xProfile={xProfile}
+      yProfile={yProfile}
+      onXProfileChange={setXProfile}
+      onYProfileChange={setYProfile}
+    />
+  )
+}
 
 function mockCanvasContext() {
   const images: Array<{ data: Uint8ClampedArray }> = []
@@ -118,7 +135,7 @@ describe('GradientEncodingExperimentPanel', () => {
     const { getContext, images } = mockCanvasContext()
 
     try {
-      render(<GradientEncodingExperimentPanel fieldOfViewMillimeters={128} />)
+      render(<StatefulGradientEncodingExperimentPanel />)
 
       expect(screen.getByText('Frequency Encoding')).not.toBeNull()
       expect(
@@ -149,7 +166,7 @@ describe('GradientEncodingExperimentPanel', () => {
 
     try {
       const { container } = render(
-        <GradientEncodingExperimentPanel fieldOfViewMillimeters={128} />,
+        <StatefulGradientEncodingExperimentPanel />,
       )
       const graph = screen.getByRole('group', {
         name: 'G x spatial gradient editable line',
@@ -206,7 +223,7 @@ describe('GradientEncodingExperimentPanel', () => {
     const { getContext } = mockCanvasContext()
 
     try {
-      render(<GradientEncodingExperimentPanel fieldOfViewMillimeters={128} />)
+      render(<StatefulGradientEncodingExperimentPanel />)
       const endHandle = screen.getByRole('slider', {
         name: 'G y gradient 128 millimeter endpoint',
       })

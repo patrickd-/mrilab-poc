@@ -5,9 +5,11 @@ import {
   amplitudeHeight,
   createBlockLayout,
   laboratoryFrequencyHeight,
+  magneticFieldHeight,
   phaseHeight,
   rotatingFrequencyHeight,
   sliceFrequencyField,
+  sliceMagneticField,
   smoothGridValues,
 } from './sceneMath'
 
@@ -133,11 +135,61 @@ describe('slice frequency surface', () => {
   })
 })
 
+describe('slice magnetic-field surface', () => {
+  it('sums static, timed, and fundamental spatial field offsets', () => {
+    const staticOffsets = new Float64Array(9).fill(1e-6)
+    const xProfile = {
+      startFieldOffsetMillitesla: -1,
+      endFieldOffsetMillitesla: 1,
+    }
+    const yProfile = {
+      startFieldOffsetMillitesla: -0.5,
+      endFieldOffsetMillitesla: 0.5,
+    }
+    const field = sliceMagneticField(
+      staticOffsets,
+      3,
+      0.5,
+      -0.25,
+      xProfile,
+      yProfile,
+    )
+    const timedOffsetAtTopLeft =
+      MAXIMUM_GRADIENT_TESLA_PER_METER * 0.001 * 0.75
+
+    expect(field.fieldOffsetsTesla[4]).toBeCloseTo(1e-6, 12)
+    expect(field.fieldOffsetsTesla[0]).toBeCloseTo(
+      1e-6 - 0.0005 + timedOffsetAtTopLeft,
+      12,
+    )
+    expect(field.fieldOffsetsTesla[8]).toBeCloseTo(
+      1e-6 + 0.0005 - timedOffsetAtTopLeft,
+      12,
+    )
+    expect(field.maximumAbsoluteFieldOffsetTesla).toBeGreaterThan(0.0005)
+  })
+
+  it('rejects static field offsets with the wrong dimensions', () => {
+    expect(() => sliceMagneticField([0], 2, 0, 0)).toThrow(RangeError)
+  })
+})
+
 describe('slice graph height mappings', () => {
   it('uses field-dependent laboratory-frame baselines', () => {
     expect(laboratoryFrequencyHeight(1.5, 0, 0)).toBeCloseTo(0.3)
     expect(laboratoryFrequencyHeight(3, 0, 0)).toBeCloseTo(0.42)
     expect(laboratoryFrequencyHeight(7, 0, 0)).toBeCloseTo(0.74)
+  })
+
+  it('maps magnetic field offsets around the B0-dependent baseline', () => {
+    const baseline = magneticFieldHeight(3, 0, 0.005)
+
+    expect(magneticFieldHeight(3, 0.005, 0.005)).toBeGreaterThan(
+      baseline,
+    )
+    expect(magneticFieldHeight(3, -0.005, 0.005)).toBeLessThan(
+      baseline,
+    )
   })
 
   it('maps frequency slope around the baseline and clips its extremes', () => {

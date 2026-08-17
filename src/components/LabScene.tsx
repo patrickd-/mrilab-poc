@@ -33,13 +33,16 @@ import {
   type GradientPulse,
   type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
+import type { SpatialGradientProfile } from '../simulation/spatialGradient'
 import {
   amplitudeHeight,
   createBlockLayout,
   laboratoryFrequencyHeight,
+  magneticFieldHeight,
   phaseHeight,
   rotatingFrequencyHeight,
   sliceFrequencyField,
+  sliceMagneticField,
   smoothGridValues,
 } from './sceneMath'
 
@@ -58,6 +61,8 @@ const FULL_SCALE_GRADIENT_FREQUENCY_OFFSET_HERTZ =
     MAXIMUM_GRADIENT_TESLA_PER_METER *
     SLICE_HALF_WIDTH_METERS) /
   (2 * Math.PI)
+const FULL_SCALE_COMBINED_GRADIENT_FIELD_OFFSET_TESLA =
+  MAXIMUM_GRADIENT_TESLA_PER_METER * GRID_SIZE * 1e-3
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
 const SAMPLE_SPHERE_COLORS: Readonly<Record<SamplePresetId, THREE.Color>> = {
   air: new THREE.Color('#526c78'),
@@ -121,6 +126,7 @@ export type SliceGraphMode =
   | 'none'
   | 'frequency-laboratory'
   | 'frequency-rotating'
+  | 'magnetic-field'
   | 'phase'
   | 'amplitude'
 
@@ -143,6 +149,9 @@ interface LabSceneProps {
   gradientRfExcitationPulses: ReadonlyArray<GradientPulse>
   gradientTransmitFrequencyBand: TransmitFrequencyBand
   gradientSliceSelectionPulses: ReadonlyArray<GradientPulse>
+  spatialGradientActive: boolean
+  spatialGradientXProfile: SpatialGradientProfile
+  spatialGradientYProfile: SpatialGradientProfile
   referenceFrame: ReferenceFrame
   renderMode: RenderMode
   sliceGraphMode: SliceGraphMode
@@ -189,6 +198,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientRfExcitationPulses,
       gradientTransmitFrequencyBand,
       gradientSliceSelectionPulses,
+      spatialGradientActive,
+      spatialGradientXProfile,
+      spatialGradientYProfile,
       referenceFrame,
       renderMode,
       sliceGraphMode,
@@ -210,6 +222,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     const sliceGraphModeRef = useRef(sliceGraphMode)
     const fieldStrengthTeslaRef = useRef(fieldStrengthTesla)
     const staticFieldFrequencyOffsetsRef = useRef(
+      new Float64Array(GRID_SIZE * GRID_SIZE),
+    )
+    const staticFieldOffsetsTeslaRef = useRef(
       new Float64Array(GRID_SIZE * GRID_SIZE),
     )
     const modeObjectsRef = useRef<{
@@ -255,6 +270,11 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       states: gradientEncodingEnsembleStates,
       timeMilliseconds: gradientEncodingTimeMilliseconds,
     })
+    const spatialGradientRef = useRef({
+      active: spatialGradientActive,
+      xProfile: spatialGradientXProfile,
+      yProfile: spatialGradientYProfile,
+    })
     const fidArrowsDirtyRef = useRef(true)
     const sliceGraphDirtyRef = useRef(true)
     const renderedFidStatesRef = useRef<ReadonlyArray<FidEnsembleState>>([])
@@ -278,6 +298,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     useEffect(() => {
       fieldStrengthTeslaRef.current = fieldStrengthTesla
       const offsets = staticFieldFrequencyOffsetsRef.current
+      const fieldOffsetsTesla = staticFieldOffsetsTeslaRef.current
 
       for (let row = 0; row < GRID_SIZE; row += 1) {
         for (let column = 0; column < GRID_SIZE; column += 1) {
@@ -292,10 +313,25 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           offsets[row * GRID_SIZE + column] =
             (PROTON_GYROMAGNETIC_RATIO * fieldVariationTesla) /
             (2 * Math.PI)
+          fieldOffsetsTesla[row * GRID_SIZE + column] =
+            fieldVariationTesla
         }
       }
       sliceGraphDirtyRef.current = true
     }, [fieldStrengthTesla, fieldUniformity])
+
+    useEffect(() => {
+      spatialGradientRef.current = {
+        active: spatialGradientActive,
+        xProfile: spatialGradientXProfile,
+        yProfile: spatialGradientYProfile,
+      }
+      sliceGraphDirtyRef.current = true
+    }, [
+      spatialGradientActive,
+      spatialGradientXProfile,
+      spatialGradientYProfile,
+    ])
 
     useEffect(() => {
       sliceGraphModeRef.current = sliceGraphMode
@@ -1353,6 +1389,9 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const sliceGraphFrequencyOffsets = new Float64Array(
         GRID_SIZE * GRID_SIZE,
       )
+      const sliceGraphMagneticFieldOffsets = new Float64Array(
+        GRID_SIZE * GRID_SIZE,
+      )
       const sliceGraphStateLookup: Array<FidEnsembleState | undefined> =
         new Array(GRID_SIZE * GRID_SIZE)
       const sliceGraphLowColor = new THREE.Color('#32e6ff')
@@ -1371,6 +1410,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         if (!graphVisible) return
 
         const gradientAnimation = gradientAnimationRef.current
+        const spatialGradient = spatialGradientRef.current
         const fidAnimation = fidAnimationRef.current
         const renderingGradientEncoding = gradientAnimation.selected
         const simulationActive = renderingGradientEncoding
@@ -1429,12 +1469,30 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           maximumAbsoluteFrequencyOffsetHertz =
             frequencyField.maximumAbsoluteFrequencyOffsetHertz
         }
+        let maximumAbsoluteFieldOffsetTesla = 0
+        if (graphMode === 'magnetic-field') {
+          const magneticField = sliceMagneticField(
+            staticFieldOffsetsTeslaRef.current,
+            GRID_SIZE,
+            phaseEncodingAmplitude,
+            readoutAmplitude,
+            spatialGradient.active ? spatialGradient.xProfile : null,
+            spatialGradient.active ? spatialGradient.yProfile : null,
+          )
+          sliceGraphMagneticFieldOffsets.set(
+            magneticField.fieldOffsetsTesla,
+          )
+          maximumAbsoluteFieldOffsetTesla =
+            magneticField.maximumAbsoluteFieldOffsetTesla
+        }
 
         for (let row = 0; row < GRID_SIZE; row += 1) {
           for (let column = 0; column < GRID_SIZE; column += 1) {
             const index = row * GRID_SIZE + column
             const frequencyOffsetHertz =
               sliceGraphFrequencyOffsets[index]
+            const magneticFieldOffsetTesla =
+              sliceGraphMagneticFieldOffsets[index]
             let normalizedHeight = 0.5
 
             if (graphMode === 'frequency-laboratory') {
@@ -1457,6 +1515,16 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               normalizedHeight = rotatingFrequencyHeight(
                 frequencyOffsetHertz,
                 frequencyHeightScaleHertz,
+              )
+            } else if (graphMode === 'magnetic-field') {
+              const fieldHeightScaleTesla =
+                renderingGradientEncoding || spatialGradient.active
+                  ? FULL_SCALE_COMBINED_GRADIENT_FIELD_OFFSET_TESLA
+                  : maximumAbsoluteFieldOffsetTesla
+              normalizedHeight = magneticFieldHeight(
+                fieldStrengthTeslaRef.current,
+                magneticFieldOffsetTesla,
+                fieldHeightScaleTesla,
               )
             } else if (graphMode === 'phase') {
               let phaseRadians = 0

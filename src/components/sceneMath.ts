@@ -4,6 +4,10 @@ import {
   type SupportedFieldStrengthTesla,
 } from '../models/HydrogenEnsemble'
 import { MAXIMUM_GRADIENT_TESLA_PER_METER } from '../simulation/gradientEncoding'
+import {
+  spatialFieldOffsetMilliteslaAt,
+  type SpatialGradientProfile,
+} from '../simulation/spatialGradient'
 
 export interface BlockLayout {
   contextPositions: Float32Array
@@ -157,6 +161,70 @@ export interface SliceFrequencyField {
   maximumAbsoluteFrequencyOffsetHertz: number
 }
 
+export interface SliceMagneticField {
+  fieldOffsetsTesla: Float64Array
+  maximumAbsoluteFieldOffsetTesla: number
+}
+
+/**
+ * Adds static B0 variation, active GRE gradients, and optional fundamental
+ * spatial profiles into one longitudinal field offset for every ensemble.
+ */
+export function sliceMagneticField(
+  staticFieldOffsetsTesla: ArrayLike<number>,
+  gridSize: number,
+  phaseEncodingAmplitude: number,
+  readoutAmplitude: number,
+  xProfile: SpatialGradientProfile | null = null,
+  yProfile: SpatialGradientProfile | null = null,
+): SliceMagneticField {
+  if (staticFieldOffsetsTesla.length !== gridSize * gridSize) {
+    throw new RangeError('Static field count must equal gridSize squared')
+  }
+
+  const fieldOffsetsTesla = new Float64Array(gridSize * gridSize)
+  let maximumAbsoluteFieldOffsetTesla = 0
+  const denominator = Math.max(1, gridSize - 1)
+
+  for (let row = 0; row < gridSize; row += 1) {
+    for (let column = 0; column < gridSize; column += 1) {
+      const index = row * gridSize + column
+      const positionXMeters = (column - (gridSize - 1) / 2) * 1e-3
+      const positionYMeters = ((gridSize - 1) / 2 - row) * 1e-3
+      const timedGradientFieldTesla =
+        MAXIMUM_GRADIENT_TESLA_PER_METER *
+        (positionXMeters * readoutAmplitude +
+          positionYMeters * phaseEncodingAmplitude)
+      const spatialGradientFieldTesla =
+        ((xProfile
+          ? spatialFieldOffsetMilliteslaAt(
+              xProfile,
+              column / denominator,
+            )
+          : 0) +
+          (yProfile
+            ? spatialFieldOffsetMilliteslaAt(
+                yProfile,
+                1 - row / denominator,
+              )
+            : 0)) *
+        1e-3
+      const fieldOffsetTesla =
+        staticFieldOffsetsTesla[index] +
+        timedGradientFieldTesla +
+        spatialGradientFieldTesla
+
+      fieldOffsetsTesla[index] = fieldOffsetTesla
+      maximumAbsoluteFieldOffsetTesla = Math.max(
+        maximumAbsoluteFieldOffsetTesla,
+        Math.abs(fieldOffsetTesla),
+      )
+    }
+  }
+
+  return { fieldOffsetsTesla, maximumAbsoluteFieldOffsetTesla }
+}
+
 /**
  * Builds the frequency surface: readout contributes only along x and phase
  * encoding contributes only along y, with static B0 offsets added per voxel.
@@ -230,6 +298,18 @@ export function rotatingFrequencyHeight(
         0.46 *
           clamp(frequencyOffsetHertz / frequencyHeightScaleHertz, -1, 1)
     : 0.5
+}
+
+export function magneticFieldHeight(
+  fieldStrengthTesla: SupportedFieldStrengthTesla,
+  fieldOffsetTesla: number,
+  fieldHeightScaleTesla: number,
+) {
+  return laboratoryFrequencyHeight(
+    fieldStrengthTesla,
+    fieldOffsetTesla,
+    fieldHeightScaleTesla,
+  )
 }
 
 /** Soft-limits unwrapped phase without introducing discontinuities at ±pi. */

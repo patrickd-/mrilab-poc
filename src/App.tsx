@@ -55,6 +55,10 @@ import {
   type GradientPulse,
   type TransmitFrequencyBand,
 } from './simulation/gradientEncoding'
+import {
+  createDefaultSpatialGradientProfiles,
+  type SpatialGradientProfile,
+} from './simulation/spatialGradient'
 
 type B0Tesla = '1.5' | '3' | '7'
 
@@ -66,7 +70,7 @@ const B0_OPTIONS: ReadonlyArray<{ id: B0Tesla; label: string }> = [
 // LabScene owns a long-lived Three.js animation loop. Bump this key whenever
 // the data contract consumed inside that loop changes so Vite hot reload does
 // not leave an already-mounted scene running an incompatible closure.
-const LAB_SCENE_RUNTIME_VERSION = 'sinc-bloch-slice-selection-v1'
+const LAB_SCENE_RUNTIME_VERSION = 'spatial-magnetic-field-v2'
 const EMPTY_GRADIENT_PULSES: ReadonlyArray<GradientPulse> = []
 const DEFAULT_GRADIENT_CHANNELS_ENABLED: Readonly<
   Record<GradientChannelId, boolean>
@@ -127,6 +131,7 @@ const SLICE_GRAPH_OPTIONS: ReadonlyArray<{
     id: 'frequency-rotating',
     label: '3D Frequency (Rotating Frame)',
   },
+  { id: 'magnetic-field', label: '3D Magnetic Field' },
   { id: 'phase', label: '3D Phase' },
   { id: 'amplitude', label: '3D Amplitude' },
 ]
@@ -301,6 +306,14 @@ function App() {
   const [gradientChannelsEnabled, setGradientChannelsEnabled] = useState<
     Record<GradientChannelId, boolean>
   >(() => ({ ...DEFAULT_GRADIENT_CHANNELS_ENABLED }))
+  const defaultSpatialGradientProfiles = useMemo(
+    () => createDefaultSpatialGradientProfiles(GRID_SIZE),
+    [],
+  )
+  const [spatialGradientXProfile, setSpatialGradientXProfile] =
+    useState<SpatialGradientProfile>(defaultSpatialGradientProfiles.x)
+  const [spatialGradientYProfile, setSpatialGradientYProfile] =
+    useState<SpatialGradientProfile>(defaultSpatialGradientProfiles.y)
   const [
     gradientAcquisitionResetRevision,
     setGradientAcquisitionResetRevision,
@@ -353,6 +366,8 @@ function App() {
     selectedExperiment === 'ping' || selectedExperiment === 'spin-echo'
   const gradientRecalledEchoExperimentSelected =
     selectedExperiment === 'gradient-recalled-echo'
+  const spatialGradientExperimentSelected =
+    selectedExperiment === 'gradient-encoding'
   const gradientEnsembleStates = useMemo(
     () =>
       gradientRecalledEchoExperimentSelected
@@ -618,6 +633,9 @@ function App() {
           gradientRfExcitationPulses={appliedRfExcitationPulses}
           gradientTransmitFrequencyBand={transmitFrequencyBand}
           gradientSliceSelectionPulses={appliedSliceSelectionPulses}
+          spatialGradientActive={spatialGradientExperimentSelected}
+          spatialGradientXProfile={spatialGradientXProfile}
+          spatialGradientYProfile={spatialGradientYProfile}
           referenceFrame={referenceFrame}
           renderMode={renderMode}
           sliceGraphMode={sliceGraphMode}
@@ -821,6 +839,10 @@ function App() {
             {selectedExperiment === 'gradient-encoding' && (
               <GradientEncodingExperimentPanel
                 fieldOfViewMillimeters={GRID_SIZE}
+                xProfile={spatialGradientXProfile}
+                yProfile={spatialGradientYProfile}
+                onXProfileChange={setSpatialGradientXProfile}
+                onYProfileChange={setSpatialGradientYProfile}
               />
             )}
 

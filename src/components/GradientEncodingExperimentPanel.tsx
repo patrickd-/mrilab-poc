@@ -5,17 +5,30 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import {
+  combinedSpatialFieldOffsetMilliteslaAt,
+  createDefaultSpatialGradientProfiles,
+  DEFAULT_SPATIAL_GRADIENT_FIELD_OF_VIEW_MILLIMETERS,
+  gradientStrengthMilliteslaPerMeter,
+  maximumEndpointFieldOffsetMillitesla,
+  type SpatialGradientProfile,
+} from '../simulation/spatialGradient'
 
-export interface SpatialGradientProfile {
-  endFieldOffsetMillitesla: number
-  startFieldOffsetMillitesla: number
-}
+export {
+  combinedSpatialFieldOffsetMilliteslaAt,
+  createDefaultSpatialGradientProfiles,
+  gradientStrengthMilliteslaPerMeter,
+} from '../simulation/spatialGradient'
 
 type GradientAxis = 'x' | 'y'
 type GradientEndpoint = 'start' | 'end'
 
 interface GradientEncodingExperimentPanelProps {
-  fieldOfViewMillimeters?: number
+  fieldOfViewMillimeters: number
+  onXProfileChange: (profile: SpatialGradientProfile) => void
+  onYProfileChange: (profile: SpatialGradientProfile) => void
+  xProfile: SpatialGradientProfile
+  yProfile: SpatialGradientProfile
 }
 
 interface SpatialGradientGraphProps {
@@ -40,80 +53,11 @@ const GRAPH = {
   top: 16,
   width: 460,
 }
-const DEFAULT_FIELD_OF_VIEW_MILLIMETERS = 128
-const MAXIMUM_GRADIENT_MILLITESLA_PER_METER = 40
 const KEYBOARD_FIELD_STEP_MILLITESLA = 0.08
 const PREVIEW_SIZE = 128
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
-}
-
-export function maximumEndpointFieldOffsetMillitesla(
-  fieldOfViewMillimeters: number,
-) {
-  return (
-    (MAXIMUM_GRADIENT_MILLITESLA_PER_METER *
-      fieldOfViewMillimeters) /
-    2000
-  )
-}
-
-export function createDefaultSpatialGradientProfiles(
-  fieldOfViewMillimeters = DEFAULT_FIELD_OF_VIEW_MILLIMETERS,
-) {
-  const maximumOffset = maximumEndpointFieldOffsetMillitesla(
-    fieldOfViewMillimeters,
-  )
-
-  return {
-    x: {
-      endFieldOffsetMillitesla: maximumOffset / 2,
-      startFieldOffsetMillitesla: -maximumOffset / 2,
-    },
-    y: {
-      endFieldOffsetMillitesla: 0,
-      startFieldOffsetMillitesla: 0,
-    },
-  } satisfies Record<GradientAxis, SpatialGradientProfile>
-}
-
-export function spatialFieldOffsetMilliteslaAt(
-  profile: SpatialGradientProfile,
-  normalizedPosition: number,
-) {
-  const position = clamp(normalizedPosition, 0, 1)
-  return (
-    profile.startFieldOffsetMillitesla +
-    (profile.endFieldOffsetMillitesla -
-      profile.startFieldOffsetMillitesla) *
-      position
-  )
-}
-
-export function combinedSpatialFieldOffsetMilliteslaAt(
-  xProfile: SpatialGradientProfile,
-  yProfile: SpatialGradientProfile,
-  normalizedX: number,
-  normalizedY: number,
-) {
-  return (
-    spatialFieldOffsetMilliteslaAt(xProfile, normalizedX) +
-    spatialFieldOffsetMilliteslaAt(yProfile, normalizedY)
-  )
-}
-
-export function gradientStrengthMilliteslaPerMeter(
-  profile: SpatialGradientProfile,
-  fieldOfViewMillimeters: number,
-) {
-  if (fieldOfViewMillimeters <= 0) return 0
-  return (
-    ((profile.endFieldOffsetMillitesla -
-      profile.startFieldOffsetMillitesla) *
-      1000) /
-    fieldOfViewMillimeters
-  )
 }
 
 export function createGradientHeightmap(
@@ -122,7 +66,7 @@ export function createGradientHeightmap(
   size = PREVIEW_SIZE,
   displayMagnitudeMillitesla =
     maximumEndpointFieldOffsetMillitesla(
-      DEFAULT_FIELD_OF_VIEW_MILLIMETERS,
+      DEFAULT_SPATIAL_GRADIENT_FIELD_OF_VIEW_MILLIMETERS,
     ) * 2,
 ) {
   const safeSize = Math.max(1, Math.floor(size))
@@ -589,16 +533,14 @@ function GradientHeightmap({
 }
 
 function GradientEncodingExperimentPanel({
-  fieldOfViewMillimeters = DEFAULT_FIELD_OF_VIEW_MILLIMETERS,
+  fieldOfViewMillimeters,
+  onXProfileChange,
+  onYProfileChange,
+  xProfile,
+  yProfile,
 }: GradientEncodingExperimentPanelProps) {
   const defaults = createDefaultSpatialGradientProfiles(
     fieldOfViewMillimeters,
-  )
-  const [xProfile, setXProfile] = useState<SpatialGradientProfile>(
-    defaults.x,
-  )
-  const [yProfile, setYProfile] = useState<SpatialGradientProfile>(
-    defaults.y,
   )
   const maximumFieldOffset = maximumEndpointFieldOffsetMillitesla(
     fieldOfViewMillimeters,
@@ -626,28 +568,16 @@ function GradientEncodingExperimentPanel({
           fieldOfViewMillimeters={fieldOfViewMillimeters}
           maximumFieldOffsetMillitesla={maximumFieldOffset}
           profile={xProfile}
-          onChange={setXProfile}
-          onReset={() =>
-            setXProfile(
-              createDefaultSpatialGradientProfiles(
-                fieldOfViewMillimeters,
-              ).x,
-            )
-          }
+          onChange={onXProfileChange}
+          onReset={() => onXProfileChange(defaults.x)}
         />
         <SpatialGradientGraph
           axis="y"
           fieldOfViewMillimeters={fieldOfViewMillimeters}
           maximumFieldOffsetMillitesla={maximumFieldOffset}
           profile={yProfile}
-          onChange={setYProfile}
-          onReset={() =>
-            setYProfile(
-              createDefaultSpatialGradientProfiles(
-                fieldOfViewMillimeters,
-              ).y,
-            )
-          }
+          onChange={onYProfileChange}
+          onReset={() => onYProfileChange(defaults.y)}
         />
         <GradientHeightmap
           displayMagnitudeMillitesla={maximumFieldOffset * 2}

@@ -218,6 +218,23 @@ describe('App integration', () => {
     expect(mocks.gradientHook.mock.calls.at(-1)?.[0]).toMatchObject({
       active: false,
     })
+    expect(mocks.sceneProps).toMatchObject({
+      spatialGradientActive: true,
+      spatialGradientXProfile: {
+        endFieldOffsetMillitesla: 1.28,
+        startFieldOffsetMillitesla: -1.28,
+      },
+      spatialGradientYProfile: {
+        endFieldOffsetMillitesla: 0,
+        startFieldOffsetMillitesla: 0,
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Slice 3D graph' }))
+    await user.click(
+      screen.getByRole('option', { name: '3D Magnetic Field' }),
+    )
+    expect(mocks.sceneProps?.sliceGraphMode).toBe('magnetic-field')
   })
 
   it('bypasses disabled gradient channels without discarding their waveforms', async () => {
