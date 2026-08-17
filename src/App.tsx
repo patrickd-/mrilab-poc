@@ -31,12 +31,14 @@ import {
 import { createFidEnsembleStates } from './simulation/fid'
 import {
   copyGradientPulses,
+  createDefaultTransmitFrequencyBand,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
   DEFAULT_RF_EXCITATION_PULSES,
   DEFAULT_SLICE_SELECTION_PULSES,
   GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
   type GradientPulse,
+  type TransmitFrequencyBand,
 } from './simulation/gradientEncoding'
 
 type B0Tesla = '1.5' | '3' | '7'
@@ -240,8 +242,10 @@ function App() {
   const [rfExcitationPulses, setRfExcitationPulses] = useState<
     GradientPulse[]
   >(() => copyGradientPulses(DEFAULT_RF_EXCITATION_PULSES))
-  const [rfFrequencyOffsetKilohertz, setRfFrequencyOffsetKilohertz] =
-    useState(0)
+  const [transmitFrequencyBand, setTransmitFrequencyBand] =
+    useState<TransmitFrequencyBand>(() =>
+      createDefaultTransmitFrequencyBand(GRID_SIZE),
+    )
   const [sliceSelectionPulses, setSliceSelectionPulses] = useState<
     GradientPulse[]
   >(() => copyGradientPulses(DEFAULT_SLICE_SELECTION_PULSES))
@@ -463,7 +467,7 @@ function App() {
           gradientPhaseEncodingPulses={phaseEncodingPulses}
           gradientReadoutPulses={readoutPulses}
           gradientRfExcitationPulses={rfExcitationPulses}
-          gradientRfFrequencyOffsetKilohertz={rfFrequencyOffsetKilohertz}
+          gradientTransmitFrequencyBand={transmitFrequencyBand}
           gradientSliceSelectionPulses={sliceSelectionPulses}
           referenceFrame={referenceFrame}
           renderMode={renderMode}
@@ -671,25 +675,22 @@ function App() {
                   GRADIENT_SEQUENCE_DURATION_MILLISECONDS
                 }
                 gradientImperfections={gradientImperfections}
+                gridSize={GRID_SIZE}
                 phaseEncodingPulses={phaseEncodingPulses}
                 readoutPulses={readoutPulses}
                 rfExcitationPulses={rfExcitationPulses}
-                rfFrequencyOffsetKilohertz={rfFrequencyOffsetKilohertz}
                 sliceSelectionPulses={sliceSelectionPulses}
                 speed={gradientPlayback.speed}
                 status={gradientPlayback.status}
                 timeMilliseconds={gradientPlayback.timeMilliseconds}
                 onPause={gradientPlayback.pause}
                 onRfExcitationPulsesChange={setRfExcitationPulses}
-                onRfExcitationFrequencyChange={
-                  setRfFrequencyOffsetKilohertz
-                }
-                onRfExcitationReset={() => {
+                transmitFrequencyBand={transmitFrequencyBand}
+                onRfExcitationReset={() =>
                   setRfExcitationPulses(
                     copyGradientPulses(DEFAULT_RF_EXCITATION_PULSES),
                   )
-                  setRfFrequencyOffsetKilohertz(0)
-                }}
+                }
                 onPhaseEncodingPulsesChange={setPhaseEncodingPulses}
                 onPhaseEncodingReset={() =>
                   setPhaseEncodingPulses(
@@ -706,6 +707,12 @@ function App() {
                 onSliceSelectionReset={() =>
                   setSliceSelectionPulses(
                     copyGradientPulses(DEFAULT_SLICE_SELECTION_PULSES),
+                  )
+                }
+                onTransmitFrequencyBandChange={setTransmitFrequencyBand}
+                onTransmitFrequencyBandReset={() =>
+                  setTransmitFrequencyBand(
+                    createDefaultTransmitFrequencyBand(GRID_SIZE),
                   )
                 }
                 onSimulationReset={gradientPlayback.reset}

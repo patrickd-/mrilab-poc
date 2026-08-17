@@ -30,6 +30,7 @@ import {
   gradientPhaseRadiansAt,
   MAXIMUM_GRADIENT_TESLA_PER_METER,
   type GradientPulse,
+  type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
 
 export const GRID_SIZE = 128
@@ -132,7 +133,7 @@ interface LabSceneProps {
   gradientPhaseEncodingPulses: ReadonlyArray<GradientPulse>
   gradientReadoutPulses: ReadonlyArray<GradientPulse>
   gradientRfExcitationPulses: ReadonlyArray<GradientPulse>
-  gradientRfFrequencyOffsetKilohertz: number
+  gradientTransmitFrequencyBand: TransmitFrequencyBand
   gradientSliceSelectionPulses: ReadonlyArray<GradientPulse>
   referenceFrame: ReferenceFrame
   renderMode: RenderMode
@@ -290,7 +291,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientPhaseEncodingPulses,
       gradientReadoutPulses,
       gradientRfExcitationPulses,
-      gradientRfFrequencyOffsetKilohertz,
+      gradientTransmitFrequencyBand,
       gradientSliceSelectionPulses,
       referenceFrame,
       renderMode,
@@ -352,7 +353,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       phaseEncodingPulses: gradientPhaseEncodingPulses,
       readoutPulses: gradientReadoutPulses,
       rfExcitationPulses: gradientRfExcitationPulses,
-      rfFrequencyOffsetKilohertz: gradientRfFrequencyOffsetKilohertz,
+      transmitFrequencyBand: gradientTransmitFrequencyBand,
       sliceSelectionPulses: gradientSliceSelectionPulses,
       imperfections: gradientImperfections,
       states: gradientEncodingEnsembleStates,
@@ -500,7 +501,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         phaseEncodingPulses: gradientPhaseEncodingPulses,
         readoutPulses: gradientReadoutPulses,
         rfExcitationPulses: gradientRfExcitationPulses,
-        rfFrequencyOffsetKilohertz: gradientRfFrequencyOffsetKilohertz,
+        transmitFrequencyBand: gradientTransmitFrequencyBand,
         sliceSelectionPulses: gradientSliceSelectionPulses,
         imperfections: gradientImperfections,
         states: gradientEncodingEnsembleStates,
@@ -517,7 +518,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientPhaseEncodingPulses,
       gradientReadoutPulses,
       gradientRfExcitationPulses,
-      gradientRfFrequencyOffsetKilohertz,
+      gradientTransmitFrequencyBand,
       gradientSliceSelectionPulses,
     ])
 
@@ -1357,7 +1358,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                   state,
                   timeMilliseconds,
                   gradientAnimation.rfExcitationPulses,
-                  gradientAnimation.rfFrequencyOffsetKilohertz,
+                  gradientAnimation.transmitFrequencyBand,
                   gradientAnimation.sliceSelectionPulses,
                   gradientAnimation.phaseEncodingPulses,
                   gradientAnimation.readoutPulses,
@@ -1640,7 +1641,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                       state,
                       timeMilliseconds,
                       gradientAnimation.rfExcitationPulses,
-                      gradientAnimation.rfFrequencyOffsetKilohertz,
+                      gradientAnimation.transmitFrequencyBand,
                       gradientAnimation.sliceSelectionPulses,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,
@@ -1690,7 +1691,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                       state,
                       timeMilliseconds,
                       gradientAnimation.rfExcitationPulses,
-                      gradientAnimation.rfFrequencyOffsetKilohertz,
+                      gradientAnimation.transmitFrequencyBand,
                       gradientAnimation.sliceSelectionPulses,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,

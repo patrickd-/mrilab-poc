@@ -10,14 +10,18 @@ export interface GradientPulse {
   amplitude: number
 }
 
+export interface TransmitFrequencyBand {
+  lowerAngularFrequencyKilradiansPerSecond: number
+  upperAngularFrequencyKilradiansPerSecond: number
+}
+
 export const GRADIENT_SEQUENCE_DURATION_MILLISECONDS = 20
 export const MAXIMUM_GRADIENT_TESLA_PER_METER = 1e-3
-export const MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ = 2
 const GRADIENT_FAST_RESPONSE_TIME_MILLISECONDS = 0.04
 const GRADIENT_EDDY_RESPONSE_TIME_MILLISECONDS = 0.8
 const GRADIENT_EDDY_RESPONSE_FRACTION = 0.04
 const DEFAULT_SLICE_SELECTION_AMPLITUDE = 0.58
-const DEFAULT_SLICE_HALF_THICKNESS_LAYERS = 0.25
+const DEFAULT_SLICE_THICKNESS_MILLIMETERS = 1
 
 export const DEFAULT_RF_EXCITATION_PULSES: ReadonlyArray<GradientPulse> = [
   { start: 0.08, end: 0.34, amplitude: 1 },
@@ -44,6 +48,58 @@ export const DEFAULT_READOUT_PULSES: ReadonlyArray<GradientPulse> = [
   { start: 0.34, end: 0.52, amplitude: -0.42 },
   { start: 0.52, end: 0.78, amplitude: 0.52 },
 ]
+
+export function sliceMappingAngularFrequencyKilradiansPerSecondAt(
+  layer: number,
+  gridSize: number,
+  sliceGradientAmplitude: number,
+) {
+  const positionFromLowerFrequencyEdgeMillimeters =
+    sliceGradientAmplitude >= 0 ? layer : gridSize - 1 - layer
+  return (
+    PROTON_GYROMAGNETIC_RATIO *
+    MAXIMUM_GRADIENT_TESLA_PER_METER *
+    Math.abs(sliceGradientAmplitude) *
+    positionFromLowerFrequencyEdgeMillimeters *
+    1e-6
+  )
+}
+
+export function maximumSliceMappingAngularFrequencyKilradiansPerSecond(
+  gridSize: number,
+) {
+  return sliceMappingAngularFrequencyKilradiansPerSecondAt(
+    gridSize - 1,
+    gridSize,
+    1,
+  )
+}
+
+export function createDefaultTransmitFrequencyBand(
+  gridSize: number,
+): TransmitFrequencyBand {
+  const gridCenter = (gridSize - 1) / 2
+  const centerAngularFrequency =
+    sliceMappingAngularFrequencyKilradiansPerSecondAt(
+      gridCenter,
+      gridSize,
+      DEFAULT_SLICE_SELECTION_AMPLITUDE,
+    )
+  const halfBandwidth =
+    (PROTON_GYROMAGNETIC_RATIO *
+      MAXIMUM_GRADIENT_TESLA_PER_METER *
+      DEFAULT_SLICE_SELECTION_AMPLITUDE *
+      DEFAULT_SLICE_THICKNESS_MILLIMETERS *
+      1e-6) /
+    2
+
+  return {
+    lowerAngularFrequencyKilradiansPerSecond:
+      centerAngularFrequency - halfBandwidth,
+    upperAngularFrequencyKilradiansPerSecond:
+      centerAngularFrequency + halfBandwidth,
+  }
+}
 
 export function copyGradientPulses(
   pulses: ReadonlyArray<GradientPulse>,
@@ -244,7 +300,7 @@ export function sliceSelectionExcitationScaleAt(
   layer: number,
   gridSize: number,
   excitationPulse: GradientPulse,
-  rfFrequencyOffsetKilohertz: number,
+  transmitFrequencyBand: TransmitFrequencyBand,
   sliceSelectionPulses: ReadonlyArray<GradientPulse>,
   durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
   gradientImperfections = false,
@@ -259,36 +315,42 @@ export function sliceSelectionExcitationScaleAt(
     gradientImperfections,
   )
 
-  // The RF waveform is treated as an ideal hard spatial passband. Its carrier
-  // offset chooses the center through delta-f = gamma-bar * G_SS * z, while
-  // reducing G_SS widens the selected slab.
+  // Treat the RF waveform as an ideal hard angular-frequency passband. G_SS
+  // maps that band onto position; its sign decides which edge is the
+  // lower-frequency edge, while its magnitude controls slice thickness.
   if (Math.abs(sliceGradientAmplitude) < 1e-6) {
-    return Math.abs(rfFrequencyOffsetKilohertz) < 1e-9 ? 1 : 0
+    return transmitFrequencyBand.lowerAngularFrequencyKilradiansPerSecond <=
+      0 &&
+      transmitFrequencyBand.upperAngularFrequencyKilradiansPerSecond >= 0
+      ? 1
+      : 0
   }
 
-  const halfThicknessLayers =
-    (DEFAULT_SLICE_HALF_THICKNESS_LAYERS *
-      DEFAULT_SLICE_SELECTION_AMPLITUDE) /
-    Math.abs(sliceGradientAmplitude)
-  const gridCenter = (gridSize - 1) / 2
-  const gradientTeslaPerMeter =
-    MAXIMUM_GRADIENT_TESLA_PER_METER * sliceGradientAmplitude
-  const protonGyromagneticRatioHertzPerTesla =
-    PROTON_GYROMAGNETIC_RATIO / (2 * Math.PI)
-  const targetOffsetLayers =
-    (rfFrequencyOffsetKilohertz * 1000) /
-    (protonGyromagneticRatioHertzPerTesla *
-      gradientTeslaPerMeter *
-      1e-3)
-  const targetLayer = gridCenter + targetOffsetLayers
-  return Math.abs(layer - targetLayer) <= halfThicknessLayers ? 1 : 0
+  const mappedAngularFrequency =
+    sliceMappingAngularFrequencyKilradiansPerSecondAt(
+      layer,
+      gridSize,
+      sliceGradientAmplitude,
+    )
+  const lowerAngularFrequency = Math.min(
+    transmitFrequencyBand.lowerAngularFrequencyKilradiansPerSecond,
+    transmitFrequencyBand.upperAngularFrequencyKilradiansPerSecond,
+  )
+  const upperAngularFrequency = Math.max(
+    transmitFrequencyBand.lowerAngularFrequencyKilradiansPerSecond,
+    transmitFrequencyBand.upperAngularFrequencyKilradiansPerSecond,
+  )
+  return mappedAngularFrequency > lowerAngularFrequency &&
+    mappedAngularFrequency < upperAngularFrequency
+    ? 1
+    : 0
 }
 
 export function gradientEnsembleMagnetizationStateAt(
   state: FidEnsembleState,
   timeMilliseconds: number,
   rfExcitationPulses: ReadonlyArray<GradientPulse>,
-  rfFrequencyOffsetKilohertz: number,
+  transmitFrequencyBand: TransmitFrequencyBand,
   sliceSelectionPulses: ReadonlyArray<GradientPulse>,
   phaseEncodingPulses: ReadonlyArray<GradientPulse>,
   readoutPulses: ReadonlyArray<GradientPulse>,
@@ -324,7 +386,7 @@ export function gradientEnsembleMagnetizationStateAt(
     state.layer,
     state.gridSize,
     excitationPulse,
-    rfFrequencyOffsetKilohertz,
+    transmitFrequencyBand,
     sliceSelectionPulses,
     durationMilliseconds,
     gradientImperfections,

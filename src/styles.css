@@ -921,6 +921,155 @@ a:focus-visible {
   background: rgba(7, 9, 12, 0.52);
 }
 
+.slice-selection-mapping {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: rgba(7, 9, 12, 0.52);
+}
+
+.slice-selection-mapping .gradient-input-heading strong {
+  color: var(--yellow);
+}
+
+.slice-selection-mapping-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: none;
+  user-select: none;
+}
+
+.slice-mapping-grid line {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+}
+
+.slice-mapping-axis {
+  stroke: rgba(244, 245, 241, 0.34);
+  stroke-width: 1;
+}
+
+.slice-mapping-gradient-line {
+  stroke: var(--green);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.slice-mapping-gradient-label {
+  fill: var(--green);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.05em;
+}
+
+.slice-mapping-frequency-band {
+  fill: rgba(255, 209, 102, 0.11);
+  stroke: none;
+  pointer-events: none;
+}
+
+.slice-mapping-band-edge {
+  stroke: var(--yellow);
+  stroke-linecap: round;
+  stroke-width: 1.7;
+  pointer-events: none;
+  transition: stroke 120ms ease, stroke-width 120ms ease;
+}
+
+.slice-mapping-band-grip {
+  fill: var(--black);
+  stroke: var(--yellow);
+  stroke-width: 1.3;
+  pointer-events: none;
+  transition: stroke 120ms ease;
+}
+
+.slice-mapping-band-hit {
+  stroke: transparent;
+  stroke-width: 14;
+  cursor: ns-resize;
+  pointer-events: stroke;
+}
+
+.slice-mapping-band-handle:hover .slice-mapping-band-edge,
+.slice-mapping-band-handle:has(.slice-mapping-band-hit.active)
+  .slice-mapping-band-edge,
+.slice-mapping-band-handle:has(.slice-mapping-band-hit:focus-visible)
+  .slice-mapping-band-edge {
+  stroke: var(--white);
+  stroke-width: 2.3;
+}
+
+.slice-mapping-band-handle:hover .slice-mapping-band-grip,
+.slice-mapping-band-handle:has(.slice-mapping-band-hit.active)
+  .slice-mapping-band-grip,
+.slice-mapping-band-handle:has(.slice-mapping-band-hit:focus-visible)
+  .slice-mapping-band-grip {
+  stroke: var(--white);
+}
+
+.slice-mapping-band-hit:focus {
+  outline: none;
+}
+
+.slice-mapping-projection {
+  stroke: var(--yellow);
+  stroke-dasharray: 3 4;
+  stroke-width: 1;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.slice-mapping-spatial-band {
+  fill: rgba(255, 209, 102, 0.42);
+  stroke: var(--yellow);
+  stroke-width: 0.8;
+  pointer-events: none;
+}
+
+.slice-mapping-tick,
+.slice-mapping-axis-label {
+  fill: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.03em;
+}
+
+.slice-mapping-axis-label {
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.slice-mapping-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 12px;
+  padding: 0 13px 13px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+
+.slice-mapping-meta span:last-of-type {
+  text-align: right;
+}
+
+.slice-mapping-meta strong {
+  grid-column: 1 / -1;
+  color: var(--yellow);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.slice-mapping-meta sub {
+  font-size: 0.7em;
+}
+
 .gradient-input-heading {
   display: flex;
   min-height: 42px;
@@ -1049,13 +1198,6 @@ a:focus-visible {
   fill: var(--coral);
 }
 
-.rf-frequency-axis-label {
-  fill: var(--yellow);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 8px;
-  letter-spacing: 0.04em;
-}
-
 .gradient-reference-waveforms {
   fill: none;
   stroke: rgba(244, 245, 241, 0.27);
@@ -1104,54 +1246,6 @@ a:focus-visible {
   stroke-width: 1.35;
   opacity: 0.9;
   pointer-events: none;
-}
-
-.rf-frequency-bar {
-  stroke: var(--yellow);
-  stroke-linecap: square;
-  stroke-width: 1.8;
-  pointer-events: none;
-}
-
-.rf-frequency-grip {
-  fill: var(--black);
-  stroke: var(--yellow);
-  stroke-width: 1.4;
-  pointer-events: none;
-}
-
-.rf-frequency-value {
-  fill: var(--yellow);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 7px;
-  letter-spacing: 0.02em;
-  pointer-events: none;
-}
-
-.rf-frequency-hit {
-  stroke: transparent;
-  stroke-width: 15;
-  cursor: ns-resize;
-  pointer-events: stroke;
-}
-
-.rf-frequency-control:hover .rf-frequency-bar,
-.rf-frequency-control:has(.rf-frequency-hit.active) .rf-frequency-bar,
-.rf-frequency-control:has(.rf-frequency-hit:focus-visible)
-  .rf-frequency-bar {
-  stroke: var(--white);
-  stroke-width: 2.3;
-}
-
-.rf-frequency-control:hover .rf-frequency-grip,
-.rf-frequency-control:has(.rf-frequency-hit.active) .rf-frequency-grip,
-.rf-frequency-control:has(.rf-frequency-hit:focus-visible)
-  .rf-frequency-grip {
-  stroke: var(--white);
-}
-
-.rf-frequency-hit:focus {
-  outline: none;
 }
 
 .gradient-handle-stroke {
@@ -1700,7 +1794,9 @@ a:focus-visible {
   .slice-graph-select .dark-select-trigger,
   .ensemble-details-close,
   .gradient-input-reset,
-  .gradient-handle-stroke {
+  .gradient-handle-stroke,
+  .slice-mapping-band-edge,
+  .slice-mapping-band-grip {
     transition: none;
   }
 }

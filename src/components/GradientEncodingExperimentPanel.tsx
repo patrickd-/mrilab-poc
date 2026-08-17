@@ -14,10 +14,11 @@ import {
   DEFAULT_READOUT_PULSES,
   DEFAULT_RF_EXCITATION_PULSES,
   DEFAULT_SLICE_SELECTION_PULSES,
-  MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ,
   type GradientPulse,
+  type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
 import DarkSelect from './DarkSelect'
+import SliceSelectionMappingGraph from './SliceSelectionMappingGraph'
 
 type PulseHandle = 'left' | 'right' | 'top'
 
@@ -39,20 +40,18 @@ interface EditableGradientGraphProps {
   linkedPulses?: boolean
   onChange: (pulses: GradientPulse[]) => void
   onGuideTimeChange: (time: number | null) => void
-  onRfFrequencyOffsetChange?: (frequencyKilohertz: number) => void
   onReset: () => void
   playheadTime: number | null
   pulses: ReadonlyArray<GradientPulse>
   referenceWaveforms: ReadonlyArray<ReadonlyArray<GradientPulse>>
-  rfFrequencyOffsetKilohertz?: number
 }
 
 interface GradientEncodingExperimentPanelProps {
   durationMilliseconds: number
   gradientImperfections: boolean
+  gridSize: number
   onPause: () => void
   onRfExcitationPulsesChange: (pulses: GradientPulse[]) => void
-  onRfExcitationFrequencyChange: (frequencyKilohertz: number) => void
   onRfExcitationReset: () => void
   onPhaseEncodingPulsesChange: (pulses: GradientPulse[]) => void
   onPhaseEncodingReset: () => void
@@ -60,17 +59,19 @@ interface GradientEncodingExperimentPanelProps {
   onReadoutReset: () => void
   onSliceSelectionPulsesChange: (pulses: GradientPulse[]) => void
   onSliceSelectionReset: () => void
+  onTransmitFrequencyBandChange: (band: TransmitFrequencyBand) => void
+  onTransmitFrequencyBandReset: () => void
   onSimulationReset: () => void
   onSpeedChange: (speed: GradientPlaybackSpeed) => void
   onStart: () => void
   phaseEncodingPulses: ReadonlyArray<GradientPulse>
   readoutPulses: ReadonlyArray<GradientPulse>
   rfExcitationPulses: ReadonlyArray<GradientPulse>
-  rfFrequencyOffsetKilohertz: number
   sliceSelectionPulses: ReadonlyArray<GradientPulse>
   speed: GradientPlaybackSpeed
   status: GradientPlaybackStatus
   timeMilliseconds: number
+  transmitFrequencyBand: TransmitFrequencyBand
 }
 
 const GRAPH = {
@@ -84,7 +85,6 @@ const GRAPH = {
 const MINIMUM_PULSE_DURATION = 0.025
 const KEYBOARD_TIME_STEP = 0.01
 const KEYBOARD_AMPLITUDE_STEP = 0.05
-const KEYBOARD_RF_FREQUENCY_STEP_KILOHERTZ = 0.05
 const PHASE_ENCODING_REFERENCE_LEVELS = [
   -1,
   -5 / 7,
@@ -207,16 +207,13 @@ function EditableGradientGraph({
   linkedPulses = false,
   onChange,
   onGuideTimeChange,
-  onRfFrequencyOffsetChange,
   onReset,
   playheadTime,
   pulses,
   referenceWaveforms,
-  rfFrequencyOffsetKilohertz = 0,
 }: EditableGradientGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragState | null>(null)
-  const rfFrequencyDragPointerRef = useRef<number | null>(null)
   const [activeHandle, setActiveHandle] = useState<string | null>(null)
   const plotWidth = GRAPH.width - GRAPH.left - GRAPH.right
   const plotHeight = GRAPH.height - GRAPH.top - GRAPH.bottom
@@ -261,12 +258,6 @@ function EditableGradientGraph({
   const continueDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
     const coordinates = pointerCoordinates(event.clientX, event.clientY)
     onGuideTimeChange(coordinates.time)
-    if (rfFrequencyDragPointerRef.current === event.pointerId) {
-      onRfFrequencyOffsetChange?.(
-        coordinates.amplitude * MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ,
-      )
-      return
-    }
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
     const initialPulse = drag.initialPulses[drag.pulseIndex]
@@ -285,12 +276,8 @@ function EditableGradientGraph({
   }
 
   const endDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const pulseDragEnded = dragRef.current?.pointerId === event.pointerId
-    const frequencyDragEnded =
-      rfFrequencyDragPointerRef.current === event.pointerId
-    if (!pulseDragEnded && !frequencyDragEnded) return
-    if (pulseDragEnded) dragRef.current = null
-    if (frequencyDragEnded) rfFrequencyDragPointerRef.current = null
+    if (dragRef.current?.pointerId !== event.pointerId) return
+    dragRef.current = null
     setActiveHandle(null)
 
     const bounds = svgRef.current?.getBoundingClientRect()
@@ -303,42 +290,6 @@ function EditableGradientGraph({
     ) {
       onGuideTimeChange(null)
     }
-  }
-
-  const beginRfFrequencyDrag = (
-    event: ReactPointerEvent<SVGLineElement>,
-  ) => {
-    event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    const coordinates = pointerCoordinates(event.clientX, event.clientY)
-    onGuideTimeChange(coordinates.time)
-    rfFrequencyDragPointerRef.current = event.pointerId
-    setActiveHandle('rf-frequency')
-    onRfFrequencyOffsetChange?.(
-      coordinates.amplitude * MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ,
-    )
-  }
-
-  const handleRfFrequencyKeyDown = (
-    event: ReactKeyboardEvent<SVGLineElement>,
-  ) => {
-    let deltaFrequency = 0
-    if (event.key === 'ArrowUp') {
-      deltaFrequency = KEYBOARD_RF_FREQUENCY_STEP_KILOHERTZ
-    } else if (event.key === 'ArrowDown') {
-      deltaFrequency = -KEYBOARD_RF_FREQUENCY_STEP_KILOHERTZ
-    } else {
-      return
-    }
-
-    event.preventDefault()
-    onRfFrequencyOffsetChange?.(
-      clamp(
-        rfFrequencyOffsetKilohertz + deltaFrequency,
-        -MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ,
-        MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ,
-      ),
-    )
   }
 
   const handleKeyDown = (
@@ -403,16 +354,6 @@ function EditableGradientGraph({
         )} ${amplitudeToY(amplitude)}`
       }).join(' ')
     : ''
-  const rfPulse = label === 'RF' ? pulses[0] : undefined
-  const rfFrequencyY = amplitudeToY(
-    clamp(
-      rfFrequencyOffsetKilohertz /
-        MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ,
-      -1,
-      1,
-    ),
-  )
-
   return (
     <div className={`gradient-input gradient-input-${label.toLowerCase()}`}>
       <header className="gradient-input-heading">
@@ -448,12 +389,7 @@ function EditableGradientGraph({
           )
         }
         onPointerLeave={() => {
-          if (
-            !dragRef.current &&
-            rfFrequencyDragPointerRef.current === null
-          ) {
-            onGuideTimeChange(null)
-          }
+          if (!dragRef.current) onGuideTimeChange(null)
         }}
         onPointerUp={endDrag}
         onPointerCancel={(event) => {
@@ -500,16 +436,6 @@ function EditableGradientGraph({
         >
           {label === 'RF' ? 'relative B₁' : 'mT/m'}
         </text>
-        {label === 'RF' && (
-          <text
-            className="rf-frequency-axis-label"
-            textAnchor="middle"
-            transform={`translate(${GRAPH.width - 4} ${baselineY}) rotate(90)`}
-            aria-hidden="true"
-          >
-            Δf RF · kHz
-          </text>
-        )}
         <g className="gradient-reference-waveforms" aria-hidden="true">
           {referenceWaveforms.map((referencePulses, index) => (
             <path
@@ -578,54 +504,6 @@ function EditableGradientGraph({
             d={appliedWaveformPath}
             aria-hidden="true"
           />
-        )}
-
-        {rfPulse && (
-          <g className="rf-frequency-control">
-            <line
-              className="rf-frequency-bar"
-              x1={timeToX(rfPulse.start)}
-              y1={rfFrequencyY}
-              x2={timeToX(rfPulse.end)}
-              y2={rfFrequencyY}
-              aria-hidden="true"
-            />
-            <circle
-              className="rf-frequency-grip"
-              cx={timeToX((rfPulse.start + rfPulse.end) / 2)}
-              cy={rfFrequencyY}
-              r="3.2"
-              aria-hidden="true"
-            />
-            <text
-              className="rf-frequency-value"
-              x={timeToX(rfPulse.end) + 5}
-              y={rfFrequencyY - 5}
-              aria-hidden="true"
-            >
-              {rfFrequencyOffsetKilohertz >= 0 ? '+' : ''}
-              {rfFrequencyOffsetKilohertz.toFixed(2)} kHz
-            </text>
-            <line
-              className={`rf-frequency-hit${
-                activeHandle === 'rf-frequency' ? ' active' : ''
-              }`}
-              x1={timeToX(rfPulse.start)}
-              y1={rfFrequencyY}
-              x2={timeToX(rfPulse.end)}
-              y2={rfFrequencyY}
-              role="slider"
-              tabIndex={0}
-              aria-label={`RF carrier frequency offset: ${rfFrequencyOffsetKilohertz.toFixed(2)} kilohertz`}
-              aria-orientation="vertical"
-              aria-valuemin={-MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ}
-              aria-valuemax={MAXIMUM_RF_FREQUENCY_OFFSET_KILOHERTZ}
-              aria-valuenow={rfFrequencyOffsetKilohertz}
-              aria-valuetext={`${rfFrequencyOffsetKilohertz.toFixed(2)} kHz`}
-              onPointerDown={beginRfFrequencyDrag}
-              onKeyDown={handleRfFrequencyKeyDown}
-            />
-          </g>
         )}
 
         {pulses.flatMap((pulse, pulseIndex) => {
@@ -722,8 +600,8 @@ function EditableGradientGraph({
 function GradientEncodingExperimentPanel({
   durationMilliseconds,
   gradientImperfections,
+  gridSize,
   onPause,
-  onRfExcitationFrequencyChange,
   onRfExcitationPulsesChange,
   onRfExcitationReset,
   onPhaseEncodingPulsesChange,
@@ -732,23 +610,35 @@ function GradientEncodingExperimentPanel({
   onReadoutReset,
   onSliceSelectionPulsesChange,
   onSliceSelectionReset,
+  onTransmitFrequencyBandChange,
+  onTransmitFrequencyBandReset,
   onSimulationReset,
   onSpeedChange,
   onStart,
   phaseEncodingPulses,
   readoutPulses,
   rfExcitationPulses,
-  rfFrequencyOffsetKilohertz,
   sliceSelectionPulses,
   speed,
   status,
   timeMilliseconds,
+  transmitFrequencyBand,
 }: GradientEncodingExperimentPanelProps) {
   const [timingGuideTime, setTimingGuideTime] = useState<number | null>(null)
   const playheadTime =
     status === 'idle'
       ? null
       : clamp(timeMilliseconds / durationMilliseconds, 0, 1)
+  const rfExcitationPulse = rfExcitationPulses[0]
+  const sliceMappingGradientAmplitude = rfExcitationPulse
+    ? appliedGradientAmplitudeAt(
+        sliceSelectionPulses,
+        ((rfExcitationPulse.start + rfExcitationPulse.end) / 2) *
+          durationMilliseconds,
+        durationMilliseconds,
+        gradientImperfections,
+      )
+    : 0
 
   return (
     <>
@@ -810,10 +700,10 @@ function GradientEncodingExperimentPanel({
         </div>
 
         <p className="gradient-input-instructions">
-          The coral B₁ bar sets flip amplitude; drag the yellow Δf RF bar to
-          move the selected slice in frequency. The default idealized passband
-          selects the isocenter plane. Gradient full scale is ±1 mT/m. Drag
-          either pulse side to adjust timing.
+          The coral B₁ bar sets flip amplitude. The mapping below G
+          <sub>SS</sub> projects the yellow transmit bandwidth Δω
+          <sub>RF</sub> into slice position and thickness. Gradient full scale
+          is ±1 mT/m. Drag either pulse side to adjust timing.
           {gradientImperfections &&
             ' Dashed yellow shows the applied gradient response.'}
         </p>
@@ -828,10 +718,8 @@ function GradientEncodingExperimentPanel({
             pulses={rfExcitationPulses}
             playheadTime={playheadTime}
             referenceWaveforms={RF_EXCITATION_REFERENCE_WAVEFORMS}
-            rfFrequencyOffsetKilohertz={rfFrequencyOffsetKilohertz}
             onChange={onRfExcitationPulsesChange}
             onGuideTimeChange={setTimingGuideTime}
-            onRfFrequencyOffsetChange={onRfExcitationFrequencyChange}
             onReset={onRfExcitationReset}
           />
           <EditableGradientGraph
@@ -847,6 +735,13 @@ function GradientEncodingExperimentPanel({
             onChange={onSliceSelectionPulsesChange}
             onGuideTimeChange={setTimingGuideTime}
             onReset={onSliceSelectionReset}
+          />
+          <SliceSelectionMappingGraph
+            gradientAmplitude={sliceMappingGradientAmplitude}
+            gridSize={gridSize}
+            transmitFrequencyBand={transmitFrequencyBand}
+            onChange={onTransmitFrequencyBandChange}
+            onReset={onTransmitFrequencyBandReset}
           />
         </div>
       </section>
