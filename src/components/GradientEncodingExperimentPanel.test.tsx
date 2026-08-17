@@ -246,6 +246,10 @@ describe('GradientEncodingExperimentPanel', () => {
     ).toContain(
       `kx ${(expectedKx / 1000).toFixed(3)} and ky ${(expectedKy / 1000).toFixed(3)}`,
     )
+    expect(
+      screen.getByRole('img', { name: /K-space trajectory with 0 ADC/i })
+        .getAttribute('aria-label'),
+    ).not.toContain('cursor at kx 0.00 and ky 0.00')
 
     rerender(
       <GradientEncodingExperimentPanel
@@ -266,6 +270,10 @@ describe('GradientEncodingExperimentPanel', () => {
       screen.getByRole('img', { name: /Real .* spatial encoding map/i })
         .getAttribute('aria-label'),
     ).toContain('ky 0.000')
+    expect(
+      screen.getByRole('img', { name: /K-space trajectory with 0 ADC/i })
+        .getAttribute('aria-label'),
+    ).toContain('ky 0.00')
   })
 
   it('warns when a 90-degree pulse exceeds the available peak B1', () => {
