@@ -40,6 +40,7 @@ import {
 } from '../simulation/spatialGradient'
 import {
   amplitudeHeight,
+  combinedSliceGradientVectorTeslaPerMeter,
   createBlockLayout,
   laboratoryFrequencyHeight,
   larmorFrequencyOffsetHertzFromFieldOffsetTesla,
@@ -60,6 +61,8 @@ const BLOCK_SIMULATED_ENSEMBLE_COUNT =
   3 * (GRID_SIZE / 2) ** 2
 const SLICE_GRAPH_BASE_HEIGHT = 10
 const SLICE_GRAPH_HEIGHT = 5.6
+const SLICE_GRAPH_DIRECTION_ARROW_HEIGHT =
+  SLICE_GRAPH_BASE_HEIGHT + SLICE_GRAPH_HEIGHT + 0.8
 const FULL_SCALE_COMBINED_GRADIENT_FIELD_OFFSET_TESLA =
   MAXIMUM_GRADIENT_TESLA_PER_METER * GRID_SIZE * 1e-3
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
@@ -254,6 +257,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       fieldArrowShafts: THREE.InstancedMesh
       fidArrowMaterial: THREE.MeshBasicMaterial
       fidArrowShafts: THREE.InstancedMesh
+      gradientDirectionArrow: THREE.ArrowHelper
       sliceGraphSurface: THREE.Mesh
       stackedFieldArrowHead: THREE.Mesh
       stackedFieldArrowShaft: THREE.Mesh
@@ -393,6 +397,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       if (modeObjects) {
         modeObjects.sliceGraphSurface.visible =
           renderModeRef.current === 'slice' && sliceGraphMode !== 'none'
+        modeObjects.gradientDirectionArrow.visible = false
       }
     }, [sliceGraphMode])
 
@@ -421,6 +426,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       modeObjects.stackedFieldArrowHead.visible = stacked
       modeObjects.sliceGraphSurface.visible =
         slice && sliceGraphModeRef.current !== 'none'
+      modeObjects.gradientDirectionArrow.visible = false
       modeObjects.fidArrowMaterial.opacity = stacked ? 0.025 : 1
       modeObjects.fidArrowMaterial.needsUpdate = true
       fidArrowsDirtyRef.current = true
@@ -1049,7 +1055,29 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       sliceGraphSurface.visible =
         renderModeRef.current === 'slice' &&
         sliceGraphModeRef.current !== 'none'
-      scene.add(sliceGraphSurface)
+      const gradientDirectionArrow = new THREE.ArrowHelper(
+        new THREE.Vector3(1, 0, 0),
+        new THREE.Vector3(-GRID_OFFSET, 0, SLICE_GRAPH_DIRECTION_ARROW_HEIGHT),
+        GRID_OFFSET * 2,
+        '#ffd166',
+        2.6,
+        1.35,
+      )
+      gradientDirectionArrow.visible = false
+      gradientDirectionArrow.line.renderOrder = 8
+      gradientDirectionArrow.cone.renderOrder = 8
+      const gradientArrowLineMaterial =
+        gradientDirectionArrow.line.material as THREE.LineBasicMaterial
+      const gradientArrowConeMaterial =
+        gradientDirectionArrow.cone.material as THREE.MeshBasicMaterial
+      ;[gradientArrowLineMaterial, gradientArrowConeMaterial].forEach(
+        (material) => {
+          material.depthTest = false
+          material.opacity = 0.9
+          material.transparent = true
+        },
+      )
+      scene.add(sliceGraphSurface, gradientDirectionArrow)
 
       const stackedSphereMaterial = sphereMaterial.clone()
       stackedSphereMaterial.color.set('#91a8b5')
@@ -1110,6 +1138,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         fieldArrowShafts: arrowShafts,
         fidArrowMaterial,
         fidArrowShafts,
+        gradientDirectionArrow,
         sliceGraphSurface,
         stackedFieldArrowHead,
         stackedFieldArrowShaft,
@@ -1500,6 +1529,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const sliceGraphMiddleColor = new THREE.Color('#9b70ff')
       const sliceGraphHighColor = new THREE.Color('#ffcf66')
       const sliceGraphColor = new THREE.Color()
+      const gradientDirection = new THREE.Vector3()
+      const gradientArrowOrigin = new THREE.Vector3()
 
       const updateSliceGraph = () => {
         if (!sliceGraphDirtyRef.current) return
@@ -1509,6 +1540,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         const graphVisible =
           renderModeRef.current === 'slice' && graphMode !== 'none'
         sliceGraphSurface.visible = graphVisible
+        gradientDirectionArrow.visible = false
         if (!graphVisible) return
 
         const gradientAnimation = gradientAnimationRef.current
@@ -1570,6 +1602,49 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               spatialGradientProfileHasField(
                 spatialGradient.yProfile,
               )))
+
+        if (graphMode === 'magnetic-field') {
+          const gradientVector =
+            combinedSliceGradientVectorTeslaPerMeter(
+              phaseEncodingAmplitude,
+              readoutAmplitude,
+              spatialGradient.active && spatialGradient.xEnabled
+                ? spatialGradient.xProfile
+                : null,
+              spatialGradient.active && spatialGradient.yEnabled
+                ? spatialGradient.yProfile
+                : null,
+              GRID_SIZE,
+            )
+          if (gradientVector.magnitudeTeslaPerMeter > 1e-12) {
+            gradientDirection.set(
+              gradientVector.xTeslaPerMeter /
+                gradientVector.magnitudeTeslaPerMeter,
+              gradientVector.yTeslaPerMeter /
+                gradientVector.magnitudeTeslaPerMeter,
+              0,
+            )
+            const halfArrowLength =
+              GRID_OFFSET /
+              Math.max(
+                Math.abs(gradientDirection.x),
+                Math.abs(gradientDirection.y),
+              )
+            gradientArrowOrigin.set(
+              -gradientDirection.x * halfArrowLength,
+              -gradientDirection.y * halfArrowLength,
+              SLICE_GRAPH_DIRECTION_ARROW_HEIGHT,
+            )
+            gradientDirectionArrow.position.copy(gradientArrowOrigin)
+            gradientDirectionArrow.setDirection(gradientDirection)
+            gradientDirectionArrow.setLength(
+              halfArrowLength * 2,
+              2.6,
+              1.35,
+            )
+            gradientDirectionArrow.visible = true
+          }
+        }
 
         let maximumAbsoluteFieldOffsetTesla = 0
         if (
@@ -2030,6 +2105,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         boundaryMaterial.dispose()
         sliceGraphGeometry.dispose()
         sliceGraphMaterial.dispose()
+        gradientDirectionArrow.dispose()
 
         renderer.dispose()
         renderer.forceContextLoss()

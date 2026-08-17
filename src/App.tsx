@@ -132,7 +132,7 @@ const SLICE_GRAPH_OPTIONS: ReadonlyArray<{
     id: 'frequency-rotating',
     label: '3D Frequency (Rotating Frame)',
   },
-  { id: 'magnetic-field', label: '3D Magnetic Field' },
+  { id: 'magnetic-field', label: '3D Magnetic Field Gradient' },
   { id: 'phase', label: '3D Phase' },
   { id: 'amplitude', label: '3D Amplitude' },
 ]

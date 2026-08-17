@@ -3,6 +3,7 @@ import { PROTON_GYROMAGNETIC_RATIO } from '../models/HydrogenEnsemble'
 import { MAXIMUM_GRADIENT_TESLA_PER_METER } from '../simulation/gradientEncoding'
 import {
   amplitudeHeight,
+  combinedSliceGradientVectorTeslaPerMeter,
   createBlockLayout,
   laboratoryFrequencyHeight,
   larmorFrequencyOffsetHertzFromFieldOffsetTesla,
@@ -138,6 +139,26 @@ describe('slice frequency surface', () => {
 })
 
 describe('slice magnetic-field surface', () => {
+  it('combines timed and spatial gradients into one direction vector', () => {
+    const vector = combinedSliceGradientVectorTeslaPerMeter(
+      1 / 3,
+      -0.5,
+      {
+        startFieldOffsetMillitesla: -0.64,
+        endFieldOffsetMillitesla: 0.64,
+      },
+      {
+        startFieldOffsetMillitesla: 0.64,
+        endFieldOffsetMillitesla: -0.64,
+      },
+      128,
+    )
+
+    expect(vector.xTeslaPerMeter).toBeCloseTo(-0.005, 12)
+    expect(vector.yTeslaPerMeter).toBeCloseTo(0, 12)
+    expect(vector.magnitudeTeslaPerMeter).toBeCloseTo(0.005, 12)
+  })
+
   it('sums static, timed, and fundamental spatial field offsets', () => {
     const staticOffsets = new Float64Array(9).fill(1e-6)
     const xProfile = {

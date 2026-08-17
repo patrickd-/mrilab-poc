@@ -265,7 +265,7 @@ describe('App integration', () => {
 
     await user.click(screen.getByRole('button', { name: 'Slice 3D graph' }))
     await user.click(
-      screen.getByRole('option', { name: '3D Magnetic Field' }),
+      screen.getByRole('option', { name: '3D Magnetic Field Gradient' }),
     )
     expect(mocks.sceneProps?.sliceGraphMode).toBe('magnetic-field')
 

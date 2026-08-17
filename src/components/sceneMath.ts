@@ -5,6 +5,7 @@ import {
 } from '../models/HydrogenEnsemble'
 import { MAXIMUM_GRADIENT_TESLA_PER_METER } from '../simulation/gradientEncoding'
 import {
+  gradientStrengthMilliteslaPerMeter,
   spatialFieldOffsetMilliteslaAt,
   type SpatialGradientProfile,
 } from '../simulation/spatialGradient'
@@ -13,6 +14,43 @@ export interface BlockLayout {
   contextPositions: Float32Array
   simulatedPositions: Float32Array
   sourceIndices: number[]
+}
+
+export interface SliceGradientVector {
+  magnitudeTeslaPerMeter: number
+  xTeslaPerMeter: number
+  yTeslaPerMeter: number
+}
+
+export function combinedSliceGradientVectorTeslaPerMeter(
+  phaseEncodingAmplitude: number,
+  readoutAmplitude: number,
+  xProfile: SpatialGradientProfile | null,
+  yProfile: SpatialGradientProfile | null,
+  fieldOfViewMillimeters: number,
+): SliceGradientVector {
+  const xTeslaPerMeter =
+    readoutAmplitude * MAXIMUM_GRADIENT_TESLA_PER_METER +
+    (xProfile
+      ? gradientStrengthMilliteslaPerMeter(
+          xProfile,
+          fieldOfViewMillimeters,
+        ) * 1e-3
+      : 0)
+  const yTeslaPerMeter =
+    phaseEncodingAmplitude * MAXIMUM_GRADIENT_TESLA_PER_METER +
+    (yProfile
+      ? gradientStrengthMilliteslaPerMeter(
+          yProfile,
+          fieldOfViewMillimeters,
+        ) * 1e-3
+      : 0)
+
+  return {
+    magnitudeTeslaPerMeter: Math.hypot(xTeslaPerMeter, yTeslaPerMeter),
+    xTeslaPerMeter,
+    yTeslaPerMeter,
+  }
 }
 
 /**
