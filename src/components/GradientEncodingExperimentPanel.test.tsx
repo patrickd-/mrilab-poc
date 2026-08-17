@@ -175,6 +175,12 @@ describe('GradientEncodingExperimentPanel', () => {
         name: /K-space trajectory with 0 ADC-acquired complex signal samples/i,
       }),
     ).not.toBeNull()
+    expect(screen.getByText('Inverse Fourier Transform')).not.toBeNull()
+    expect(
+      screen.getByRole('img', {
+        name: /Partial MRI magnitude reconstruction from 0 acquisitions/i,
+      }),
+    ).not.toBeNull()
     expect(
       screen.queryByRole('slider', {
         name: /Signal acquisition window, pulse 1, top handle/,

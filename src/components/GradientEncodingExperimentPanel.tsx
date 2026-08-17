@@ -36,6 +36,7 @@ import {
 } from '../simulation/gradientEncoding'
 import DarkSelect from './DarkSelect'
 import GradientAcquisitionGraph from './GradientAcquisitionGraph'
+import InverseFourierReconstruction from './InverseFourierReconstruction'
 import KSpaceAcquisitionGraph from './KSpaceAcquisitionGraph'
 import KSpaceEncodingMaps from './KSpaceEncodingMaps'
 import SliceSelectionMappingGraph from './SliceSelectionMappingGraph'
@@ -1128,6 +1129,27 @@ function GradientEncodingExperimentPanel({
             status={status}
           />
         </div>
+      </section>
+
+      <section className="gradient-inverse-fourier-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">04</span>
+            <h2>Inverse Fourier Transform</h2>
+          </div>
+        </div>
+
+        <p className="gradient-input-instructions">
+          Each measured complex k-space phasor contributes its conjugate
+          spatial basis surface. Their running sum forms a partial MRI image;
+          brightness shows the magnitude of the complex reconstruction,
+          normalized to its current peak.
+        </p>
+
+        <InverseFourierReconstruction
+          acquisitionRuns={adcAcquisitionRuns}
+          gridSize={gridSize}
+        />
       </section>
     </>
   )

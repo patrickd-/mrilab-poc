@@ -893,12 +893,14 @@ a:focus-visible {
 .spin-echo-section,
 .gradient-slice-selection-section,
 .gradient-encoding-section,
-.gradient-k-space-section {
+.gradient-k-space-section,
+.gradient-inverse-fourier-section {
   padding: 30px;
 }
 
 .gradient-slice-selection-section,
-.gradient-encoding-section {
+.gradient-encoding-section,
+.gradient-k-space-section {
   border-bottom: 1px solid var(--line);
 }
 
@@ -1718,6 +1720,87 @@ a:focus-visible {
   background: linear-gradient(90deg, #1a1a1a, #fff);
 }
 
+.inverse-fourier-reconstruction {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  background: rgba(7, 9, 12, 0.52);
+}
+
+.inverse-fourier-reconstruction > figcaption {
+  display: flex;
+  min-height: 48px;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  text-transform: uppercase;
+}
+
+.inverse-fourier-reconstruction > figcaption div {
+  display: grid;
+  gap: 3px;
+}
+
+.inverse-fourier-reconstruction > figcaption strong {
+  color: var(--white);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.inverse-fourier-reconstruction > figcaption span,
+.inverse-fourier-reconstruction > figcaption small {
+  color: var(--muted);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  line-height: 1.45;
+}
+
+.inverse-fourier-reconstruction > figcaption small {
+  max-width: 52%;
+  text-align: right;
+}
+
+.inverse-fourier-reconstruction canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  background: #000;
+  image-rendering: pixelated;
+}
+
+.inverse-fourier-reconstruction > footer {
+  display: grid;
+  min-height: 36px;
+  grid-template-columns: auto minmax(50px, 1fr) auto auto;
+  gap: 7px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.inverse-fourier-reconstruction > footer i {
+  height: 3px;
+  background: linear-gradient(90deg, #000, #fff);
+}
+
+.inverse-fourier-reconstruction > footer strong {
+  margin-left: 8px;
+  color: var(--white);
+  font-size: 7px;
+  font-weight: 500;
+  text-align: right;
+}
+
 .gradient-handle-hit {
   stroke: transparent;
   stroke-width: 14;
@@ -2222,7 +2305,8 @@ a:focus-visible {
   .gradient-playback-controls-top,
   .gradient-slice-selection-section,
   .gradient-encoding-section,
-  .gradient-k-space-section {
+  .gradient-k-space-section,
+  .gradient-inverse-fourier-section {
     padding-right: 20px;
     padding-left: 20px;
   }
