@@ -1151,7 +1151,7 @@ a:focus-visible {
   flex: 0 0 auto;
   gap: 5px;
   align-items: center;
-  margin: 0;
+  margin: -2px 0 -1px auto;
   padding: 0 7px;
   border: 1px solid var(--line);
   color: var(--muted);
@@ -1163,6 +1163,10 @@ a:focus-visible {
   text-transform: uppercase;
   transition: border-color 140ms ease, color 140ms ease,
     background 140ms ease;
+}
+
+.gradient-input-actions .gradient-input-reset {
+  margin: 0;
 }
 
 .gradient-input-graph,
