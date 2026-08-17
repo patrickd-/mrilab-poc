@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, renderHook } from '@testing-library/react'
+import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { GradientSignalPoint } from '../simulation/gradientEncoding'
 import {
@@ -30,6 +30,7 @@ describe('useGradientAcquisition', () => {
           adcEnabled: true,
           adcPulses: [{ start: 0.5, end: 0.8, amplitude: 1 }],
           durationMilliseconds: 1,
+          resetRevision: 0,
           sampleAt,
           status: 'running',
           timeMilliseconds,
@@ -37,22 +38,27 @@ describe('useGradientAcquisition', () => {
       { initialProps: { timeMilliseconds: 0.49 } },
     )
 
-    expect(result.current).toHaveLength(0)
+    expect(result.current.currentSignalPoints).toHaveLength(0)
     rerender({ timeMilliseconds: 0.7 })
 
-    expect(result.current.length).toBeGreaterThan(0)
+    expect(result.current.currentSignalPoints.length).toBeGreaterThan(0)
     expect(
-      result.current.every(
+      result.current.currentSignalPoints.every(
         (point) =>
           point.timeMilliseconds >= 0.5 && point.timeMilliseconds < 0.8,
       ),
     ).toBe(true)
-    for (let index = 1; index < result.current.length; index += 1) {
+    for (
+      let index = 1;
+      index < result.current.currentSignalPoints.length;
+      index += 1
+    ) {
       expect(
-        result.current[index].timeMilliseconds -
-          result.current[index - 1].timeMilliseconds,
+        result.current.currentSignalPoints[index].timeMilliseconds -
+          result.current.currentSignalPoints[index - 1].timeMilliseconds,
       ).toBeCloseTo(ADC_DWELL_TIME_MILLISECONDS, 12)
     }
+    expect(result.current.acquisitionRuns).toHaveLength(1)
   })
 
   it('does not acquire while ADC is disabled', () => {
@@ -63,20 +69,23 @@ describe('useGradientAcquisition', () => {
         adcEnabled: false,
         adcPulses: [{ start: 0, end: 1, amplitude: 1 }],
         durationMilliseconds: 1,
+        resetRevision: 0,
         sampleAt,
         status: 'running',
         timeMilliseconds: 1,
       }),
     )
 
-    expect(result.current).toHaveLength(0)
+    expect(result.current.currentSignalPoints).toHaveLength(0)
+    expect(result.current.acquisitionRuns).toHaveLength(0)
     expect(sampleAt).not.toHaveBeenCalled()
   })
 
-  it('clears acquired data on reset and on sequence replay', () => {
+  it('starts a fresh signal graph while retaining k-space runs until explicit reset', () => {
     const sampleAt = vi.fn(signalPoint)
     const { result, rerender } = renderHook(
-      ({ status, timeMilliseconds }: {
+      ({ resetRevision, status, timeMilliseconds }: {
+        resetRevision: number
         status: GradientPlaybackStatus
         timeMilliseconds: number
       }) =>
@@ -85,25 +94,53 @@ describe('useGradientAcquisition', () => {
           adcEnabled: true,
           adcPulses: [{ start: 0.1, end: 1, amplitude: 1 }],
           durationMilliseconds: 1,
+          resetRevision,
           sampleAt,
           status,
           timeMilliseconds,
         }),
       {
         initialProps: {
+          resetRevision: 0,
           status: 'running',
           timeMilliseconds: 0.2,
         },
       },
     )
 
-    expect(result.current.length).toBeGreaterThan(0)
-    act(() => rerender({ status: 'idle', timeMilliseconds: 0 }))
-    expect(result.current).toHaveLength(0)
+    expect(result.current.currentSignalPoints.length).toBeGreaterThan(0)
+    expect(result.current.acquisitionRuns).toHaveLength(1)
 
-    rerender({ status: 'running', timeMilliseconds: 0.2 })
-    expect(result.current.length).toBeGreaterThan(0)
-    rerender({ status: 'running', timeMilliseconds: 0 })
-    expect(result.current).toHaveLength(0)
+    rerender({
+      resetRevision: 0,
+      status: 'running',
+      timeMilliseconds: 0,
+    })
+    expect(result.current.currentSignalPoints).toHaveLength(0)
+    expect(result.current.acquisitionRuns).toHaveLength(1)
+
+    rerender({
+      resetRevision: 0,
+      status: 'running',
+      timeMilliseconds: 0.2,
+    })
+    expect(result.current.currentSignalPoints.length).toBeGreaterThan(0)
+    expect(result.current.acquisitionRuns).toHaveLength(2)
+
+    rerender({
+      resetRevision: 0,
+      status: 'idle',
+      timeMilliseconds: 0,
+    })
+    expect(result.current.currentSignalPoints).toHaveLength(0)
+    expect(result.current.acquisitionRuns).toHaveLength(2)
+
+    rerender({
+      resetRevision: 1,
+      status: 'idle',
+      timeMilliseconds: 0,
+    })
+    expect(result.current.currentSignalPoints).toHaveLength(0)
+    expect(result.current.acquisitionRuns).toHaveLength(0)
   })
 })

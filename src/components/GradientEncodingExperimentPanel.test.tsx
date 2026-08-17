@@ -112,6 +112,7 @@ function panelProps(
   overrides: Partial<ComponentProps<typeof GradientEncodingExperimentPanel>> = {},
 ): ComponentProps<typeof GradientEncodingExperimentPanel> {
   return {
+    adcAcquisitionRuns: [],
     adcPulses: DEFAULT_ADC_PULSES,
     adcSignalPoints: [],
     durationMilliseconds: GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
@@ -331,6 +332,33 @@ describe('GradientEncodingExperimentPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset' }))
     expect(runningProps.onSimulationReset).toHaveBeenCalledOnce()
+  })
+
+  it('keeps reset available while idle when k-space history is retained', async () => {
+    const user = userEvent.setup()
+    const props = panelProps({
+      adcAcquisitionRuns: [
+        {
+          id: 0,
+          points: [
+            {
+              kxCyclesPerMeter: 0,
+              kyCyclesPerMeter: 0,
+              normalizedInPhaseSignal: 1,
+              normalizedMagnitude: 1,
+              normalizedQuadratureSignal: 0,
+              timeMilliseconds: 10,
+            },
+          ],
+        },
+      ],
+    })
+    render(<GradientEncodingExperimentPanel {...props} />)
+
+    const resetButton = screen.getByRole('button', { name: 'Reset' })
+    expect((resetButton as HTMLButtonElement).disabled).toBe(false)
+    await user.click(resetButton)
+    expect(props.onSimulationReset).toHaveBeenCalledOnce()
   })
 
   it('routes each waveform reset independently', async () => {

@@ -8,7 +8,10 @@ import type {
   GradientPlaybackSpeed,
   GradientPlaybackStatus,
 } from '../hooks/useGradientEncodingPlayback'
-import { ADC_DWELL_TIME_MILLISECONDS } from '../hooks/useGradientAcquisition'
+import {
+  ADC_DWELL_TIME_MILLISECONDS,
+  type GradientAcquisitionRun,
+} from '../hooks/useGradientAcquisition'
 import {
   appliedGradientAmplitudeAt,
   createDefaultTransmitFrequencyBand,
@@ -76,6 +79,7 @@ interface EditableGradientGraphProps {
 }
 
 interface GradientEncodingExperimentPanelProps {
+  adcAcquisitionRuns: ReadonlyArray<GradientAcquisitionRun>
   adcPulses: ReadonlyArray<GradientPulse>
   adcSignalPoints: ReadonlyArray<GradientSignalPoint>
   durationMilliseconds: number
@@ -727,6 +731,7 @@ function EditableGradientGraph({
 }
 
 function GradientEncodingExperimentPanel({
+  adcAcquisitionRuns,
   adcPulses,
   adcSignalPoints,
   durationMilliseconds,
@@ -872,7 +877,9 @@ function GradientEncodingExperimentPanel({
           <button
             className="fid-control-button"
             type="button"
-            disabled={status === 'idle'}
+            disabled={
+              status === 'idle' && adcAcquisitionRuns.length === 0
+            }
             onClick={onSimulationReset}
           >
             Reset
@@ -1104,6 +1111,7 @@ function GradientEncodingExperimentPanel({
             points={adcSignalPoints}
           />
           <KSpaceAcquisitionGraph
+            acquisitionRuns={adcAcquisitionRuns}
             currentKxCyclesPerMeter={kxCyclesPerMeter}
             currentKyCyclesPerMeter={kyCyclesPerMeter}
             durationMilliseconds={durationMilliseconds}
@@ -1114,7 +1122,6 @@ function GradientEncodingExperimentPanel({
                 ? phaseEncodingPulses
                 : []
             }
-            points={adcSignalPoints}
             readoutPulses={
               enabledChannels.readout ? readoutPulses : []
             }

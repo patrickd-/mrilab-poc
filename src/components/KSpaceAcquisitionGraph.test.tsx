@@ -36,13 +36,13 @@ function renderGraph(
 ) {
   return render(
     <KSpaceAcquisitionGraph
+      acquisitionRuns={[]}
       currentKxCyclesPerMeter={0}
       currentKyCyclesPerMeter={0}
       durationMilliseconds={20}
       encodingStartTimeMilliseconds={6.8}
       gradientImperfections={false}
       phaseEncodingPulses={phaseEncodingPulses}
-      points={[]}
       readoutPulses={readoutPulses}
       status="idle"
       {...overrides}
@@ -75,13 +75,13 @@ describe('KSpaceAcquisitionGraph', () => {
 
     rerender(
       <KSpaceAcquisitionGraph
+        acquisitionRuns={[]}
         currentKxCyclesPerMeter={1200}
         currentKyCyclesPerMeter={-600}
         durationMilliseconds={20}
         encodingStartTimeMilliseconds={6.8}
         gradientImperfections={false}
         phaseEncodingPulses={phaseEncodingPulses}
-        points={[]}
         readoutPulses={readoutPulses}
         status="running"
       />,
@@ -100,7 +100,9 @@ describe('KSpaceAcquisitionGraph', () => {
       signalPoint(10.04, 0, 500, 1),
       signalPoint(11, 800, 500, 0.5),
     ]
-    const { container } = renderGraph({ points })
+    const { container } = renderGraph({
+      acquisitionRuns: [{ id: 0, points }],
+    })
     const segments = Array.from(
       container.querySelectorAll<SVGLineElement>(
         '.k-space-acquired-trace line',
@@ -115,16 +117,42 @@ describe('KSpaceAcquisitionGraph', () => {
       segments[1].getAttribute('stroke')?.match(/\d+/)?.[0],
     )
     expect(secondGrayscale).toBeGreaterThan(firstGrayscale)
-    expect(screen.getByText(/4 samples · max \|S\| 1\.00/)).not.toBeNull()
+    expect(
+      screen.getByText(/1 acquisition · 4 samples · max \|S\| 1\.00/),
+    ).not.toBeNull()
   })
 
   it('renders a single ADC sample as a grayscale point', () => {
     const { container } = renderGraph({
-      points: [signalPoint(10, 0, 500, 0.25)],
+      acquisitionRuns: [
+        { id: 0, points: [signalPoint(10, 0, 500, 0.25)] },
+      ],
     })
 
     expect(
       container.querySelector('.k-space-acquired-trace circle'),
     ).not.toBeNull()
+  })
+
+  it('retains multiple acquisitions without connecting replay boundaries', () => {
+    const firstRun = [
+      signalPoint(10, -1000, -500, 0.2),
+      signalPoint(10.02, -500, -500, 0.3),
+    ]
+    const secondRun = [
+      signalPoint(10, -1000, 500, 0.4),
+      signalPoint(10.02, -500, 500, 0.5),
+    ]
+    const { container } = renderGraph({
+      acquisitionRuns: [
+        { id: 0, points: firstRun },
+        { id: 1, points: secondRun },
+      ],
+    })
+
+    expect(
+      container.querySelectorAll('.k-space-acquired-trace line'),
+    ).toHaveLength(2)
+    expect(screen.getByText(/2 acquisitions · 4 samples/)).not.toBeNull()
   })
 })

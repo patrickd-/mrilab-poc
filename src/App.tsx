@@ -289,6 +289,10 @@ function App() {
   const [gradientChannelsEnabled, setGradientChannelsEnabled] = useState<
     Record<GradientChannelId, boolean>
   >(() => ({ ...DEFAULT_GRADIENT_CHANNELS_ENABLED }))
+  const [
+    gradientAcquisitionResetRevision,
+    setGradientAcquisitionResetRevision,
+  ] = useState(0)
   const selectedEnsemble = selected ? ensembles[selected.index] : null
   const fieldStrengthTesla = B0_TESLA_VALUES[b0Tesla]
   const fieldUniformity: FieldUniformity = enabledRealismOptions.includes(
@@ -418,15 +422,20 @@ function App() {
       transmitFrequencyBand,
     ],
   )
-  const gradientSignalPoints = useGradientAcquisition({
+  const gradientAcquisition = useGradientAcquisition({
     active: gradientExperimentSelected,
     adcEnabled: gradientChannelsEnabled.adc,
     adcPulses,
     durationMilliseconds: GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+    resetRevision: gradientAcquisitionResetRevision,
     sampleAt: sampleGradientSignalAt,
     status: gradientPlayback.status,
     timeMilliseconds: gradientPlayback.timeMilliseconds,
   })
+  const resetGradientSimulation = () => {
+    gradientPlayback.reset()
+    setGradientAcquisitionResetRevision((revision) => revision + 1)
+  }
 
   useEffect(() => {
     if (!experimentMenuOpen) return
@@ -790,8 +799,9 @@ function App() {
 
             {selectedExperiment === 'gradient-encoding' && (
               <GradientEncodingExperimentPanel
+                adcAcquisitionRuns={gradientAcquisition.acquisitionRuns}
                 adcPulses={adcPulses}
-                adcSignalPoints={gradientSignalPoints}
+                adcSignalPoints={gradientAcquisition.currentSignalPoints}
                 durationMilliseconds={
                   GRADIENT_SEQUENCE_DURATION_MILLISECONDS
                 }
@@ -847,7 +857,7 @@ function App() {
                     createDefaultTransmitFrequencyBand(GRID_SIZE),
                   )
                 }
-                onSimulationReset={gradientPlayback.reset}
+                onSimulationReset={resetGradientSimulation}
                 onSpeedChange={gradientPlayback.setSpeed}
                 onStart={gradientPlayback.start}
               />

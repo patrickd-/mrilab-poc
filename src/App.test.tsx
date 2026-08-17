@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   gradientHook: vi.fn(),
+  gradientReset: vi.fn(),
   fidHook: vi.fn(),
   gradientPanelProps: null as Record<string, any> | null,
   resetCamera: vi.fn(),
@@ -70,6 +71,9 @@ vi.mock('./components/GradientEncodingExperimentPanel', () => ({
     return (
       <div data-testid="gradient-experiment">
         Gradient experiment view
+        <button type="button" onClick={props.onSimulationReset}>
+          Reset gradient simulation
+        </button>
         {[
           ['rf', 'Disable RF channel'],
           ['slice-selection', 'Disable slice-selection channel'],
@@ -126,13 +130,14 @@ describe('App integration', () => {
     })
     mocks.gradientHook.mockReset().mockReturnValue({
       pause: vi.fn(),
-      reset: vi.fn(),
+      reset: mocks.gradientReset,
       setSpeed: vi.fn(),
       speed: '1',
       start: vi.fn(),
       status: 'idle',
       timeMilliseconds: 0,
     })
+    mocks.gradientReset.mockReset()
   })
 
   it('starts with no experiment and no ensemble details', () => {
@@ -198,6 +203,18 @@ describe('App integration', () => {
       expect(mocks.sceneProps?.[sceneProp]).toEqual([])
       expect(mocks.gradientPanelProps?.[panelProp]).not.toHaveLength(0)
     }
+  })
+
+  it('routes an explicit gradient reset through the acquisition reset boundary', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await selectExperiment(user, 'Gradient Encoding Experiment')
+    await user.click(
+      screen.getByRole('button', { name: 'Reset gradient simulation' }),
+    )
+
+    expect(mocks.gradientReset).toHaveBeenCalledOnce()
   })
 
   it('applies nested slice presets and resets the selected ensemble to air', async () => {

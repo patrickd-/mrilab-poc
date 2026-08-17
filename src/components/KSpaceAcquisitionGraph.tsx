@@ -1,20 +1,22 @@
 import { useMemo } from 'react'
-import { ADC_DWELL_TIME_MILLISECONDS } from '../hooks/useGradientAcquisition'
+import {
+  ADC_DWELL_TIME_MILLISECONDS,
+  type GradientAcquisitionRun,
+} from '../hooks/useGradientAcquisition'
 import type { GradientPlaybackStatus } from '../hooks/useGradientEncodingPlayback'
 import {
   gradientKSpaceCyclesPerMeterAt,
   type GradientPulse,
-  type GradientSignalPoint,
 } from '../simulation/gradientEncoding'
 
 interface KSpaceAcquisitionGraphProps {
+  acquisitionRuns: ReadonlyArray<GradientAcquisitionRun>
   currentKxCyclesPerMeter: number
   currentKyCyclesPerMeter: number
   durationMilliseconds: number
   encodingStartTimeMilliseconds: number
   gradientImperfections: boolean
   phaseEncodingPulses: ReadonlyArray<GradientPulse>
-  points: ReadonlyArray<GradientSignalPoint>
   readoutPulses: ReadonlyArray<GradientPulse>
   status: GradientPlaybackStatus
 }
@@ -62,17 +64,18 @@ function grayscaleForSignal(
 }
 
 function KSpaceAcquisitionGraph({
+  acquisitionRuns,
   currentKxCyclesPerMeter,
   currentKyCyclesPerMeter,
   durationMilliseconds,
   encodingStartTimeMilliseconds,
   gradientImperfections,
   phaseEncodingPulses,
-  points,
   readoutPulses,
   status,
 }: KSpaceAcquisitionGraphProps) {
-  const { extent, maximumMagnitude, segments } = useMemo(() => {
+  const { extent, maximumMagnitude, points, segments } = useMemo(() => {
+    const points = acquisitionRuns.flatMap((run) => run.points)
     const plannedPoints = Array.from(
       { length: AXIS_SAMPLE_COUNT + 1 },
       (_, index) => {
@@ -112,39 +115,44 @@ function KSpaceAcquisitionGraph({
       0,
       ...points.map((point) => point.normalizedMagnitude),
     )
-    const acquiredSegments = points.slice(1).flatMap((point, index) => {
-      const previousPoint = points[index]
-      if (
-        point.timeMilliseconds - previousPoint.timeMilliseconds >
-        ADC_DWELL_TIME_MILLISECONDS * 1.5
-      ) {
-        return []
-      }
-      return [
-        {
-          from: previousPoint,
-          magnitude:
-            (previousPoint.normalizedMagnitude +
-              point.normalizedMagnitude) /
-            2,
-          to: point,
-        },
-      ]
-    })
+    const acquiredSegments = acquisitionRuns.flatMap((run) =>
+      run.points.slice(1).flatMap((point, index) => {
+        const previousPoint = run.points[index]
+        const elapsedMilliseconds =
+          point.timeMilliseconds - previousPoint.timeMilliseconds
+        if (
+          elapsedMilliseconds <= 0 ||
+          elapsedMilliseconds > ADC_DWELL_TIME_MILLISECONDS * 1.5
+        ) {
+          return []
+        }
+        return [
+          {
+            from: previousPoint,
+            magnitude:
+              (previousPoint.normalizedMagnitude +
+                point.normalizedMagnitude) /
+              2,
+            to: point,
+          },
+        ]
+      }),
+    )
 
     return {
       extent: niceSymmetricExtent(maximumKSpaceCoordinate),
       maximumMagnitude: greatestSignalMagnitude,
+      points,
       segments: acquiredSegments,
     }
   }, [
+    acquisitionRuns,
     currentKxCyclesPerMeter,
     currentKyCyclesPerMeter,
     durationMilliseconds,
     encodingStartTimeMilliseconds,
     gradientImperfections,
     phaseEncodingPulses,
-    points,
     readoutPulses,
   ])
   const xForKx = (kxCyclesPerMeter: number) =>
@@ -225,16 +233,21 @@ function KSpaceAcquisitionGraph({
               )}
             />
           ))}
-          {points.length === 1 && (
-            <circle
-              cx={xForKx(points[0].kxCyclesPerMeter)}
-              cy={yForKy(points[0].kyCyclesPerMeter)}
-              r="1.6"
-              fill={grayscaleForSignal(
-                points[0].normalizedMagnitude,
-                maximumMagnitude,
-              )}
-            />
+          {acquisitionRuns.flatMap((run) =>
+            run.points.length === 1
+              ? [
+                  <circle
+                    key={run.id}
+                    cx={xForKx(run.points[0].kxCyclesPerMeter)}
+                    cy={yForKy(run.points[0].kyCyclesPerMeter)}
+                    r="1.6"
+                    fill={grayscaleForSignal(
+                      run.points[0].normalizedMagnitude,
+                      maximumMagnitude,
+                    )}
+                  />,
+                ]
+              : [],
           )}
         </g>
 
@@ -297,7 +310,8 @@ function KSpaceAcquisitionGraph({
           <span>Strong |S|</span>
         </div>
         <strong>
-          {points.length} samples
+          {acquisitionRuns.length} acquisition
+          {acquisitionRuns.length === 1 ? '' : 's'} · {points.length} samples
           {latestPoint
             ? ` · max |S| ${maximumMagnitude.toPrecision(3)}`
             : ''}
