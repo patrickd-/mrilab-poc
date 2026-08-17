@@ -12,6 +12,8 @@ import {
   appliedGradientAmplitudeAt,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
+  DEFAULT_RF_EXCITATION_PULSES,
+  DEFAULT_SLICE_SELECTION_PULSES,
   type GradientPulse,
 } from '../simulation/gradientEncoding'
 import DarkSelect from './DarkSelect'
@@ -32,7 +34,7 @@ interface EditableGradientGraphProps {
   durationMilliseconds: number
   gradientImperfections: boolean
   guideTime: number | null
-  label: 'PE' | 'RO'
+  label: 'RF' | 'SS' | 'PE' | 'RO'
   linkedPulses?: boolean
   onChange: (pulses: GradientPulse[]) => void
   onGuideTimeChange: (time: number | null) => void
@@ -46,15 +48,21 @@ interface GradientEncodingExperimentPanelProps {
   durationMilliseconds: number
   gradientImperfections: boolean
   onPause: () => void
+  onRfExcitationPulsesChange: (pulses: GradientPulse[]) => void
+  onRfExcitationReset: () => void
   onPhaseEncodingPulsesChange: (pulses: GradientPulse[]) => void
   onPhaseEncodingReset: () => void
   onReadoutPulsesChange: (pulses: GradientPulse[]) => void
   onReadoutReset: () => void
+  onSliceSelectionPulsesChange: (pulses: GradientPulse[]) => void
+  onSliceSelectionReset: () => void
   onSimulationReset: () => void
   onSpeedChange: (speed: GradientPlaybackSpeed) => void
   onStart: () => void
   phaseEncodingPulses: ReadonlyArray<GradientPulse>
   readoutPulses: ReadonlyArray<GradientPulse>
+  rfExcitationPulses: ReadonlyArray<GradientPulse>
+  sliceSelectionPulses: ReadonlyArray<GradientPulse>
   speed: GradientPlaybackSpeed
   status: GradientPlaybackStatus
   timeMilliseconds: number
@@ -89,6 +97,10 @@ const PHASE_ENCODING_REFERENCE_WAVEFORMS =
     })),
   )
 const READOUT_REFERENCE_WAVEFORMS = [DEFAULT_READOUT_PULSES]
+const RF_EXCITATION_REFERENCE_WAVEFORMS = [DEFAULT_RF_EXCITATION_PULSES]
+const SLICE_SELECTION_REFERENCE_WAVEFORMS = [
+  DEFAULT_SLICE_SELECTION_PULSES,
+]
 const GRADIENT_PLAYBACK_SPEED_OPTIONS: ReadonlyArray<{
   id: GradientPlaybackSpeed
   label: string
@@ -341,7 +353,11 @@ function EditableGradientGraph({
     <div className={`gradient-input gradient-input-${label.toLowerCase()}`}>
       <header className="gradient-input-heading">
         <strong className="formula">
-          G<sub>{label}</sub>
+          {label === 'RF' ? (
+            <>B<sub>1</sub></>
+          ) : (
+            <>G<sub>{label}</sub></>
+          )}
         </strong>
         <span>{description}</span>
         <button
@@ -360,7 +376,7 @@ function EditableGradientGraph({
         className="gradient-input-graph"
         viewBox={`0 0 ${GRAPH.width} ${GRAPH.height}`}
         role="group"
-        aria-label={`${description} editable gradient waveform`}
+        aria-label={`${description} editable waveform`}
         onPointerMove={continueDrag}
         onPointerEnter={(event) =>
           onGuideTimeChange(
@@ -411,7 +427,7 @@ function EditableGradientGraph({
           transform={`translate(13 ${baselineY}) rotate(-90)`}
           aria-hidden="true"
         >
-          mT/m
+          {label === 'RF' ? 'relative B₁' : 'mT/m'}
         </text>
         <g className="gradient-reference-waveforms" aria-hidden="true">
           {referenceWaveforms.map((referencePulses, index) => (
@@ -522,7 +538,9 @@ function EditableGradientGraph({
             const handleKey = `${pulseIndex}-${handle}`
             const value =
               handle === 'top'
-                ? `${pulse.amplitude.toFixed(2)} mT/m`
+                ? label === 'RF'
+                  ? `${pulse.amplitude.toFixed(2)} relative B1`
+                  : `${pulse.amplitude.toFixed(2)} mT/m`
                 : `${Math.round(
                     (handle === 'left' ? pulse.start : pulse.end) * 100,
                   )}%`
@@ -576,15 +594,21 @@ function GradientEncodingExperimentPanel({
   durationMilliseconds,
   gradientImperfections,
   onPause,
+  onRfExcitationPulsesChange,
+  onRfExcitationReset,
   onPhaseEncodingPulsesChange,
   onPhaseEncodingReset,
   onReadoutPulsesChange,
   onReadoutReset,
+  onSliceSelectionPulsesChange,
+  onSliceSelectionReset,
   onSimulationReset,
   onSpeedChange,
   onStart,
   phaseEncodingPulses,
   readoutPulses,
+  rfExcitationPulses,
+  sliceSelectionPulses,
   speed,
   status,
   timeMilliseconds,
@@ -596,53 +620,8 @@ function GradientEncodingExperimentPanel({
       : clamp(timeMilliseconds / durationMilliseconds, 0, 1)
 
   return (
-    <section className="gradient-encoding-section">
-      <div className="section-heading">
-        <div>
-          <span className="section-index">01</span>
-          <h2>Phase &amp; Frequency Encoding</h2>
-        </div>
-      </div>
-
-      <p className="gradient-input-instructions">
-        Drag a pulse top to move it or change amplitude. Drag either side to
-        adjust timing. Gray lines mark the default encoding steps. The 20 ms
-        window maps full scale to ±1 mT/m.
-        {gradientImperfections &&
-          ' Dashed yellow shows the applied gradient response.'}
-      </p>
-
-      <div className="gradient-timing-diagram">
-        <EditableGradientGraph
-          description="Phase encoding gradient"
-          durationMilliseconds={durationMilliseconds}
-          gradientImperfections={gradientImperfections}
-          guideTime={timingGuideTime}
-          label="PE"
-          pulses={phaseEncodingPulses}
-          playheadTime={playheadTime}
-          referenceWaveforms={PHASE_ENCODING_REFERENCE_WAVEFORMS}
-          onChange={onPhaseEncodingPulsesChange}
-          onGuideTimeChange={setTimingGuideTime}
-          onReset={onPhaseEncodingReset}
-        />
-        <EditableGradientGraph
-          description="Readout gradient"
-          durationMilliseconds={durationMilliseconds}
-          gradientImperfections={gradientImperfections}
-          guideTime={timingGuideTime}
-          label="RO"
-          linkedPulses
-          pulses={readoutPulses}
-          playheadTime={playheadTime}
-          referenceWaveforms={READOUT_REFERENCE_WAVEFORMS}
-          onChange={onReadoutPulsesChange}
-          onGuideTimeChange={setTimingGuideTime}
-          onReset={onReadoutReset}
-        />
-      </div>
-
-      <div className="gradient-playback-controls">
+    <>
+      <div className="gradient-playback-controls gradient-playback-controls-top">
         <div className="gradient-playback-actions">
           <button
             className="fid-control-button primary transport"
@@ -682,13 +661,110 @@ function GradientEncodingExperimentPanel({
 
         <div className="gradient-playback-meta">
           <span className={`fid-status ${status}`}>{status}</span>
-          <span>G<sub>PE</sub> ⟂ G<sub>RO</sub></span>
+          <span>
+            G<sub>SS</sub> ⟂ G<sub>PE</sub> ⟂ G<sub>RO</sub>
+          </span>
           <strong>
             {timeMilliseconds.toFixed(2)} / {durationMilliseconds} ms
           </strong>
         </div>
       </div>
-    </section>
+
+      <section className="gradient-slice-selection-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">01</span>
+            <h2>Slice Selection</h2>
+          </div>
+        </div>
+
+        <p className="gradient-input-instructions">
+          The default idealized RF passband selects the isocenter plane. RF
+          amplitude is relative to a 90° pulse; gradient full scale is ±1
+          mT/m. Drag a pulse top to move it or change amplitude. Drag either
+          side to adjust timing.
+          {gradientImperfections &&
+            ' Dashed yellow shows the applied gradient response.'}
+        </p>
+
+        <div className="gradient-timing-diagram">
+          <EditableGradientGraph
+            description="RF excitation pulse"
+            durationMilliseconds={durationMilliseconds}
+            gradientImperfections={false}
+            guideTime={timingGuideTime}
+            label="RF"
+            pulses={rfExcitationPulses}
+            playheadTime={playheadTime}
+            referenceWaveforms={RF_EXCITATION_REFERENCE_WAVEFORMS}
+            onChange={onRfExcitationPulsesChange}
+            onGuideTimeChange={setTimingGuideTime}
+            onReset={onRfExcitationReset}
+          />
+          <EditableGradientGraph
+            description="Slice selection gradient"
+            durationMilliseconds={durationMilliseconds}
+            gradientImperfections={gradientImperfections}
+            guideTime={timingGuideTime}
+            label="SS"
+            linkedPulses
+            pulses={sliceSelectionPulses}
+            playheadTime={playheadTime}
+            referenceWaveforms={SLICE_SELECTION_REFERENCE_WAVEFORMS}
+            onChange={onSliceSelectionPulsesChange}
+            onGuideTimeChange={setTimingGuideTime}
+            onReset={onSliceSelectionReset}
+          />
+        </div>
+      </section>
+
+      <section className="gradient-encoding-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">02</span>
+            <h2>Phase &amp; Frequency Encoding</h2>
+          </div>
+        </div>
+
+        <p className="gradient-input-instructions">
+          Gray lines mark the default encoding steps on the shared 20 ms
+          timeline. G<sub>PE</sub> occupies the middle interval; readout
+          prephasing leads directly into positive acquisition.
+          {gradientImperfections &&
+            ' Dashed yellow shows the applied gradient response.'}
+        </p>
+
+        <div className="gradient-timing-diagram">
+          <EditableGradientGraph
+            description="Phase encoding gradient"
+            durationMilliseconds={durationMilliseconds}
+            gradientImperfections={gradientImperfections}
+            guideTime={timingGuideTime}
+            label="PE"
+            pulses={phaseEncodingPulses}
+            playheadTime={playheadTime}
+            referenceWaveforms={PHASE_ENCODING_REFERENCE_WAVEFORMS}
+            onChange={onPhaseEncodingPulsesChange}
+            onGuideTimeChange={setTimingGuideTime}
+            onReset={onPhaseEncodingReset}
+          />
+          <EditableGradientGraph
+            description="Readout gradient"
+            durationMilliseconds={durationMilliseconds}
+            gradientImperfections={gradientImperfections}
+            guideTime={timingGuideTime}
+            label="RO"
+            linkedPulses
+            pulses={readoutPulses}
+            playheadTime={playheadTime}
+            referenceWaveforms={READOUT_REFERENCE_WAVEFORMS}
+            onChange={onReadoutPulsesChange}
+            onGuideTimeChange={setTimingGuideTime}
+            onReset={onReadoutReset}
+          />
+        </div>
+      </section>
+    </>
   )
 }
 

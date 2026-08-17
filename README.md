@@ -34,9 +34,10 @@ normal, while Block View and Stacked View remain unrestricted.
   RF rotations to each ensemble's magnetization state.
 - `src/workers/fidSimulation.worker.ts` advances simulated time and samples the
   aggregate signal away from the rendering thread.
-- `src/simulation/gradientEncoding.ts` applies orthogonal phase-encoding and
-  readout gradient areas to each ensemble's transverse phase; its sequence is
-  paced for inspection by `src/hooks/useGradientEncodingPlayback.ts`.
+- `src/simulation/gradientEncoding.ts` applies slice-selection,
+  phase-encoding, and readout gradients to each ensemble's transverse phase;
+  its RF-gated sequence is paced for inspection by
+  `src/hooks/useGradientEncodingPlayback.ts`.
 - Slice View can overlay a translucent, spatially smoothed 3D surface for
   laboratory/rotating-frame frequency, phase, or transverse amplitude.
 - `src/components/FidExperimentPanel.tsx`,
@@ -92,6 +93,14 @@ with smooth, deterministic local values: T1 varies by up to 5%, while T2 and
 the refocusable T2* ratio vary by up to 8%. The selected-cell readout and every
 simulation path use the same local values, and T2* is constrained not to exceed
 T2.
+
+The Gradient Encoding timing diagram shares one 20 ms clock across editable RF,
+G_SS, G_PE, and G_RO rows. Its default idealized hard RF/G_SS passband excites
+the 1 mm isocenter plane represented by Slice View. In Block View this makes
+the selected horizontal mid-plane distinguishable from the two orthogonal
+context faces. RF ends as phase encoding begins; G_SS then reverses for half
+of the G_PE interval, while readout prephasing leads into a positive lobe with
+the same duration as the RF pulse.
 
 The brain T2* values use [published 1.5/3/7 T measurements](https://pubmed.ncbi.nlm.nih.gov/17459640/).
 CSF uses the 333.5 ms and 168 ms values from a [compiled 3/7 T quantitative-MRI

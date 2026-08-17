@@ -125,6 +125,8 @@ interface LabSceneProps {
   gradientEncodingTimeMilliseconds: number
   gradientPhaseEncodingPulses: ReadonlyArray<GradientPulse>
   gradientReadoutPulses: ReadonlyArray<GradientPulse>
+  gradientRfExcitationPulses: ReadonlyArray<GradientPulse>
+  gradientSliceSelectionPulses: ReadonlyArray<GradientPulse>
   referenceFrame: ReferenceFrame
   renderMode: RenderMode
   sliceGraphMode: SliceGraphMode
@@ -174,7 +176,7 @@ function createBlockLayout(): BlockLayout {
         simulatedIndex,
         column * GRID_SPACING - GRID_OFFSET,
         GRID_OFFSET - row * GRID_SPACING,
-        cutBoundary,
+        0,
       )
       simulatedIndex += 1
     }
@@ -280,6 +282,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientEncodingTimeMilliseconds,
       gradientPhaseEncodingPulses,
       gradientReadoutPulses,
+      gradientRfExcitationPulses,
+      gradientSliceSelectionPulses,
       referenceFrame,
       renderMode,
       sliceGraphMode,
@@ -339,6 +343,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       selected: gradientEncodingSelected,
       phaseEncodingPulses: gradientPhaseEncodingPulses,
       readoutPulses: gradientReadoutPulses,
+      rfExcitationPulses: gradientRfExcitationPulses,
+      sliceSelectionPulses: gradientSliceSelectionPulses,
       imperfections: gradientImperfections,
       states: gradientEncodingEnsembleStates,
       timeMilliseconds: gradientEncodingTimeMilliseconds,
@@ -484,6 +490,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         selected: gradientEncodingSelected,
         phaseEncodingPulses: gradientPhaseEncodingPulses,
         readoutPulses: gradientReadoutPulses,
+        rfExcitationPulses: gradientRfExcitationPulses,
+        sliceSelectionPulses: gradientSliceSelectionPulses,
         imperfections: gradientImperfections,
         states: gradientEncodingEnsembleStates,
         timeMilliseconds: gradientEncodingTimeMilliseconds,
@@ -498,6 +506,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientEncodingTimeMilliseconds,
       gradientPhaseEncodingPulses,
       gradientReadoutPulses,
+      gradientRfExcitationPulses,
+      gradientSliceSelectionPulses,
     ])
 
     useEffect(() => {
@@ -1226,6 +1236,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       )
       let renderedB1PulseStartedAt = -1
       let renderedB1ReferenceFrame: ReferenceFrame | null = null
+      let renderedGradientRfPulseKey: string | null = null
 
       const hideFidArrow = (index: number) => {
         if (index < SLICE_ENSEMBLE_COUNT) {
@@ -1334,6 +1345,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               ? gradientEnsembleMagnetizationStateAt(
                   state,
                   timeMilliseconds,
+                  gradientAnimation.rfExcitationPulses,
+                  gradientAnimation.sliceSelectionPulses,
                   gradientAnimation.phaseEncodingPulses,
                   gradientAnimation.readoutPulses,
                   GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
@@ -1598,6 +1611,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                   ? gradientEnsembleMagnetizationStateAt(
                       state,
                       timeMilliseconds,
+                      gradientAnimation.rfExcitationPulses,
+                      gradientAnimation.sliceSelectionPulses,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,
                       GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
@@ -1606,12 +1621,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                   : gradientPhaseRadiansAt(
                       column,
                       row,
+                      (GRID_SIZE - 1) / 2,
                       GRID_SIZE,
                       (staticFieldFrequencyOffsetsRef.current[index] *
                         2 *
                         Math.PI) /
                         1000,
                       timeMilliseconds,
+                      gradientAnimation.sliceSelectionPulses,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,
                       GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
@@ -1643,6 +1660,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                   ? gradientEnsembleMagnetizationStateAt(
                       state,
                       timeMilliseconds,
+                      gradientAnimation.rfExcitationPulses,
+                      gradientAnimation.sliceSelectionPulses,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,
                       GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
@@ -1708,6 +1727,62 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         sliceGraphGeometry.computeVertexNormals()
       }
 
+      const writeB1ArrowMatrices = () => {
+        let b1ArrowIndex = 0
+        for (let row = 0; row < GRID_SIZE; row += 1) {
+          for (let column = 0; column < GRID_SIZE; column += 1) {
+            b1ArrowPosition.set(
+              column * GRID_SPACING - GRID_OFFSET,
+              GRID_OFFSET - row * GRID_SPACING,
+              0,
+            )
+            b1ArrowMatrix.compose(
+              b1ArrowPosition,
+              b1ArrowQuaternion,
+              b1ArrowScale,
+            )
+            b1ArrowShafts.setMatrixAt(b1ArrowIndex, b1ArrowMatrix)
+            b1ArrowHeads.setMatrixAt(b1ArrowIndex, b1ArrowMatrix)
+            b1ArrowIndex += 1
+          }
+        }
+        b1ArrowShafts.instanceMatrix.needsUpdate = true
+        b1ArrowHeads.instanceMatrix.needsUpdate = true
+        for (
+          let blockIndex = 0;
+          blockIndex < BLOCK_SIMULATED_ENSEMBLE_COUNT;
+          blockIndex += 1
+        ) {
+          b1ArrowPosition.fromArray(
+            blockLayout.simulatedPositions,
+            blockIndex * 3,
+          )
+          b1ArrowMatrix.compose(
+            b1ArrowPosition,
+            b1ArrowQuaternion,
+            b1ArrowScale,
+          )
+          blockB1ArrowShafts.setMatrixAt(blockIndex, b1ArrowMatrix)
+          blockB1ArrowHeads.setMatrixAt(blockIndex, b1ArrowMatrix)
+        }
+        blockB1ArrowShafts.instanceMatrix.needsUpdate = true
+        blockB1ArrowHeads.instanceMatrix.needsUpdate = true
+        stackedB1ArrowShaft.quaternion.copy(b1ArrowQuaternion)
+        stackedB1ArrowHead.quaternion.copy(b1ArrowQuaternion)
+      }
+
+      const showB1PulseArrows = () => {
+        const slice = renderModeRef.current === 'slice'
+        const block = renderModeRef.current === 'block'
+        const stacked = renderModeRef.current === 'stacked'
+        b1ArrowShafts.visible = slice
+        b1ArrowHeads.visible = slice
+        blockB1ArrowShafts.visible = block
+        blockB1ArrowHeads.visible = block
+        stackedB1ArrowShaft.visible = stacked
+        stackedB1ArrowHead.visible = stacked
+      }
+
       const hideB1PulseArrows = () => {
         b1ArrowShafts.visible = false
         b1ArrowHeads.visible = false
@@ -1718,6 +1793,55 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       }
 
       const updateB1PulseArrows = (time: number) => {
+        const gradientAnimation = gradientAnimationRef.current
+        const gradientNormalizedTime = THREE.MathUtils.clamp(
+          gradientAnimation.timeMilliseconds /
+            GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+          0,
+          1,
+        )
+        const activeGradientRfPulse =
+          gradientAnimation.active && gradientAnimation.selected
+            ? gradientAnimation.rfExcitationPulses.find(
+                (pulse) =>
+                  gradientNormalizedTime >= pulse.start &&
+                  gradientNormalizedTime < pulse.end,
+              )
+            : undefined
+
+        if (activeGradientRfPulse) {
+          const effectivePulseTimeMilliseconds =
+            ((activeGradientRfPulse.start + activeGradientRfPulse.end) / 2) *
+            GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+          const referenceFramePhase =
+            referenceFrameRef.current === 'laboratory-slowed'
+              ? SLOWED_LAB_PRECESSION_RADIANS_PER_MILLISECOND *
+                effectivePulseTimeMilliseconds
+              : 0
+          const pulseAxisPhase =
+            referenceFramePhase +
+            (activeGradientRfPulse.amplitude < 0 ? Math.PI : 0)
+          b1ArrowDirection.set(
+            Math.cos(pulseAxisPhase),
+            Math.sin(pulseAxisPhase),
+            0,
+          )
+          b1ArrowQuaternion.setFromUnitVectors(
+            b1ArrowLocalDirection,
+            b1ArrowDirection,
+          )
+          const pulseKey = `${activeGradientRfPulse.start}:${activeGradientRfPulse.end}:${activeGradientRfPulse.amplitude}:${referenceFrameRef.current}`
+          if (renderedGradientRfPulseKey !== pulseKey) {
+            writeB1ArrowMatrices()
+            renderedGradientRfPulseKey = pulseKey
+          }
+          b1ArrowMaterial.opacity =
+            0.92 * Math.abs(activeGradientRfPulse.amplitude)
+          showB1PulseArrows()
+          return
+        }
+        renderedGradientRfPulseKey = null
+
         const visualization = b1PulseVisualizationRef.current
         if (!visualization) {
           hideB1PulseArrows()
@@ -1755,62 +1879,14 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           renderedB1PulseStartedAt !== visualization.startedAt ||
           renderedB1ReferenceFrame !== referenceFrameRef.current
         ) {
-          let b1ArrowIndex = 0
-          for (let row = 0; row < GRID_SIZE; row += 1) {
-            for (let column = 0; column < GRID_SIZE; column += 1) {
-              b1ArrowPosition.set(
-                column * GRID_SPACING - GRID_OFFSET,
-                GRID_OFFSET - row * GRID_SPACING,
-                0,
-              )
-              b1ArrowMatrix.compose(
-                b1ArrowPosition,
-                b1ArrowQuaternion,
-                b1ArrowScale,
-              )
-              b1ArrowShafts.setMatrixAt(b1ArrowIndex, b1ArrowMatrix)
-              b1ArrowHeads.setMatrixAt(b1ArrowIndex, b1ArrowMatrix)
-              b1ArrowIndex += 1
-            }
-          }
-          b1ArrowShafts.instanceMatrix.needsUpdate = true
-          b1ArrowHeads.instanceMatrix.needsUpdate = true
-          for (
-            let blockIndex = 0;
-            blockIndex < BLOCK_SIMULATED_ENSEMBLE_COUNT;
-            blockIndex += 1
-          ) {
-            b1ArrowPosition.fromArray(
-              blockLayout.simulatedPositions,
-              blockIndex * 3,
-            )
-            b1ArrowMatrix.compose(
-              b1ArrowPosition,
-              b1ArrowQuaternion,
-              b1ArrowScale,
-            )
-            blockB1ArrowShafts.setMatrixAt(blockIndex, b1ArrowMatrix)
-            blockB1ArrowHeads.setMatrixAt(blockIndex, b1ArrowMatrix)
-          }
-          blockB1ArrowShafts.instanceMatrix.needsUpdate = true
-          blockB1ArrowHeads.instanceMatrix.needsUpdate = true
-          stackedB1ArrowShaft.quaternion.copy(b1ArrowQuaternion)
-          stackedB1ArrowHead.quaternion.copy(b1ArrowQuaternion)
+          writeB1ArrowMatrices()
           renderedB1PulseStartedAt = visualization.startedAt
           renderedB1ReferenceFrame = referenceFrameRef.current
         }
 
         const fadeProgress = Math.max(0, (progress - 0.55) / 0.45)
         b1ArrowMaterial.opacity = 0.92 * (1 - smoothStep(fadeProgress))
-        const slice = renderModeRef.current === 'slice'
-        const block = renderModeRef.current === 'block'
-        const stacked = renderModeRef.current === 'stacked'
-        b1ArrowShafts.visible = slice
-        b1ArrowHeads.visible = slice
-        blockB1ArrowShafts.visible = block
-        blockB1ArrowHeads.visible = block
-        stackedB1ArrowShaft.visible = stacked
-        stackedB1ArrowHead.visible = stacked
+        showB1PulseArrows()
       }
 
       const animate = (time: number) => {

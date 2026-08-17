@@ -885,8 +885,13 @@ a:focus-visible {
 .fid-experiment-section,
 .t1-relaxation-section,
 .spin-echo-section,
+.gradient-slice-selection-section,
 .gradient-encoding-section {
   padding: 30px;
+}
+
+.gradient-slice-selection-section {
+  border-bottom: 1px solid var(--line);
 }
 
 .gradient-input-instructions {
@@ -978,6 +983,14 @@ a:focus-visible {
   color: var(--pink);
 }
 
+.gradient-input-rf .gradient-input-heading strong {
+  color: var(--coral);
+}
+
+.gradient-input-ss .gradient-input-heading strong {
+  color: var(--green);
+}
+
 .gradient-input-graph {
   display: block;
   width: 100%;
@@ -1044,6 +1057,14 @@ a:focus-visible {
   fill: rgba(244, 148, 190, 0.075);
 }
 
+.gradient-input-rf .gradient-pulse-fill {
+  fill: rgba(255, 120, 102, 0.085);
+}
+
+.gradient-input-ss .gradient-pulse-fill {
+  fill: rgba(145, 230, 179, 0.08);
+}
+
 .gradient-waveform {
   fill: none;
   stroke: var(--white);
@@ -1076,6 +1097,14 @@ a:focus-visible {
 
 .gradient-input-ro .gradient-handle-stroke {
   stroke: var(--pink);
+}
+
+.gradient-input-rf .gradient-handle-stroke {
+  stroke: var(--coral);
+}
+
+.gradient-input-ss .gradient-handle-stroke {
+  stroke: var(--green);
 }
 
 .gradient-handle-hit {
@@ -1112,6 +1141,13 @@ a:focus-visible {
   border-top: 1px solid var(--line);
 }
 
+.gradient-playback-controls-top {
+  margin: 0;
+  padding: 24px 30px;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
 .gradient-playback-actions {
   display: grid;
   grid-template-columns: auto minmax(96px, 1fr) auto;
@@ -1126,6 +1162,13 @@ a:focus-visible {
 .gradient-playback-speed-select .dark-select-options {
   top: auto;
   bottom: calc(100% + 6px);
+}
+
+.gradient-playback-controls-top
+  .gradient-playback-speed-select
+  .dark-select-options {
+  top: calc(100% + 6px);
+  bottom: auto;
 }
 
 .gradient-playback-meta {
@@ -1559,6 +1602,8 @@ a:focus-visible {
   .fid-experiment-section,
   .t1-relaxation-section,
   .spin-echo-section,
+  .gradient-playback-controls-top,
+  .gradient-slice-selection-section,
   .gradient-encoding-section {
     padding-right: 20px;
     padding-left: 20px;

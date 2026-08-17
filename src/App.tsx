@@ -33,6 +33,8 @@ import {
   copyGradientPulses,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
+  DEFAULT_RF_EXCITATION_PULSES,
+  DEFAULT_SLICE_SELECTION_PULSES,
   GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
   type GradientPulse,
 } from './simulation/gradientEncoding'
@@ -235,6 +237,12 @@ function App() {
   const [readoutPulses, setReadoutPulses] = useState<GradientPulse[]>(() =>
     copyGradientPulses(DEFAULT_READOUT_PULSES),
   )
+  const [rfExcitationPulses, setRfExcitationPulses] = useState<
+    GradientPulse[]
+  >(() => copyGradientPulses(DEFAULT_RF_EXCITATION_PULSES))
+  const [sliceSelectionPulses, setSliceSelectionPulses] = useState<
+    GradientPulse[]
+  >(() => copyGradientPulses(DEFAULT_SLICE_SELECTION_PULSES))
   const selectedEnsemble = selected ? ensembles[selected.index] : null
   const fieldStrengthTesla = B0_TESLA_VALUES[b0Tesla]
   const fieldUniformity: FieldUniformity = enabledRealismOptions.includes(
@@ -452,6 +460,8 @@ function App() {
           }
           gradientPhaseEncodingPulses={phaseEncodingPulses}
           gradientReadoutPulses={readoutPulses}
+          gradientRfExcitationPulses={rfExcitationPulses}
+          gradientSliceSelectionPulses={sliceSelectionPulses}
           referenceFrame={referenceFrame}
           renderMode={renderMode}
           sliceGraphMode={sliceGraphMode}
@@ -660,10 +670,18 @@ function App() {
                 gradientImperfections={gradientImperfections}
                 phaseEncodingPulses={phaseEncodingPulses}
                 readoutPulses={readoutPulses}
+                rfExcitationPulses={rfExcitationPulses}
+                sliceSelectionPulses={sliceSelectionPulses}
                 speed={gradientPlayback.speed}
                 status={gradientPlayback.status}
                 timeMilliseconds={gradientPlayback.timeMilliseconds}
                 onPause={gradientPlayback.pause}
+                onRfExcitationPulsesChange={setRfExcitationPulses}
+                onRfExcitationReset={() =>
+                  setRfExcitationPulses(
+                    copyGradientPulses(DEFAULT_RF_EXCITATION_PULSES),
+                  )
+                }
                 onPhaseEncodingPulsesChange={setPhaseEncodingPulses}
                 onPhaseEncodingReset={() =>
                   setPhaseEncodingPulses(
@@ -674,6 +692,12 @@ function App() {
                 onReadoutReset={() =>
                   setReadoutPulses(
                     copyGradientPulses(DEFAULT_READOUT_PULSES),
+                  )
+                }
+                onSliceSelectionPulsesChange={setSliceSelectionPulses}
+                onSliceSelectionReset={() =>
+                  setSliceSelectionPulses(
+                    copyGradientPulses(DEFAULT_SLICE_SELECTION_PULSES),
                   )
                 }
                 onSimulationReset={gradientPlayback.reset}

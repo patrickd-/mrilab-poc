@@ -216,7 +216,7 @@ export class HydrogenEnsemble {
     readonly column: number,
     readonly row: number,
     readonly gridSize: number,
-    readonly layer: number = 0,
+    readonly layer: number = (gridSize - 1) / 2,
   ) {}
 
   get possibleSpinProjectionCount() {
@@ -385,7 +385,7 @@ export function createBlockSimulationEnsembles(
     const faceIndex = Math.floor(simulationIndex / faceEnsembleCount)
     let column = source.column
     let row = source.row
-    let layer = cutSize - 1
+    let layer = (source.gridSize - 1) / 2
 
     if (faceIndex === 1) {
       column = cutSize - 1

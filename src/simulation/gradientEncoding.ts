@@ -15,14 +15,33 @@ export const MAXIMUM_GRADIENT_TESLA_PER_METER = 1e-3
 const GRADIENT_FAST_RESPONSE_TIME_MILLISECONDS = 0.04
 const GRADIENT_EDDY_RESPONSE_TIME_MILLISECONDS = 0.8
 const GRADIENT_EDDY_RESPONSE_FRACTION = 0.04
+const DEFAULT_SLICE_SELECTION_AMPLITUDE = 0.58
+const DEFAULT_SLICE_HALF_THICKNESS_LAYERS = 0.25
+
+export const DEFAULT_RF_EXCITATION_PULSES: ReadonlyArray<GradientPulse> = [
+  { start: 0.08, end: 0.34, amplitude: 1 },
+]
+
+export const DEFAULT_SLICE_SELECTION_PULSES: ReadonlyArray<GradientPulse> = [
+  {
+    start: 0.08,
+    end: 0.34,
+    amplitude: DEFAULT_SLICE_SELECTION_AMPLITUDE,
+  },
+  {
+    start: 0.34,
+    end: 0.43,
+    amplitude: -DEFAULT_SLICE_SELECTION_AMPLITUDE,
+  },
+]
 
 export const DEFAULT_PHASE_ENCODING_PULSES: ReadonlyArray<GradientPulse> = [
-  { start: 0.12, end: 0.32, amplitude: 0.52 },
+  { start: 0.34, end: 0.52, amplitude: 0.52 },
 ]
 
 export const DEFAULT_READOUT_PULSES: ReadonlyArray<GradientPulse> = [
-  { start: 0.12, end: 0.32, amplitude: -0.42 },
-  { start: 0.32, end: 0.72, amplitude: 0.52 },
+  { start: 0.34, end: 0.52, amplitude: -0.42 },
+  { start: 0.52, end: 0.78, amplitude: 0.52 },
 ]
 
 export function copyGradientPulses(
@@ -165,51 +184,97 @@ function gradientAreaSecondsAt(
 export function gradientPhaseRadiansAt(
   column: number,
   row: number,
+  layer: number,
   gridSize: number,
   angularFrequencyOffsetRadiansPerMillisecond: number,
   timeMilliseconds: number,
+  sliceSelectionPulses: ReadonlyArray<GradientPulse>,
   phaseEncodingPulses: ReadonlyArray<GradientPulse>,
   readoutPulses: ReadonlyArray<GradientPulse>,
   durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
   gradientImperfections = false,
+  phaseStartTimeMilliseconds = 0,
 ) {
   const boundedTimeMilliseconds = Math.min(
     durationMilliseconds,
     Math.max(0, timeMilliseconds),
   )
-  const phaseEncodingAreaSeconds =
+  const gradientAreaSincePhaseStart = (
+    pulses: ReadonlyArray<GradientPulse>,
+  ) =>
     gradientAreaSecondsAt(
-      phaseEncodingPulses,
+      pulses,
       boundedTimeMilliseconds,
       durationMilliseconds,
       gradientImperfections,
-    )
-  const readoutAreaSeconds =
+    ) -
     gradientAreaSecondsAt(
-      readoutPulses,
-      boundedTimeMilliseconds,
+      pulses,
+      phaseStartTimeMilliseconds,
       durationMilliseconds,
       gradientImperfections,
     )
+  const sliceSelectionAreaSeconds = gradientAreaSincePhaseStart(
+    sliceSelectionPulses,
+  )
+  const phaseEncodingAreaSeconds = gradientAreaSincePhaseStart(
+    phaseEncodingPulses,
+  )
+  const readoutAreaSeconds = gradientAreaSincePhaseStart(readoutPulses)
   const gridCenter = (gridSize - 1) / 2
   const positionXMeters = (column - gridCenter) * 1e-3
   const positionYMeters = (gridCenter - row) * 1e-3
+  const positionZMeters = (layer - gridCenter) * 1e-3
   const gradientPhaseRadians =
     PROTON_GYROMAGNETIC_RATIO *
     MAXIMUM_GRADIENT_TESLA_PER_METER *
     (positionXMeters * readoutAreaSeconds +
-      positionYMeters * phaseEncodingAreaSeconds)
+      positionYMeters * phaseEncodingAreaSeconds +
+      positionZMeters * sliceSelectionAreaSeconds)
 
   return (
     angularFrequencyOffsetRadiansPerMillisecond *
-      boundedTimeMilliseconds +
+      Math.max(0, boundedTimeMilliseconds - phaseStartTimeMilliseconds) +
     gradientPhaseRadians
   )
+}
+
+export function sliceSelectionExcitationScaleAt(
+  layer: number,
+  gridSize: number,
+  excitationPulse: GradientPulse,
+  sliceSelectionPulses: ReadonlyArray<GradientPulse>,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  gradientImperfections = false,
+) {
+  const effectiveExcitationTimeMilliseconds =
+    ((excitationPulse.start + excitationPulse.end) / 2) *
+    durationMilliseconds
+  const sliceGradientAmplitude = appliedGradientAmplitudeAt(
+    sliceSelectionPulses,
+    effectiveExcitationTimeMilliseconds,
+    durationMilliseconds,
+    gradientImperfections,
+  )
+
+  // The RF waveform is treated as an ideal hard spatial passband. At the
+  // default G_SS amplitude it selects the single virtual 1 mm isocenter
+  // plane used by Slice View; reducing G_SS widens the selected slab.
+  if (Math.abs(sliceGradientAmplitude) < 1e-6) return 1
+
+  const halfThicknessLayers =
+    (DEFAULT_SLICE_HALF_THICKNESS_LAYERS *
+      DEFAULT_SLICE_SELECTION_AMPLITUDE) /
+    Math.abs(sliceGradientAmplitude)
+  const gridCenter = (gridSize - 1) / 2
+  return Math.abs(layer - gridCenter) <= halfThicknessLayers ? 1 : 0
 }
 
 export function gradientEnsembleMagnetizationStateAt(
   state: FidEnsembleState,
   timeMilliseconds: number,
+  rfExcitationPulses: ReadonlyArray<GradientPulse>,
+  sliceSelectionPulses: ReadonlyArray<GradientPulse>,
   phaseEncodingPulses: ReadonlyArray<GradientPulse>,
   readoutPulses: ReadonlyArray<GradientPulse>,
   durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
@@ -219,21 +284,65 @@ export function gradientEnsembleMagnetizationStateAt(
     durationMilliseconds,
     Math.max(0, timeMilliseconds),
   )
+  const excitationPulse = [...rfExcitationPulses]
+    .reverse()
+    .find(
+      (pulse) =>
+        pulse.end * durationMilliseconds <=
+        boundedTimeMilliseconds + Number.EPSILON * durationMilliseconds * 8,
+    )
+
+  if (!excitationPulse) {
+    return {
+      excited: false,
+      xFraction: 0,
+      yFraction: 0,
+      zFraction: 1,
+      transverseFraction: 0,
+      longitudinalFraction: 1,
+      precessionPhaseRadians: 0,
+      flipAngleRadians: 0,
+    }
+  }
+
+  const sliceExcitationScale = sliceSelectionExcitationScaleAt(
+    state.layer,
+    state.gridSize,
+    excitationPulse,
+    sliceSelectionPulses,
+    durationMilliseconds,
+    gradientImperfections,
+  )
+  const flipAngleRadians =
+    excitationPulse.amplitude * (Math.PI / 2) * sliceExcitationScale
+  const excitationEndMilliseconds =
+    excitationPulse.end * durationMilliseconds
+  const effectiveExcitationTimeMilliseconds =
+    ((excitationPulse.start + excitationPulse.end) / 2) *
+    durationMilliseconds
+  const relaxationTimeMilliseconds = Math.max(
+    0,
+    boundedTimeMilliseconds - excitationEndMilliseconds,
+  )
+  const initialTransverseFraction = Math.sin(flipAngleRadians)
+  const initialLongitudinalFraction = Math.cos(flipAngleRadians)
   const transverseFraction =
     state.transverseRelaxationTimeMilliseconds === 0
       ? 0
-      : Math.exp(
-          -boundedTimeMilliseconds /
+      : initialTransverseFraction *
+        Math.exp(
+          -relaxationTimeMilliseconds /
             state.transverseRelaxationTimeMilliseconds,
         )
   const longitudinalFraction =
     state.longitudinalRelaxationTimeMilliseconds === 0
       ? 1
-      : 1 -
-        Math.exp(
-          -boundedTimeMilliseconds /
-            state.longitudinalRelaxationTimeMilliseconds,
-        )
+      : 1 +
+        (initialLongitudinalFraction - 1) *
+          Math.exp(
+            -relaxationTimeMilliseconds /
+              state.longitudinalRelaxationTimeMilliseconds,
+          )
   let packetXFraction = 0
   let packetYFraction = 0
   let totalPacketWeight = 0
@@ -242,13 +351,16 @@ export function gradientEnsembleMagnetizationStateAt(
     const packetPhaseRadians = gradientPhaseRadiansAt(
       state.column + spinPacket.offsetXMillimeters,
       state.row - spinPacket.offsetYMillimeters,
+      state.layer,
       state.gridSize,
       spinPacket.angularFrequencyOffsetRadiansPerMillisecond,
       boundedTimeMilliseconds,
+      sliceSelectionPulses,
       phaseEncodingPulses,
       readoutPulses,
       durationMilliseconds,
       gradientImperfections,
+      effectiveExcitationTimeMilliseconds,
     )
     packetXFraction +=
       Math.cos(packetPhaseRadians) * spinPacket.weight
@@ -271,16 +383,13 @@ export function gradientEnsembleMagnetizationStateAt(
       : Math.atan2(yFraction, xFraction)
 
   return {
-    excited: true,
+    excited: Math.abs(initialTransverseFraction) > 1e-6,
     xFraction,
     yFraction,
     zFraction: longitudinalFraction,
     transverseFraction: coherentTransverseFraction,
     longitudinalFraction,
     precessionPhaseRadians,
-    flipAngleRadians: Math.atan2(
-      coherentTransverseFraction,
-      longitudinalFraction,
-    ),
+    flipAngleRadians,
   }
 }

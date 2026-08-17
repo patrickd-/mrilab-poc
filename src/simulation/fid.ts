@@ -48,6 +48,7 @@ export interface FidEnsembleState {
   index: number
   column: number
   row: number
+  layer: number
   gridSize: number
   equilibriumMagnetization: number
   longitudinalRelaxationTimeMilliseconds: number
@@ -352,6 +353,7 @@ export function createFidEnsembleStates(
       index: ensemble.index,
       column: ensemble.column,
       row: ensemble.row,
+      layer: ensemble.layer,
       gridSize: ensemble.gridSize,
       equilibriumMagnetization: magneticProperties.boltzmannMagnetization,
       longitudinalRelaxationTimeMilliseconds:
