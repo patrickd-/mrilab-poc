@@ -38,6 +38,7 @@ import {
   type SamplePresetId,
   type SupportedFieldStrengthTesla,
 } from './models/HydrogenEnsemble'
+import { simplifiedBrainSampleAt } from './presets/simplifiedBrain'
 import { createFidEnsembleStates } from './simulation/fid'
 import {
   calibrateRfPulseForFlipAngle,
@@ -125,6 +126,7 @@ type TissueSamplePresetId = Exclude<SamplePresetId, 'air'>
 type SlicePresetAction =
   | 'reset'
   | 'phantom-3-circles'
+  | 'simplified-brain'
   | TissueSamplePresetId
 
 const SLICE_PRESET_OPTIONS: ReadonlyArray<{
@@ -133,6 +135,7 @@ const SLICE_PRESET_OPTIONS: ReadonlyArray<{
 }> = [
   { id: 'reset', label: 'Reset' },
   { id: 'phantom-3-circles', label: 'Phantom (3 circles)' },
+  { id: 'simplified-brain', label: 'Simplified Brain' },
   { id: 'cortical-bone', label: 'Add Cortical bone' },
   {
     id: 'cerebrospinal-fluid',
@@ -498,6 +501,14 @@ function App() {
     if (action === 'reset') {
       ensembles.forEach((ensemble) => {
         ensemble.samplePreset = 'air'
+      })
+    } else if (action === 'simplified-brain') {
+      ensembles.forEach((ensemble) => {
+        ensemble.samplePreset = simplifiedBrainSampleAt(
+          ensemble.column,
+          ensemble.row,
+          ensemble.gridSize,
+        )
       })
     } else if (action === 'phantom-3-circles') {
       const maximumCoordinate = GRID_SIZE - 1

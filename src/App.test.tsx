@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SamplePresetId } from './models/HydrogenEnsemble'
 
 const mocks = vi.hoisted(() => ({
   gradientHook: vi.fn(),
@@ -265,6 +266,31 @@ describe('App integration', () => {
     expect(sampleAt(32, 95)).toBe('air')
     expect(sampleAt(95, 32)).toBe('air')
     expect(sampleAt(0, 0)).toBe('air')
+  })
+
+  it('applies a simplified brain using every available sample type', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Apply slice preset' }))
+    await user.click(
+      screen.getByRole('option', { name: 'Simplified Brain' }),
+    )
+
+    const ensembles = mocks.sceneProps?.ensembleModels as Array<{
+      samplePreset: SamplePresetId
+    }>
+    expect(new Set(ensembles.map((ensemble) => ensemble.samplePreset))).toEqual(
+      new Set([
+        'air',
+        'cortical-bone',
+        'cerebrospinal-fluid',
+        'gray-matter',
+        'white-matter',
+      ]),
+    )
+    expect(ensembles[4 * 128 + 64].samplePreset).toBe('cortical-bone')
+    expect(ensembles[45 * 128 + 45].samplePreset).toBe('white-matter')
   })
 
   it('routes camera and viewport controls while clearing a stale selection', async () => {
