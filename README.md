@@ -55,9 +55,10 @@ Block View expands the logical domain to 128 × 128 × 128 voxels. A removed
 64³ corner exposes three independently simulated 64 × 64 faces, each mapped
 from a rotated copy of the slice's corresponding quadrant. Together with the
 full source plane, 28,672 colored spheres participate in simulations and can
-be selected. The other 1,806,336 voxels are rendered as one lightweight,
-faint-gray point cloud; they provide volumetric context without participating
-in selection or signal calculations.
+be selected. Only the 67,914 exposed, non-simulated shell voxels are rendered
+as a lightweight, faint-gray point cloud; the block interior is omitted. They
+provide volumetric context without participating in selection or signal
+calculations.
 
 The initial non-uniform isocenter approximation uses normalized radial
 position `rho` and a 1 ppm outer variation:

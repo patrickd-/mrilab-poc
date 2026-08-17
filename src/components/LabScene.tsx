@@ -41,11 +41,6 @@ const BLOCK_PLANE_ENSEMBLE_COUNT = GRID_SIZE * GRID_SIZE
 const BLOCK_FACE_ENSEMBLE_COUNT = BLOCK_CUT_SIZE * BLOCK_CUT_SIZE
 const BLOCK_SIMULATED_ENSEMBLE_COUNT =
   BLOCK_PLANE_ENSEMBLE_COUNT + 3 * BLOCK_FACE_ENSEMBLE_COUNT
-const BLOCK_CONTEXT_ENSEMBLE_COUNT =
-  GRID_SIZE ** 3 -
-  BLOCK_CUT_SIZE ** 3 -
-  BLOCK_PLANE_ENSEMBLE_COUNT -
-  3 * BLOCK_FACE_ENSEMBLE_COUNT
 const SLICE_GRAPH_BASE_HEIGHT = 10
 const SLICE_GRAPH_HEIGHT = 5.6
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
@@ -210,10 +205,7 @@ function createBlockLayout(): BlockLayout {
     }
   }
 
-  const contextPositions = new Float32Array(
-    BLOCK_CONTEXT_ENSEMBLE_COUNT * 3,
-  )
-  let contextOffset = 0
+  const contextPositionValues: number[] = []
   for (let layer = 0; layer < GRID_SIZE; layer += 1) {
     for (let row = 0; row < GRID_SIZE; row += 1) {
       for (let column = 0; column < GRID_SIZE; column += 1) {
@@ -234,30 +226,36 @@ function createBlockLayout(): BlockLayout {
           row === BLOCK_CUT_SIZE - 1 &&
           column >= BLOCK_CUT_SIZE &&
           layer >= BLOCK_CUT_SIZE
+        const onOuterSurface =
+          column === 0 ||
+          column === GRID_SIZE - 1 ||
+          row === 0 ||
+          row === GRID_SIZE - 1 ||
+          layer === 0 ||
+          layer === GRID_SIZE - 1
 
         if (
           inRemovedCorner ||
           onSourcePlane ||
           onHorizontalCutFace ||
           onVerticalXCutFace ||
-          onVerticalYCutFace
+          onVerticalYCutFace ||
+          !onOuterSurface
         ) {
           continue
         }
 
-        contextPositions[contextOffset] =
-          column * GRID_SPACING - GRID_OFFSET
-        contextPositions[contextOffset + 1] =
-          GRID_OFFSET - row * GRID_SPACING
-        contextPositions[contextOffset + 2] =
-          layer * GRID_SPACING - GRID_OFFSET
-        contextOffset += 3
+        contextPositionValues.push(
+          column * GRID_SPACING - GRID_OFFSET,
+          GRID_OFFSET - row * GRID_SPACING,
+          layer * GRID_SPACING - GRID_OFFSET,
+        )
       }
     }
   }
 
   return {
-    contextPositions,
+    contextPositions: new Float32Array(contextPositionValues),
     simulatedPositions,
     sourceIndices,
   }
@@ -899,7 +897,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         color: '#b8c0c5',
         depthWrite: false,
         map: blockContextTexture,
-        opacity: 0.055,
+        opacity: 0.12,
         size: 2.3,
         sizeAttenuation: true,
         transparent: true,
