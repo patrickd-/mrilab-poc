@@ -8,6 +8,7 @@ import GradientEncodingExperimentPanel, {
   createDefaultSpatialGradientProfiles,
   createGradientHeightmap,
   gradientStrengthMilliteslaPerMeter,
+  magneticFieldHeightColor,
 } from './GradientEncodingExperimentPanel'
 
 function StatefulGradientEncodingExperimentPanel() {
@@ -80,7 +81,7 @@ describe('fundamental spatial gradient model', () => {
     ).toBeCloseTo(1.28, 10)
   })
 
-  it('maps field offsets onto one fixed physical grayscale scale', () => {
+  it('maps field offsets onto one fixed physical color scale', () => {
     const profiles = createDefaultSpatialGradientProfiles(128)
     const heightmap = createGradientHeightmap(
       profiles.x,
@@ -98,18 +99,17 @@ describe('fundamental spatial gradient model', () => {
       5.12,
       10,
     )
-    expect(Array.from(heightmap.rgba.slice(0, 4))).toEqual([
-      96,
-      96,
-      96,
-      255,
-    ])
-    expect(Array.from(heightmap.rgba.slice(8, 12))).toEqual([
-      159,
-      159,
-      159,
-      255,
-    ])
+    expect(magneticFieldHeightColor(0)).toEqual([68, 1, 84])
+    expect(magneticFieldHeightColor(0.5)).toEqual([33, 145, 140])
+    expect(magneticFieldHeightColor(1)).toEqual([253, 231, 37])
+    expect(Array.from(heightmap.rgba.slice(0, 3))).toEqual(
+      magneticFieldHeightColor(0.375),
+    )
+    expect(heightmap.rgba[3]).toBe(255)
+    expect(Array.from(heightmap.rgba.slice(8, 11))).toEqual(
+      magneticFieldHeightColor(0.625),
+    )
+    expect(heightmap.rgba[11]).toBe(255)
   })
 
   it('changes gradually while summing both gradient axes per pixel', () => {
@@ -129,10 +129,18 @@ describe('fundamental spatial gradient model', () => {
       5.12,
     )
 
-    expect(xOnly.rgba[0]).toBe(128)
-    expect(xOnly.rgba[4]).toBe(129)
-    expect(xAndY.rgba[4]).toBe(131)
-    expect(xAndY.rgba[8]).toBe(128)
+    expect(Array.from(xOnly.rgba.slice(0, 3))).toEqual(
+      magneticFieldHeightColor(0.5),
+    )
+    expect(Array.from(xOnly.rgba.slice(4, 7))).toEqual(
+      magneticFieldHeightColor((0.08 + 5.12) / 10.24),
+    )
+    expect(Array.from(xAndY.rgba.slice(4, 7))).toEqual(
+      magneticFieldHeightColor((0.16 + 5.12) / 10.24),
+    )
+    expect(Array.from(xAndY.rgba.slice(8, 11))).toEqual(
+      magneticFieldHeightColor(0.5),
+    )
   })
 })
 
@@ -156,12 +164,16 @@ describe('GradientEncodingExperimentPanel', () => {
       ).not.toBeNull()
       expect(
         screen.getByRole('img', {
-          name: /grayscale magnetic gradient heightmap with actual field offsets from −1\.28 to \+1\.28 millitesla on a fixed −5\.12 to \+5\.12 millitesla scale/i,
+          name: /magnetic gradient color heightmap with actual field offsets from −1\.28 to \+1\.28 millitesla on a fixed −5\.12 to \+5\.12 millitesla scale/i,
         }),
       ).not.toBeNull()
       expect(images).toHaveLength(1)
-      expect(images[0].data[0]).toBe(96)
-      expect(images[0].data.at(-4)).toBe(159)
+      expect(Array.from(images[0].data.slice(0, 3))).toEqual(
+        magneticFieldHeightColor(0.375),
+      )
+      expect(Array.from(images[0].data.slice(-4, -1))).toEqual(
+        magneticFieldHeightColor(0.625),
+      )
     } finally {
       getContext.mockRestore()
     }
@@ -274,8 +286,12 @@ describe('GradientEncodingExperimentPanel', () => {
       ).toBe(true)
       expect(xStartHandle.getAttribute('aria-valuenow')).toBe('-1.28')
       const disabledPreview = images.at(-1)?.data
-      expect(disabledPreview?.[0]).toBe(128)
-      expect(disabledPreview?.at(-4)).toBe(128)
+      expect(Array.from(disabledPreview?.slice(0, 3) ?? [])).toEqual(
+        magneticFieldHeightColor(0.5),
+      )
+      expect(Array.from(disabledPreview?.slice(-4, -1) ?? [])).toEqual(
+        magneticFieldHeightColor(0.5),
+      )
 
       fireEvent.click(xToggle)
       expect((xToggle as HTMLInputElement).checked).toBe(true)

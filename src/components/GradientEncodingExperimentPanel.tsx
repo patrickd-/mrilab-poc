@@ -61,6 +61,13 @@ const GRAPH = {
 }
 const KEYBOARD_FIELD_STEP_MILLITESLA = 0.08
 const PREVIEW_SIZE = 128
+const MAGNETIC_FIELD_HEIGHT_PALETTE = [
+  [68, 1, 84],
+  [59, 82, 139],
+  [33, 145, 140],
+  [94, 201, 98],
+  [253, 231, 37],
+] as const
 const ZERO_SPATIAL_GRADIENT_PROFILE: SpatialGradientProfile = {
   endFieldOffsetMillitesla: 0,
   startFieldOffsetMillitesla: 0,
@@ -68,6 +75,27 @@ const ZERO_SPATIAL_GRADIENT_PROFILE: SpatialGradientProfile = {
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
+}
+
+export function magneticFieldHeightColor(
+  normalizedHeight: number,
+): readonly [number, number, number] {
+  const palettePosition =
+    clamp(normalizedHeight, 0, 1) *
+    (MAGNETIC_FIELD_HEIGHT_PALETTE.length - 1)
+  const lowerIndex = Math.min(
+    MAGNETIC_FIELD_HEIGHT_PALETTE.length - 2,
+    Math.floor(palettePosition),
+  )
+  const interpolation = palettePosition - lowerIndex
+  const lower = MAGNETIC_FIELD_HEIGHT_PALETTE[lowerIndex]
+  const upper = MAGNETIC_FIELD_HEIGHT_PALETTE[lowerIndex + 1]
+
+  return [
+    Math.round(lower[0] + (upper[0] - lower[0]) * interpolation),
+    Math.round(lower[1] + (upper[1] - lower[1]) * interpolation),
+    Math.round(lower[2] + (upper[2] - lower[2]) * interpolation),
+  ]
 }
 
 export function createGradientHeightmap(
@@ -117,18 +145,18 @@ export function createGradientHeightmap(
   const rgba = new Uint8ClampedArray(safeSize ** 2 * 4)
 
   fieldOffsets.forEach((fieldOffset, index) => {
-    const grayscale = Math.round(
-      clamp(
-        (fieldOffset + safeDisplayMagnitudeMillitesla) /
-          (2 * safeDisplayMagnitudeMillitesla),
-        0,
-        1,
-      ) * 255,
+    const normalizedHeight = clamp(
+      (fieldOffset + safeDisplayMagnitudeMillitesla) /
+        (2 * safeDisplayMagnitudeMillitesla),
+      0,
+      1,
     )
+    const [red, green, blue] =
+      magneticFieldHeightColor(normalizedHeight)
     const pixelOffset = index * 4
-    rgba[pixelOffset] = grayscale
-    rgba[pixelOffset + 1] = grayscale
-    rgba[pixelOffset + 2] = grayscale
+    rgba[pixelOffset] = red
+    rgba[pixelOffset + 1] = green
+    rgba[pixelOffset + 2] = blue
     rgba[pixelOffset + 3] = 255
   })
 
@@ -529,7 +557,7 @@ function GradientHeightmap({
           width={heightmap.size}
           height={heightmap.size}
           role="img"
-          aria-label={`Grayscale magnetic gradient heightmap with actual field offsets from ${formatFieldOffset(
+          aria-label={`Magnetic gradient color heightmap with actual field offsets from ${formatFieldOffset(
             heightmap.minimumFieldOffsetMillitesla,
           )} to ${formatFieldOffset(
             heightmap.maximumFieldOffsetMillitesla,
@@ -591,7 +619,7 @@ function GradientEncodingExperimentPanel({
       <p className="gradient-input-instructions">
         Drag either endpoint to define the linear ΔB₀ profile across each
         spatial axis. The line slope is the applied gradient strength; the
-        grayscale map combines G<sub>x</sub> and G<sub>y</sub> across the
+        color map combines G<sub>x</sub> and G<sub>y</sub> across the
         sample plane.
       </p>
 

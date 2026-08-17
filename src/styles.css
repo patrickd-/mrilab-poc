@@ -1129,7 +1129,14 @@ a:focus-visible {
 
 .spatial-gradient-heightmap > footer i {
   height: 3px;
-  background: linear-gradient(90deg, #000, #fff);
+  background: linear-gradient(
+    90deg,
+    #440154,
+    #3b528b,
+    #21918c,
+    #5ec962,
+    #fde725
+  );
 }
 
 .spatial-gradient-heightmap > footer strong {
