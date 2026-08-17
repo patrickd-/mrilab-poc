@@ -71,4 +71,29 @@ describe('GradientAcquisitionGraph', () => {
     expect(container.querySelector('.gradient-acquisition-i-path')).toBeNull()
     expect(container.querySelector('.gradient-acquisition-q-path')).toBeNull()
   })
+
+  it('auto-scales low-amplitude acquired signals instead of flattening them', () => {
+    const { container } = render(
+      <GradientAcquisitionGraph
+        adcPulses={adcPulses}
+        durationMilliseconds={20}
+        points={[
+          point(10, -0.0008, 0),
+          point(12.5, 0.0012, 0),
+          point(15, -0.0003, 0),
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('+2.0e−3')).not.toBeNull()
+    expect(screen.getByText('−2.0e−3')).not.toBeNull()
+    const path = container
+      .querySelector('.gradient-acquisition-i-path')
+      ?.getAttribute('d')
+    const yCoordinates = path
+      ?.match(/[ML] [\d.]+ ([\d.]+)/g)
+      ?.map((segment) => Number(segment.split(' ')[2]))
+
+    expect(new Set(yCoordinates).size).toBeGreaterThan(1)
+  })
 })

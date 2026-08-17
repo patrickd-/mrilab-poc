@@ -19,6 +19,37 @@ const GRAPH = {
   bottom: 42,
 }
 
+function signalPlotRange(points: ReadonlyArray<GradientSignalPoint>) {
+  const maximumAbsoluteSignal = points.reduce(
+    (maximum, point) =>
+      Math.max(
+        maximum,
+        Math.abs(point.normalizedInPhaseSignal),
+        Math.abs(point.normalizedQuadratureSignal),
+      ),
+    0,
+  )
+  if (maximumAbsoluteSignal < 1e-12) return 1
+
+  const paddedMaximum = maximumAbsoluteSignal * 1.08
+  const exponent = Math.floor(Math.log10(paddedMaximum))
+  const magnitude = 10 ** exponent
+  const fraction = paddedMaximum / magnitude
+  const niceFraction =
+    fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10
+  return niceFraction * magnitude
+}
+
+function formatSignalAxisValue(value: number) {
+  if (value >= 0.01) {
+    return value
+      .toFixed(value >= 1 ? 1 : 3)
+      .replace(/\.0+$/, '')
+      .replace(/(\.\d*?)0+$/, '$1')
+  }
+  return value.toExponential(1).replace('e-', 'e−')
+}
+
 function GradientAcquisitionGraph({
   adcPulses,
   durationMilliseconds,
@@ -36,6 +67,7 @@ function GradientAcquisitionGraph({
     1e-9,
     windowEndMilliseconds - windowStartMilliseconds,
   )
+  const plotRange = signalPlotRange(points)
   const { inPhasePath, quadraturePath } = useMemo(() => {
     const graphX = (timeMilliseconds: number) =>
       GRAPH.left +
@@ -43,7 +75,11 @@ function GradientAcquisitionGraph({
         windowDurationMilliseconds) *
         plotWidth
     const graphY = (signal: number) =>
-      GRAPH.top + ((1 - Math.max(-1, Math.min(1, signal))) / 2) * plotHeight
+      GRAPH.top +
+      ((plotRange -
+        Math.max(-plotRange, Math.min(plotRange, signal))) /
+        (2 * plotRange)) *
+        plotHeight
     const pathFor = (
       valueAt: (point: GradientSignalPoint) => number,
     ) =>
@@ -65,6 +101,7 @@ function GradientAcquisitionGraph({
   }, [
     plotHeight,
     plotWidth,
+    plotRange,
     points,
     windowDurationMilliseconds,
     windowStartMilliseconds,
@@ -118,7 +155,7 @@ function GradientAcquisitionGraph({
         </g>
         <g className="gradient-acquisition-axis-labels">
           <text x={GRAPH.left - 9} y={GRAPH.top + 4} textAnchor="end">
-            +1
+            +{formatSignalAxisValue(plotRange)}
           </text>
           <text x={GRAPH.left - 9} y={baselineY + 4} textAnchor="end">
             0
@@ -128,7 +165,7 @@ function GradientAcquisitionGraph({
             y={GRAPH.top + plotHeight + 4}
             textAnchor="end"
           >
-            −1
+            −{formatSignalAxisValue(plotRange)}
           </text>
           <text
             x={GRAPH.left}
