@@ -245,6 +245,7 @@ function App() {
   const gradientImperfections = enabledRealismOptions.includes(
     'gradient-imperfections',
   )
+  const receiverNoise = enabledRealismOptions.includes('receiver-noise')
   const magneticProperties = selectedEnsemble?.magneticProperties(
     fieldStrengthTesla,
     fieldUniformity,
@@ -292,6 +293,7 @@ function App() {
     fieldUniformity,
     intravoxelDephasing,
     b1Inhomogeneity,
+    receiverNoise,
     initialPulseKind: selectedExperiment === 'spin-echo' ? '90-y' : null,
     millisecondsPerTick: Number(simulationTimeStep),
   })

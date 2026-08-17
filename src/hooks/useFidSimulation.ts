@@ -51,6 +51,7 @@ interface UseFidSimulationOptions {
   fieldUniformity: FieldUniformity
   intravoxelDephasing: boolean
   b1Inhomogeneity: boolean
+  receiverNoise: boolean
   initialPulseKind: RfPulseKind | null
   millisecondsPerTick: number
 }
@@ -63,6 +64,7 @@ export function useFidSimulation({
   fieldUniformity,
   intravoxelDephasing,
   b1Inhomogeneity,
+  receiverNoise,
   initialPulseKind,
   millisecondsPerTick,
 }: UseFidSimulationOptions) {
@@ -134,10 +136,11 @@ export function useFidSimulation({
           type: 'configure',
           ensembleStates: [...ensembleStates],
           millisecondsPerTick,
+          receiverNoise,
         }
       : { type: 'reset' }
     worker.postMessage(message)
-  }, [active, ensembleStates, initialPulseKind])
+  }, [active, ensembleStates, initialPulseKind, receiverNoise])
 
   useEffect(() => {
     const message: FidWorkerRequest = {

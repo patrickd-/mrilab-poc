@@ -74,6 +74,10 @@ but excitation and refocusing angles are no longer spatially perfect.
 with a 0.04 ms fast coil time constant and a 4% component decaying over 0.8 ms.
 The gradient editor shows the resulting applied waveform as a dashed yellow
 trace, and that response—not the ideal command—drives phase accumulation.
+`Receiver noise` adds deterministic Gaussian noise after ensemble summation to
+the independent I and Q voltage channels at a normalized SNR of 80. It affects
+FID/echo measurements and fitted echo peaks, but not the underlying arrows or
+longitudinal magnetization.
 
 The brain T2* values use [published 1.5/3/7 T measurements](https://pubmed.ncbi.nlm.nih.gov/17459640/).
 CSF uses the 333.5 ms and 168 ms values from a [compiled 3/7 T quantitative-MRI

@@ -170,6 +170,13 @@ function SpinEchoExperimentPanel({
     [pulseEvents],
   )
   const initialPulse = pulseEvents.find((pulse) => pulse.kind === '90-y')
+  const initialPeakMagnitude = initialPulse
+    ? signalMagnitudeNear(
+        signalPoints,
+        initialPulse.timeMilliseconds,
+        Math.max(timeStepMilliseconds * 1.1, 1e-6),
+      )
+    : null
   const pendingEcho = [...echoTimings]
     .reverse()
     .find((echo) => echo.echoTimeMilliseconds > timeMilliseconds)
@@ -215,11 +222,11 @@ function SpinEchoExperimentPanel({
   )
   const decayPeaks = useMemo<MeasuredDecayPeak[]>(
     () => [
-      ...(initialPulse
+      ...(initialPulse && initialPeakMagnitude !== null
         ? [
             {
               peakTimeMilliseconds: initialPulse.timeMilliseconds,
-              magnitude: 1,
+              magnitude: initialPeakMagnitude,
               kind: 'excitation' as const,
             },
           ]
@@ -230,7 +237,7 @@ function SpinEchoExperimentPanel({
         kind: 'echo' as const,
       })),
     ],
-    [echoPeaks, initialPulse],
+    [echoPeaks, initialPeakMagnitude, initialPulse],
   )
   const decayFit = useMemo(() => fitEchoDecay(decayPeaks), [decayPeaks])
   const { echoPeakPath, fitPath, signalPath } = useMemo(() => {

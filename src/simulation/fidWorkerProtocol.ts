@@ -12,6 +12,7 @@ export type FidWorkerRequest =
       type: 'configure'
       ensembleStates: FidEnsembleState[]
       millisecondsPerTick: number
+      receiverNoise: boolean
     }
   | { type: 'set-time-step'; millisecondsPerTick: number }
   | { type: 'start'; initialPulseKind: RfPulseKind | null }

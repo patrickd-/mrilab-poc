@@ -8,6 +8,7 @@ import {
 
 export const FID_GRAPH_INITIAL_RANGE_MILLISECONDS = 100
 export const FID_GRAPH_MAXIMUM_WINDOW_MILLISECONDS = 5000
+const NORMALIZED_RECEIVER_NOISE_STANDARD_DEVIATION = 1 / 80
 const B1_MAXIMUM_FRACTIONAL_DEVIATION: Readonly<
   Record<SupportedFieldStrengthTesla, number>
 > = {
@@ -83,6 +84,33 @@ export interface FidSignalPoint {
   normalizedVoltage: number
   normalizedQuadratureVoltage: number
   normalizedLongitudinalMagnetization: number
+}
+
+function hashedUnitInterval(seed: number) {
+  let hash = seed >>> 0
+  hash = Math.imul(hash ^ (hash >>> 16), 0x7feb352d)
+  hash = Math.imul(hash ^ (hash >>> 15), 0x846ca68b)
+  hash ^= hash >>> 16
+  return ((hash >>> 0) + 0.5) / 0x100000000
+}
+
+export function receiverNoiseAt(timeMilliseconds: number) {
+  const sampleKey = Math.round(timeMilliseconds * 10_000)
+  const uniformRadius = hashedUnitInterval(sampleKey ^ 0x2f6e2b1)
+  const uniformAngle = hashedUnitInterval(sampleKey ^ 0x68bc21d)
+  const radius = Math.sqrt(-2 * Math.log(uniformRadius))
+  const angle = 2 * Math.PI * uniformAngle
+
+  return {
+    inPhase:
+      radius *
+      Math.cos(angle) *
+      NORMALIZED_RECEIVER_NOISE_STANDARD_DEVIATION,
+    quadrature:
+      radius *
+      Math.sin(angle) *
+      NORMALIZED_RECEIVER_NOISE_STANDARD_DEVIATION,
+  }
 }
 
 export function transmitFieldScaleAt(
@@ -429,16 +457,21 @@ export function fidSignalPointAt(
   states: ReadonlyArray<FidEnsembleState>,
   timeMilliseconds: number,
   pulseEvents: ReadonlyArray<RfPulseEvent>,
+  receiverNoise = false,
 ): FidSignalPoint {
   const signal = normalizedFidSignal(
     states,
     timeMilliseconds,
     pulseEvents,
   )
+  const noise = receiverNoise
+    ? receiverNoiseAt(timeMilliseconds)
+    : { inPhase: 0, quadrature: 0 }
   return {
     timeMilliseconds,
-    normalizedVoltage: signal.inPhaseVoltage,
-    normalizedQuadratureVoltage: signal.quadratureVoltage,
+    normalizedVoltage: signal.inPhaseVoltage + noise.inPhase,
+    normalizedQuadratureVoltage:
+      signal.quadratureVoltage + noise.quadrature,
     normalizedLongitudinalMagnetization:
       signal.longitudinalMagnetization,
   }

@@ -5,6 +5,7 @@ export type RealismOptionId =
   | 'b1-inhomogeneity'
   | 'gradient-imperfections'
   | 'intravoxel-dephasing'
+  | 'receiver-noise'
 
 const REALISM_OPTIONS: ReadonlyArray<{
   id: RealismOptionId
@@ -14,6 +15,7 @@ const REALISM_OPTIONS: ReadonlyArray<{
   { id: 'b1-inhomogeneity', label: 'B1 inhomogeneity' },
   { id: 'gradient-imperfections', label: 'Gradient imperfections' },
   { id: 'intravoxel-dephasing', label: 'Intravoxel dephasing' },
+  { id: 'receiver-noise', label: 'Receiver noise' },
 ]
 
 interface RealismMenuProps {

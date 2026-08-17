@@ -17,6 +17,7 @@ const SNAPSHOT_INTERVAL_MILLISECONDS = 1000 / 60
 
 let ensembleStates: FidEnsembleState[] = []
 let millisecondsPerTick = 2
+let receiverNoise = false
 let status: FidSimulationStatus = 'idle'
 let timeMilliseconds = 0
 let pulseEvents: RfPulseEvent[] = []
@@ -29,6 +30,7 @@ function signalPointAt(sampleTimeMilliseconds: number) {
     ensembleStates,
     sampleTimeMilliseconds,
     pulseEvents,
+    receiverNoise,
   )
 }
 
@@ -95,6 +97,7 @@ self.onmessage = (event: MessageEvent<FidWorkerRequest>) => {
     case 'configure':
       ensembleStates = message.ensembleStates
       millisecondsPerTick = message.millisecondsPerTick
+      receiverNoise = message.receiverNoise
       resetSimulation()
       break
     case 'set-time-step':
