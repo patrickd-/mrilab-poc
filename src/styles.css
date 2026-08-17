@@ -1235,6 +1235,57 @@ a:focus-visible {
 
 .gradient-input-rf .gradient-waveform {
   stroke: var(--coral);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rf-pulse-meta,
+.slice-rephasing-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px 12px;
+  margin-top: -14px;
+  padding: 10px 13px 12px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  color: var(--muted);
+  background: rgba(7, 9, 12, 0.52);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+
+.rf-pulse-meta strong {
+  grid-column: 1 / -1;
+  color: var(--coral);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.rf-pulse-meta sub,
+.slice-rephasing-meta sub {
+  font-size: 0.7em;
+}
+
+.slice-rephasing-meta {
+  grid-template-columns: 1fr auto;
+}
+
+.slice-rephasing-meta strong {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.slice-rephasing-meta.matched span,
+.slice-rephasing-meta.matched strong {
+  color: var(--green);
+}
+
+.slice-rephasing-meta.warning span,
+.slice-rephasing-meta.warning strong {
+  color: var(--yellow);
 }
 
 .gradient-applied-waveform {

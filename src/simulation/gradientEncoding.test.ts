@@ -3,6 +3,7 @@ import { PROTON_GYROMAGNETIC_RATIO } from '../models/HydrogenEnsemble'
 import type { FidEnsembleState } from './fid'
 import {
   appliedGradientAmplitudeAt,
+  calibrateRfPulseForFlipAngle,
   copyGradientPulses,
   createDefaultTransmitFrequencyBand,
   DEFAULT_PHASE_ENCODING_PULSES,
@@ -14,11 +15,15 @@ import {
   gradientEnsembleMagnetizationStateAt,
   gradientPhaseRadiansAt,
   MAXIMUM_GRADIENT_TESLA_PER_METER,
+  MAXIMUM_RF_B1_TESLA,
   maximumSliceMappingAngularFrequencyKilradiansPerSecond,
+  rfPulseAreaTeslaSecondsAt,
+  rfPulseB1TeslaAt,
+  rfPulseNominalFlipAngleRadiansAt,
+  rfPulseTimeBandwidthProduct,
   sliceMappingAngularFrequencyKilradiansPerSecondAt,
-  sliceSelectionExcitationScaleAt,
+  sliceSelectiveRfMagnetizationAt,
   type GradientPulse,
-  type TransmitFrequencyBand,
 } from './gradientEncoding'
 
 const GRID_SIZE = 128
@@ -26,11 +31,6 @@ const EXCITATION_PULSE = DEFAULT_RF_EXCITATION_PULSES[0]
 const DEFAULT_BAND = createDefaultTransmitFrequencyBand(GRID_SIZE)
 const MAXIMUM_ANGULAR_FREQUENCY =
   maximumSliceMappingAngularFrequencyKilradiansPerSecond(GRID_SIZE)
-const FULL_BAND: TransmitFrequencyBand = {
-  lowerAngularFrequencyKilradiansPerSecond: 0,
-  upperAngularFrequencyKilradiansPerSecond: MAXIMUM_ANGULAR_FREQUENCY,
-}
-
 describe('gradient waveform primitives', () => {
   it('keeps the default RF, slice, phase, and readout timing relationships', () => {
     const rf = DEFAULT_RF_EXCITATION_PULSES[0]
@@ -42,6 +42,14 @@ describe('gradient waveform primitives', () => {
     expect(slicePositive.start).toBe(rf.start)
     expect(slicePositive.end).toBe(rf.end)
     expect(sliceRephase.start).toBe(rf.end)
+    expect(
+      sliceRephase.amplitude * (sliceRephase.end - sliceRephase.start),
+    ).toBeCloseTo(
+      -0.5 *
+        slicePositive.amplitude *
+        (slicePositive.end - slicePositive.start),
+      12,
+    )
     expect(phase.start).toBe(rf.end)
     expect(readoutPrephase.start).toBe(phase.start)
     expect(readoutPrephase.end).toBe(phase.end)
@@ -338,21 +346,6 @@ describe('gradient phase accumulation', () => {
   })
 })
 
-function excitationScale(
-  layer: number,
-  band = DEFAULT_BAND,
-  sliceSelectionPulses: ReadonlyArray<GradientPulse> =
-    DEFAULT_SLICE_SELECTION_PULSES,
-) {
-  return sliceSelectionExcitationScaleAt(
-    layer,
-    GRID_SIZE,
-    EXCITATION_PULSE,
-    band,
-    sliceSelectionPulses,
-  )
-}
-
 function reverseSliceGradient() {
   return DEFAULT_SLICE_SELECTION_PULSES.map((pulse) => ({
     ...pulse,
@@ -387,102 +380,271 @@ function stateAtLayer(layer: number): FidEnsembleState {
   }
 }
 
-describe('slice-selection transmit bandwidth', () => {
-  it('selects the 1 mm isocenter plane by default', () => {
-    expect(excitationScale(63.5)).toBe(1)
-    expect(excitationScale(63)).toBe(0)
-    expect(excitationScale(64)).toBe(0)
-  })
+describe('windowed-sinc RF excitation', () => {
+  it('uses the configured bandwidth for a symmetric sinc envelope', () => {
+    const pulse = DEFAULT_RF_EXCITATION_PULSES[0]
+    const centerMilliseconds =
+      ((pulse.start + pulse.end) / 2) *
+      GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+    const bandwidthRadiansPerMillisecond =
+      DEFAULT_BAND.upperAngularFrequencyKilradiansPerSecond -
+      DEFAULT_BAND.lowerAngularFrequencyKilradiansPerSecond
+    const firstZeroOffsetMilliseconds =
+      (2 * Math.PI) / bandwidthRadiansPerMillisecond
 
-  it('selects the complete volume when the band covers the full graph', () => {
-    for (let layer = 0; layer < GRID_SIZE; layer += 1) {
-      expect(excitationScale(layer, FULL_BAND)).toBe(1)
-    }
-    expect(excitationScale(63.5, FULL_BAND)).toBe(1)
-  })
-
-  it('rejects a band that does not cross the active GSS frequency span', () => {
-    const outOfRangeBand = {
-      lowerAngularFrequencyKilradiansPerSecond:
-        MAXIMUM_ANGULAR_FREQUENCY * 0.75,
-      upperAngularFrequencyKilradiansPerSecond:
-        MAXIMUM_ANGULAR_FREQUENCY * 0.9,
-    }
-
-    for (let layer = 0; layer < GRID_SIZE; layer += 1) {
-      expect(excitationScale(layer, outOfRangeBand)).toBe(0)
-    }
-  })
-
-  it('moves the selected layer with the transmit band', () => {
-    const angularFrequencyPerLayer =
-      sliceMappingAngularFrequencyKilradiansPerSecondAt(
-        1,
-        GRID_SIZE,
-        DEFAULT_SLICE_SELECTION_PULSES[0].amplitude,
-      )
-    const movedBand = {
-      lowerAngularFrequencyKilradiansPerSecond:
-        angularFrequencyPerLayer * 79.5,
-      upperAngularFrequencyKilradiansPerSecond:
-        angularFrequencyPerLayer * 80.5,
-    }
-
-    expect(excitationScale(80, movedBand)).toBe(1)
-    expect(excitationScale(70, movedBand)).toBe(0)
-  })
-
-  it('mirrors the spatial mapping when GSS is reversed', () => {
-    const angularFrequencyPerLayer =
-      sliceMappingAngularFrequencyKilradiansPerSecondAt(
-        1,
-        GRID_SIZE,
-        DEFAULT_SLICE_SELECTION_PULSES[0].amplitude,
-      )
-    const movedBand = {
-      lowerAngularFrequencyKilradiansPerSecond:
-        angularFrequencyPerLayer * 79.5,
-      upperAngularFrequencyKilradiansPerSecond:
-        angularFrequencyPerLayer * 80.5,
-    }
-
-    expect(excitationScale(47, movedBand, reverseSliceGradient())).toBe(1)
-    expect(excitationScale(80, movedBand, reverseSliceGradient())).toBe(0)
-  })
-
-  it('selects the whole volume at zero GSS only when the band contains zero', () => {
-    const zeroGradient = DEFAULT_SLICE_SELECTION_PULSES.map((pulse) => ({
-      ...pulse,
-      amplitude: 0,
-    }))
-
-    expect(excitationScale(20, DEFAULT_BAND, zeroGradient)).toBe(0)
     expect(
-      excitationScale(
-        20,
-        {
-          lowerAngularFrequencyKilradiansPerSecond: 0,
-          upperAngularFrequencyKilradiansPerSecond: 0.2,
-        },
-        zeroGradient,
+      rfPulseB1TeslaAt(pulse, DEFAULT_BAND, centerMilliseconds),
+    ).toBeCloseTo(pulse.amplitude * MAXIMUM_RF_B1_TESLA, 15)
+    expect(
+      rfPulseB1TeslaAt(
+        pulse,
+        DEFAULT_BAND,
+        centerMilliseconds - firstZeroOffsetMilliseconds,
       ),
-    ).toBe(1)
+    ).toBeCloseTo(0, 15)
+    expect(
+      rfPulseB1TeslaAt(
+        pulse,
+        DEFAULT_BAND,
+        centerMilliseconds - 0.7,
+      ),
+    ).toBeCloseTo(
+      rfPulseB1TeslaAt(
+        pulse,
+        DEFAULT_BAND,
+        centerMilliseconds + 0.7,
+      ),
+      15,
+    )
   })
 
-  it('produces transverse magnetization for a full-band RF pulse', () => {
-    const magnetization = gradientEnsembleMagnetizationStateAt(
-      stateAtLayer(127),
-      4,
-      DEFAULT_RF_EXCITATION_PULSES,
-      FULL_BAND,
-      DEFAULT_SLICE_SELECTION_PULSES,
-      DEFAULT_PHASE_ENCODING_PULSES,
-      DEFAULT_READOUT_PULSES,
+  it('calibrates the default physical pulse to 90 degrees', () => {
+    const pulse = DEFAULT_RF_EXCITATION_PULSES[0]
+
+    expect(rfPulseTimeBandwidthProduct(pulse, DEFAULT_BAND)).toBeCloseTo(
+      3.8524,
+      3,
+    )
+    expect(pulse.amplitude * MAXIMUM_RF_B1_TESLA * 1e6).toBeCloseTo(
+      4.334,
+      3,
+    )
+    expect(rfPulseNominalFlipAngleRadiansAt(pulse, DEFAULT_BAND)).toBeCloseTo(
+      Math.PI / 2,
+      8,
+    )
+  })
+
+  it('derives flip angle linearly from RF area and peak B1', () => {
+    const pulse = DEFAULT_RF_EXCITATION_PULSES[0]
+    const halfAmplitudePulse = { ...pulse, amplitude: pulse.amplitude / 2 }
+
+    expect(
+      rfPulseAreaTeslaSecondsAt(halfAmplitudePulse, DEFAULT_BAND),
+    ).toBeCloseTo(rfPulseAreaTeslaSecondsAt(pulse, DEFAULT_BAND) / 2, 15)
+    expect(
+      rfPulseNominalFlipAngleRadiansAt(halfAmplitudePulse, DEFAULT_BAND),
+    ).toBeCloseTo(Math.PI / 4, 8)
+  })
+
+  it('under-flips when shortened without increasing peak B1', () => {
+    const pulse = DEFAULT_RF_EXCITATION_PULSES[0]
+    const shortenedPulse = {
+      ...pulse,
+      end: pulse.start + (pulse.end - pulse.start) / 2,
+    }
+    const shortenedFlip = rfPulseNominalFlipAngleRadiansAt(
+      shortenedPulse,
+      DEFAULT_BAND,
     )
 
-    expect(magnetization.excited).toBe(true)
-    expect(magnetization.transverseFraction).toBeGreaterThan(0)
-    expect(magnetization.longitudinalFraction).toBeLessThan(1)
+    expect(shortenedFlip).toBeLessThan(Math.PI / 2)
+    expect(shortenedFlip).toBeGreaterThan(0)
+    expect(
+      calibrateRfPulseForFlipAngle(shortenedPulse, DEFAULT_BAND).amplitude,
+    ).toBeGreaterThan(shortenedPulse.amplitude)
+  })
+})
+
+describe('slice-selective Bloch evolution', () => {
+  const effectivelyNoRelaxation = {
+    longitudinalRelaxationTimeMilliseconds: 1e12,
+    transverseRelaxationTimeMilliseconds: 1e12,
+  }
+  const packet = stateAtLayer(0).spinPackets[0]
+  const rfEndMilliseconds =
+    EXCITATION_PULSE.end * GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+  const rephasingEndMilliseconds =
+    DEFAULT_SLICE_SELECTION_PULSES[1].end *
+    GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+
+  function rfStateAt(
+    layer: number,
+    timeMilliseconds: number,
+    band = DEFAULT_BAND,
+    slicePulses: ReadonlyArray<GradientPulse> =
+      DEFAULT_SLICE_SELECTION_PULSES,
+    maximumStepMilliseconds = 0.02,
+  ) {
+    const state = {
+      ...stateAtLayer(layer),
+      ...effectivelyNoRelaxation,
+    }
+    return sliceSelectiveRfMagnetizationAt(
+      state,
+      packet,
+      timeMilliseconds,
+      EXCITATION_PULSE,
+      band,
+      slicePulses,
+      GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+      false,
+      maximumStepMilliseconds,
+    )
+  }
+
+  function encodedStateAt(
+    layer: number,
+    timeMilliseconds: number,
+    slicePulses: ReadonlyArray<GradientPulse> =
+      DEFAULT_SLICE_SELECTION_PULSES,
+    band = DEFAULT_BAND,
+  ) {
+    return gradientEnsembleMagnetizationStateAt(
+      { ...stateAtLayer(layer), ...effectivelyNoRelaxation },
+      timeMilliseconds,
+      DEFAULT_RF_EXCITATION_PULSES,
+      band,
+      slicePulses,
+      [],
+      [],
+    )
+  }
+
+  it('reaches approximately 90 degrees at slice center', () => {
+    const magnetization = rfStateAt(63.5, rfEndMilliseconds)
+
+    expect(magnetization.nominalFlipAngleRadians).toBeCloseTo(Math.PI / 2, 8)
+    expect(magnetization.xFraction).toBeCloseTo(1, 4)
+    expect(magnetization.yFraction).toBeCloseTo(0, 4)
+    expect(magnetization.zFraction).toBeCloseTo(0, 4)
+  })
+
+  it('tilts progressively according to accumulated sinc area', () => {
+    const midpointMilliseconds =
+      ((EXCITATION_PULSE.start + EXCITATION_PULSE.end) / 2) *
+      GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+    const magnetization = rfStateAt(63.5, midpointMilliseconds)
+
+    expect(magnetization.nominalFlipAngleRadians).toBeCloseTo(Math.PI / 4, 5)
+    expect(magnetization.xFraction).toBeCloseTo(Math.SQRT1_2, 4)
+    expect(magnetization.zFraction).toBeCloseTo(Math.SQRT1_2, 4)
+  })
+
+  it('shows through-slice phase dispersion while RF and GSS overlap', () => {
+    const lateRfTime = rfEndMilliseconds - 0.5
+    const below = rfStateAt(63.25, lateRfTime)
+    const above = rfStateAt(63.75, lateRfTime)
+    const belowPhase = Math.atan2(below.yFraction, below.xFraction)
+    const abovePhase = Math.atan2(above.yFraction, above.xFraction)
+
+    expect(Math.abs(belowPhase - abovePhase)).toBeGreaterThan(0.2)
+    expect(belowPhase * abovePhase).toBeLessThan(0)
+  })
+
+  it('returns far out-of-band layers close to longitudinal equilibrium', () => {
+    const magnetization = rfStateAt(0, rfEndMilliseconds)
+
+    expect(Math.hypot(magnetization.xFraction, magnetization.yFraction)).toBeLessThan(
+      0.02,
+    )
+    expect(magnetization.zFraction).toBeGreaterThan(0.99)
+  })
+
+  it('moves and mirrors the selected slice with RF center and GSS sign', () => {
+    const angularFrequencyPerLayer =
+      sliceMappingAngularFrequencyKilradiansPerSecondAt(
+        1,
+        GRID_SIZE,
+        DEFAULT_SLICE_SELECTION_PULSES[0].amplitude,
+      )
+    const movedBand = {
+      lowerAngularFrequencyKilradiansPerSecond:
+        angularFrequencyPerLayer * 79.5,
+      upperAngularFrequencyKilradiansPerSecond:
+        angularFrequencyPerLayer * 80.5,
+    }
+    const positiveSelected = rfStateAt(80, rfEndMilliseconds, movedBand)
+    const positiveRejected = rfStateAt(70, rfEndMilliseconds, movedBand)
+    const negativeSelected = rfStateAt(
+      47,
+      rfEndMilliseconds,
+      movedBand,
+      reverseSliceGradient(),
+    )
+
+    expect(Math.hypot(positiveSelected.xFraction, positiveSelected.yFraction)).toBeGreaterThan(
+      0.8,
+    )
+    expect(Math.hypot(negativeSelected.xFraction, negativeSelected.yFraction)).toBeGreaterThan(
+      0.8,
+    )
+    expect(Math.hypot(positiveRejected.xFraction, positiveRejected.yFraction)).toBeLessThan(
+      0.1,
+    )
+  })
+
+  it('uses the half-area negative GSS lobe to reduce the slice phase slope', () => {
+    const phaseDifference = (
+      timeMilliseconds: number,
+      pulses = DEFAULT_SLICE_SELECTION_PULSES,
+    ) => {
+      const below = encodedStateAt(63.25, timeMilliseconds, pulses)
+      const above = encodedStateAt(63.75, timeMilliseconds, pulses)
+      return Math.abs(
+        Math.atan2(below.yFraction, below.xFraction) -
+          Math.atan2(above.yFraction, above.xFraction),
+      )
+    }
+    const atRfEnd = phaseDifference(rfEndMilliseconds)
+    const afterCorrectRephasing = phaseDifference(rephasingEndMilliseconds)
+    const insufficientRephasing = DEFAULT_SLICE_SELECTION_PULSES.map(
+      (pulse, index) =>
+        index === 1
+          ? {
+              ...pulse,
+              amplitude: DEFAULT_SLICE_SELECTION_PULSES[0].amplitude * -0.5,
+            }
+          : pulse,
+    )
+    const afterInsufficientRephasing = phaseDifference(
+      rephasingEndMilliseconds,
+      insufficientRephasing,
+    )
+
+    expect(atRfEnd).toBeGreaterThan(0.2)
+    expect(afterCorrectRephasing).toBeLessThan(atRfEnd * 0.25)
+    expect(afterInsufficientRephasing).toBeGreaterThan(
+      afterCorrectRephasing * 2,
+    )
+  })
+
+  it('converges as the Bloch integration step is refined', () => {
+    const coarse = rfStateAt(63.25, rfEndMilliseconds, DEFAULT_BAND, DEFAULT_SLICE_SELECTION_PULSES, 0.04)
+    const medium = rfStateAt(63.25, rfEndMilliseconds, DEFAULT_BAND, DEFAULT_SLICE_SELECTION_PULSES, 0.02)
+    const fine = rfStateAt(63.25, rfEndMilliseconds, DEFAULT_BAND, DEFAULT_SLICE_SELECTION_PULSES, 0.01)
+    const distance = (
+      first: typeof coarse,
+      second: typeof coarse,
+    ) =>
+      Math.hypot(
+        first.xFraction - second.xFraction,
+        first.yFraction - second.yFraction,
+        first.zFraction - second.zFraction,
+      )
+
+    expect(distance(medium, fine)).toBeLessThan(distance(coarse, medium))
+    expect(distance(medium, fine)).toBeLessThan(2e-3)
   })
 })
 
@@ -501,7 +663,7 @@ describe('gradient-encoding magnetization state', () => {
       centeredState(),
       1.5,
       DEFAULT_RF_EXCITATION_PULSES,
-      FULL_BAND,
+      DEFAULT_BAND,
       DEFAULT_SLICE_SELECTION_PULSES,
       DEFAULT_PHASE_ENCODING_PULSES,
       DEFAULT_READOUT_PULSES,
@@ -528,16 +690,16 @@ describe('gradient-encoding magnetization state', () => {
       centeredState(),
       midpointMilliseconds,
       DEFAULT_RF_EXCITATION_PULSES,
-      FULL_BAND,
+      DEFAULT_BAND,
       DEFAULT_SLICE_SELECTION_PULSES,
       DEFAULT_PHASE_ENCODING_PULSES,
       DEFAULT_READOUT_PULSES,
     )
 
     expect(magnetization.excited).toBe(true)
-    expect(magnetization.flipAngleRadians).toBeCloseTo(Math.PI / 4, 12)
-    expect(magnetization.transverseFraction).toBeCloseTo(Math.SQRT1_2, 12)
-    expect(magnetization.longitudinalFraction).toBeCloseTo(Math.SQRT1_2, 12)
+    expect(magnetization.flipAngleRadians).toBeCloseTo(Math.PI / 4, 5)
+    expect(magnetization.transverseFraction).toBeCloseTo(Math.SQRT1_2, 2)
+    expect(magnetization.longitudinalFraction).toBeCloseTo(Math.SQRT1_2, 2)
   })
 
   it('does not tilt an ensemble outside the selected transmit band', () => {
@@ -552,8 +714,8 @@ describe('gradient-encoding magnetization state', () => {
     )
 
     expect(magnetization.excited).toBe(false)
-    expect(magnetization.transverseFraction).toBe(0)
-    expect(magnetization.longitudinalFraction).toBe(1)
+    expect(magnetization.transverseFraction).toBeLessThan(0.02)
+    expect(magnetization.longitudinalFraction).toBeGreaterThan(0.99)
   })
 
   it('applies T2 decay and T1 recovery after excitation', () => {
@@ -567,16 +729,31 @@ describe('gradient-encoding magnetization state', () => {
       }),
       rfEndMilliseconds + 10,
       DEFAULT_RF_EXCITATION_PULSES,
-      FULL_BAND,
+      DEFAULT_BAND,
       DEFAULT_SLICE_SELECTION_PULSES,
       DEFAULT_PHASE_ENCODING_PULSES,
       DEFAULT_READOUT_PULSES,
     )
 
-    expect(magnetization.transverseFraction).toBeCloseTo(Math.exp(-1), 12)
+    const atRfEnd = gradientEnsembleMagnetizationStateAt(
+      centeredState({
+        transverseRelaxationTimeMilliseconds: 10,
+        longitudinalRelaxationTimeMilliseconds: 20,
+      }),
+      rfEndMilliseconds,
+      DEFAULT_RF_EXCITATION_PULSES,
+      DEFAULT_BAND,
+      DEFAULT_SLICE_SELECTION_PULSES,
+      DEFAULT_PHASE_ENCODING_PULSES,
+      DEFAULT_READOUT_PULSES,
+    )
+    expect(magnetization.transverseFraction).toBeCloseTo(
+      atRfEnd.transverseFraction * Math.exp(-1),
+      8,
+    )
     expect(magnetization.longitudinalFraction).toBeCloseTo(
-      1 - Math.exp(-0.5),
-      12,
+      1 + (atRfEnd.longitudinalFraction - 1) * Math.exp(-0.5),
+      8,
     )
   })
 
@@ -593,15 +770,18 @@ describe('gradient-encoding magnetization state', () => {
       centeredState(),
       midpointMilliseconds,
       negativeRf,
-      FULL_BAND,
+      DEFAULT_BAND,
       DEFAULT_SLICE_SELECTION_PULSES,
       DEFAULT_PHASE_ENCODING_PULSES,
       DEFAULT_READOUT_PULSES,
     )
 
     expect(magnetization.xFraction).toBeLessThan(0)
-    expect(magnetization.precessionPhaseRadians).toBe(Math.PI)
-    expect(magnetization.longitudinalFraction).toBeCloseTo(Math.SQRT1_2, 12)
+    expect(Math.abs(magnetization.precessionPhaseRadians)).toBeCloseTo(
+      Math.PI,
+      2,
+    )
+    expect(magnetization.longitudinalFraction).toBeCloseTo(Math.SQRT1_2, 2)
   })
 
   it('gives opposite readout phase to positions on opposite sides of isocenter', () => {
@@ -609,7 +789,7 @@ describe('gradient-encoding magnetization state', () => {
       centeredState({ column: 70 }),
       12,
       DEFAULT_RF_EXCITATION_PULSES,
-      FULL_BAND,
+      DEFAULT_BAND,
       DEFAULT_SLICE_SELECTION_PULSES,
       DEFAULT_PHASE_ENCODING_PULSES,
       DEFAULT_READOUT_PULSES,
@@ -618,7 +798,7 @@ describe('gradient-encoding magnetization state', () => {
       centeredState({ column: 57 }),
       12,
       DEFAULT_RF_EXCITATION_PULSES,
-      FULL_BAND,
+      DEFAULT_BAND,
       DEFAULT_SLICE_SELECTION_PULSES,
       DEFAULT_PHASE_ENCODING_PULSES,
       DEFAULT_READOUT_PULSES,

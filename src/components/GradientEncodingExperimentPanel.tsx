@@ -10,10 +10,19 @@ import type {
 } from '../hooks/useGradientEncodingPlayback'
 import {
   appliedGradientAmplitudeAt,
+  createDefaultTransmitFrequencyBand,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
   DEFAULT_RF_EXCITATION_PULSES,
   DEFAULT_SLICE_SELECTION_PULSES,
+  matchHalfAreaSliceRephasing,
+  MAXIMUM_GRADIENT_TESLA_PER_METER,
+  MAXIMUM_RF_B1_TESLA,
+  rfPulseB1TeslaAt,
+  rfPulseNominalFlipAngleRadiansAt,
+  rfPulseTimeBandwidthProduct,
+  sliceRephasingAreaRatio,
+  transmitBandwidthAngularRadiansPerMillisecond,
   type GradientPulse,
   type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
@@ -38,12 +47,15 @@ interface EditableGradientGraphProps {
   guideTime: number | null
   label: 'RF' | 'SS' | 'PE' | 'RO'
   linkedPulses?: boolean
+  maintainHalfAreaRephasing?: boolean
   onChange: (pulses: GradientPulse[]) => void
   onGuideTimeChange: (time: number | null) => void
   onReset: () => void
   playheadTime: number | null
   pulses: ReadonlyArray<GradientPulse>
   referenceWaveforms: ReadonlyArray<ReadonlyArray<GradientPulse>>
+  rfReferenceTransmitFrequencyBand?: TransmitFrequencyBand
+  rfTransmitFrequencyBand?: TransmitFrequencyBand
 }
 
 interface GradientEncodingExperimentPanelProps {
@@ -129,6 +141,7 @@ export function updatePulses(
   deltaTime: number,
   targetAmplitude: number,
   linkedPulses: boolean,
+  maintainHalfAreaRephasing = false,
 ) {
   const pulses = initialPulses.map((pulse) => ({ ...pulse }))
   const pulse = pulses[pulseIndex]
@@ -195,7 +208,10 @@ export function updatePulses(
     }
   }
 
-  return pulses
+  return maintainHalfAreaRephasing &&
+    !(pulseIndex === 1 && handle === 'top')
+    ? matchHalfAreaSliceRephasing(pulses)
+    : pulses
 }
 
 function EditableGradientGraph({
@@ -205,12 +221,15 @@ function EditableGradientGraph({
   guideTime,
   label,
   linkedPulses = false,
+  maintainHalfAreaRephasing = false,
   onChange,
   onGuideTimeChange,
   onReset,
   playheadTime,
   pulses,
   referenceWaveforms,
+  rfReferenceTransmitFrequencyBand,
+  rfTransmitFrequencyBand,
 }: EditableGradientGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragState | null>(null)
@@ -271,6 +290,7 @@ function EditableGradientGraph({
           coordinates.amplitude -
           drag.originAmplitude,
         linkedPulses,
+        maintainHalfAreaRephasing,
       ),
     )
   }
@@ -319,6 +339,7 @@ function EditableGradientGraph({
         deltaTime,
         targetAmplitude,
         linkedPulses,
+        maintainHalfAreaRephasing,
       ),
     )
   }
@@ -340,6 +361,37 @@ function EditableGradientGraph({
       )} H ${timeToX(pulse.end)} V ${baselineY}`
     }, `M ${timeToX(firstPulse.start)} ${baselineY}`)
   }
+  const rfWaveformPath = (
+    waveformPulses: ReadonlyArray<GradientPulse>,
+    transmitFrequencyBand: TransmitFrequencyBand,
+  ) => {
+    const segments = waveformPulses.map((pulse) => {
+      const sampleCount = 160
+      const points = Array.from({ length: sampleCount + 1 }, (_, index) => {
+        const normalizedPulseTime = index / sampleCount
+        const normalizedTime =
+          pulse.start + (pulse.end - pulse.start) * normalizedPulseTime
+        const b1Fraction =
+          rfPulseB1TeslaAt(
+            pulse,
+            transmitFrequencyBand,
+            normalizedTime * durationMilliseconds,
+            durationMilliseconds,
+          ) / MAXIMUM_RF_B1_TESLA
+        return `${index === 0 ? 'M' : 'L'} ${timeToX(
+          normalizedTime,
+        )} ${amplitudeToY(b1Fraction)}`
+      }).join(' ')
+      return `M ${timeToX(pulse.start)} ${baselineY} ${points} L ${timeToX(
+        pulse.end,
+      )} ${baselineY}`
+    })
+    return segments.join(' ')
+  }
+  const displayedWaveformPath =
+    label === 'RF' && rfTransmitFrequencyBand
+      ? rfWaveformPath(pulses, rfTransmitFrequencyBand)
+      : `${waveformPath} H ${GRAPH.left + plotWidth}`
   const appliedWaveformPath = gradientImperfections
     ? Array.from({ length: 161 }, (_, index) => {
         const normalizedTime = index / 160
@@ -434,13 +486,20 @@ function EditableGradientGraph({
           transform={`translate(13 ${baselineY}) rotate(-90)`}
           aria-hidden="true"
         >
-          {label === 'RF' ? 'relative B₁' : 'mT/m'}
+          {label === 'RF' ? 'B₁ · µT' : 'mT/m'}
         </text>
         <g className="gradient-reference-waveforms" aria-hidden="true">
           {referenceWaveforms.map((referencePulses, index) => (
             <path
               key={index}
-              d={referenceWaveformPath(referencePulses)}
+              d={
+                label === 'RF' && rfReferenceTransmitFrequencyBand
+                  ? rfWaveformPath(
+                      referencePulses,
+                      rfReferenceTransmitFrequencyBand,
+                    )
+                  : referenceWaveformPath(referencePulses)
+              }
             />
           ))}
         </g>
@@ -473,7 +532,7 @@ function EditableGradientGraph({
           t
         </text>
 
-        {pulses.map((pulse, pulseIndex) => {
+        {label !== 'RF' && pulses.map((pulse, pulseIndex) => {
           const x = timeToX(pulse.start)
           const width = timeToX(pulse.end) - x
           const amplitudeY = amplitudeToY(pulse.amplitude)
@@ -495,7 +554,7 @@ function EditableGradientGraph({
 
         <path
           className="gradient-waveform"
-          d={`${waveformPath} H ${GRAPH.left + plotWidth}`}
+          d={displayedWaveformPath}
           aria-hidden="true"
         />
         {gradientImperfections && (
@@ -546,8 +605,16 @@ function EditableGradientGraph({
             const value =
               handle === 'top'
                 ? label === 'RF'
-                  ? `${pulse.amplitude.toFixed(2)} relative B1`
-                  : `${pulse.amplitude.toFixed(2)} mT/m`
+                  ? `${(
+                      pulse.amplitude *
+                      MAXIMUM_RF_B1_TESLA *
+                      1e6
+                    ).toFixed(2)} microtesla peak B1`
+                  : `${(
+                      pulse.amplitude *
+                      MAXIMUM_GRADIENT_TESLA_PER_METER *
+                      1e3
+                    ).toFixed(2)} mT/m`
                 : `${Math.round(
                     (handle === 'left' ? pulse.start : pulse.end) * 100,
                   )}%`
@@ -639,6 +706,41 @@ function GradientEncodingExperimentPanel({
         gradientImperfections,
       )
     : 0
+  const defaultTransmitFrequencyBand =
+    createDefaultTransmitFrequencyBand(gridSize)
+  const rfDurationMilliseconds = rfExcitationPulse
+    ? (rfExcitationPulse.end - rfExcitationPulse.start) *
+      durationMilliseconds
+    : 0
+  const rfBandwidthKilohertz =
+    Math.abs(
+      transmitBandwidthAngularRadiansPerMillisecond(transmitFrequencyBand),
+    ) /
+    (2 * Math.PI)
+  const rfTimeBandwidthProduct = rfExcitationPulse
+    ? rfPulseTimeBandwidthProduct(
+        rfExcitationPulse,
+        transmitFrequencyBand,
+        durationMilliseconds,
+      )
+    : 0
+  const rfPeakB1Microtesla = rfExcitationPulse
+    ? Math.abs(rfExcitationPulse.amplitude) * MAXIMUM_RF_B1_TESLA * 1e6
+    : 0
+  const rfNominalFlipDegrees = rfExcitationPulse
+    ? (rfPulseNominalFlipAngleRadiansAt(
+        rfExcitationPulse,
+        transmitFrequencyBand,
+        rfExcitationPulse.end * durationMilliseconds,
+        durationMilliseconds,
+      ) *
+        180) /
+      Math.PI
+    : 0
+  const rephasingAreaRatio = sliceRephasingAreaRatio(sliceSelectionPulses)
+  const rephasingAreaMatched =
+    rephasingAreaRatio !== null &&
+    Math.abs(rephasingAreaRatio - 0.5) < 0.001
 
   return (
     <>
@@ -700,10 +802,12 @@ function GradientEncodingExperimentPanel({
         </div>
 
         <p className="gradient-input-instructions">
-          The coral B₁ bar sets flip amplitude. The mapping below G
-          <sub>SS</sub> projects the yellow transmit bandwidth Δω
-          <sub>RF</sub> into slice position and thickness. Gradient full scale
-          is ±1 mT/m. Drag either pulse side to adjust timing.
+          The coral B₁ trace is a Hamming-windowed sinc pulse. Its duration,
+          transmit bandwidth, and peak B₁ determine the time-bandwidth
+          product and nominal flip. G<sub>SS</sub> acts during RF; its opposite
+          rewinder defaults to half the selection-lobe area. Gradient full
+          scale is ±
+          {MAXIMUM_GRADIENT_TESLA_PER_METER * 1e3} mT/m.
           {gradientImperfections &&
             ' Dashed yellow shows the applied gradient response.'}
         </p>
@@ -718,10 +822,25 @@ function GradientEncodingExperimentPanel({
             pulses={rfExcitationPulses}
             playheadTime={playheadTime}
             referenceWaveforms={RF_EXCITATION_REFERENCE_WAVEFORMS}
+            rfReferenceTransmitFrequencyBand={
+              defaultTransmitFrequencyBand
+            }
+            rfTransmitFrequencyBand={transmitFrequencyBand}
             onChange={onRfExcitationPulsesChange}
             onGuideTimeChange={setTimingGuideTime}
             onReset={onRfExcitationReset}
           />
+          <div className="rf-pulse-meta" aria-label="RF pulse derived properties">
+            <span>
+              T<sub>RF</sub> = {rfDurationMilliseconds.toFixed(2)} ms
+            </span>
+            <span>BW = {rfBandwidthKilohertz.toFixed(3)} kHz</span>
+            <span>TBW = {rfTimeBandwidthProduct.toFixed(2)}</span>
+            <strong>
+              α<sub>nominal</sub> = {rfNominalFlipDegrees.toFixed(1)}° · B
+              <sub>1, peak</sub> = {rfPeakB1Microtesla.toFixed(2)} µT
+            </strong>
+          </div>
           <EditableGradientGraph
             description="Slice selection gradient"
             durationMilliseconds={durationMilliseconds}
@@ -729,6 +848,7 @@ function GradientEncodingExperimentPanel({
             guideTime={timingGuideTime}
             label="SS"
             linkedPulses
+            maintainHalfAreaRephasing
             pulses={sliceSelectionPulses}
             playheadTime={playheadTime}
             referenceWaveforms={SLICE_SELECTION_REFERENCE_WAVEFORMS}
@@ -736,6 +856,18 @@ function GradientEncodingExperimentPanel({
             onGuideTimeChange={setTimingGuideTime}
             onReset={onSliceSelectionReset}
           />
+          <div
+            className={`slice-rephasing-meta${
+              rephasingAreaMatched ? ' matched' : ' warning'
+            }`}
+            aria-label="Slice rephasing area"
+          >
+            <span>
+              |A<sub>rephase</sub> / A<sub>select</sub>| ={' '}
+              {rephasingAreaRatio?.toFixed(3) ?? '—'}
+            </span>
+            <strong>target 0.500</strong>
+          </div>
           <SliceSelectionMappingGraph
             gradientAmplitude={sliceMappingGradientAmplitude}
             gridSize={gridSize}

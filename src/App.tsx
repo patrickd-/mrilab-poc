@@ -30,6 +30,7 @@ import {
 } from './models/HydrogenEnsemble'
 import { createFidEnsembleStates } from './simulation/fid'
 import {
+  calibrateRfPulseForFlipAngle,
   copyGradientPulses,
   createDefaultTransmitFrequencyBand,
   DEFAULT_PHASE_ENCODING_PULSES,
@@ -51,7 +52,7 @@ const B0_OPTIONS: ReadonlyArray<{ id: B0Tesla; label: string }> = [
 // LabScene owns a long-lived Three.js animation loop. Bump this key whenever
 // the data contract consumed inside that loop changes so Vite hot reload does
 // not leave an already-mounted scene running an incompatible closure.
-const LAB_SCENE_RUNTIME_VERSION = 'transmit-band-v1'
+const LAB_SCENE_RUNTIME_VERSION = 'sinc-bloch-slice-selection-v1'
 const B0_TESLA_VALUES: Readonly<
   Record<B0Tesla, SupportedFieldStrengthTesla>
 > = {
@@ -693,7 +694,12 @@ function App() {
                 transmitFrequencyBand={transmitFrequencyBand}
                 onRfExcitationReset={() =>
                   setRfExcitationPulses(
-                    copyGradientPulses(DEFAULT_RF_EXCITATION_PULSES),
+                    DEFAULT_RF_EXCITATION_PULSES.map((pulse) =>
+                      calibrateRfPulseForFlipAngle(
+                        { ...pulse, amplitude: 1 },
+                        transmitFrequencyBand,
+                      ),
+                    ),
                   )
                 }
                 onPhaseEncodingPulsesChange={setPhaseEncodingPulses}

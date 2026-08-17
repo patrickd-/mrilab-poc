@@ -66,10 +66,14 @@ window.
   pulse boundaries, and integrated phase;
 - orthogonal phase/readout axes and polarity;
 - frequency-to-position mapping for positive, negative, and zero G_SS;
-- transmit-band overlap, full-band selection, partial overlap, and rejection of
-  out-of-band slices;
-- progressive RF excitation, negative RF direction, and post-excitation T1/T2
-  evolution.
+- Hamming-windowed sinc symmetry and zero spacing, physical peak B1 and RF
+  area, time-bandwidth product, pulse-width-dependent flip, and 90° calibration;
+- simultaneous RF/G_SS Bloch evolution, progressive tilt, through-slice phase
+  dispersion during RF, and rejection of out-of-band layers;
+- the default half-area G_SS rewinder, reduced post-RF phase slope with the
+  correct area, residual phase from an insufficient rewinder, and numerical
+  convergence across integration step sizes;
+- negative RF direction and post-excitation T1/T2 evolution.
 
 `src/components/sceneMath.test.ts` verifies the renderer-independent visual
 math that has historically been easy to regress:
@@ -83,10 +87,11 @@ math that has historically been easy to regress:
 
 `src/components/GradientEncodingExperimentPanel.test.tsx` and
 `src/components/SliceSelectionMappingGraph.test.tsx` verify default/reference
-waveforms, independent reset buttons, play/pause/speed routing, playheads,
-keyboard and pointer editing, linked pulse boundaries, timing guides, gradient
-imperfection traces, transmit-band dragging, minimum bandwidth, zero-gradient
-states, and negative-gradient position mirroring.
+waveforms (including the sampled sinc trace), derived RF metadata, independent
+reset buttons, play/pause/speed routing, playheads, keyboard and pointer editing,
+linked pulse boundaries, automatic half-area rewinder matching, timing guides,
+gradient imperfection traces, transmit-band dragging, minimum bandwidth,
+zero-gradient states, and negative-gradient position mirroring.
 
 ### Timing, worker, and React state
 

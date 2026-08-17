@@ -2,6 +2,7 @@ import { PROTON_GYROMAGNETIC_RATIO } from '../models/HydrogenEnsemble'
 import type {
   FidEnsembleMagnetizationState,
   FidEnsembleState,
+  FidSpinPacketState,
 } from './fid'
 
 export interface GradientPulse {
@@ -16,27 +17,197 @@ export interface TransmitFrequencyBand {
 }
 
 export const GRADIENT_SEQUENCE_DURATION_MILLISECONDS = 20
-export const MAXIMUM_GRADIENT_TESLA_PER_METER = 1e-3
+export const MAXIMUM_GRADIENT_TESLA_PER_METER = 30e-3
+export const MAXIMUM_RF_B1_TESLA = 12e-6
+export const RF_BLOCH_MAXIMUM_STEP_MILLISECONDS = 0.02
 const GRADIENT_FAST_RESPONSE_TIME_MILLISECONDS = 0.04
 const GRADIENT_EDDY_RESPONSE_TIME_MILLISECONDS = 0.8
 const GRADIENT_EDDY_RESPONSE_FRACTION = 0.04
 const DEFAULT_SLICE_SELECTION_AMPLITUDE = 0.58
 const DEFAULT_SLICE_THICKNESS_MILLIMETERS = 1
+const DEFAULT_RF_START = 0.08
+const DEFAULT_RF_END = 0.34
+const DEFAULT_REPHASING_END = 0.43
+
+function sinc(value: number) {
+  return Math.abs(value) < 1e-12 ? 1 : Math.sin(value) / value
+}
+
+export function transmitBandwidthAngularRadiansPerMillisecond(
+  transmitFrequencyBand: TransmitFrequencyBand,
+) {
+  // A numerical value expressed in krad/s is the same value in rad/ms.
+  return Math.abs(
+    transmitFrequencyBand.upperAngularFrequencyKilradiansPerSecond -
+      transmitFrequencyBand.lowerAngularFrequencyKilradiansPerSecond,
+  )
+}
+
+export function rfPulseTimeBandwidthProduct(
+  pulse: GradientPulse,
+  transmitFrequencyBand: TransmitFrequencyBand,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+) {
+  const pulseDurationMilliseconds =
+    Math.max(0, pulse.end - pulse.start) * durationMilliseconds
+  return (
+    (transmitBandwidthAngularRadiansPerMillisecond(
+      transmitFrequencyBand,
+    ) *
+      pulseDurationMilliseconds) /
+    (2 * Math.PI)
+  )
+}
+
+/**
+ * Hamming-windowed sinc RF envelope. The configured transmit bandwidth sets
+ * the sinc zero spacing; pulse.amplitude scales a physical 12 µT peak limit.
+ */
+export function rfPulseB1TeslaAt(
+  pulse: GradientPulse,
+  transmitFrequencyBand: TransmitFrequencyBand,
+  timeMilliseconds: number,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+) {
+  const startMilliseconds = pulse.start * durationMilliseconds
+  const endMilliseconds = pulse.end * durationMilliseconds
+  if (
+    timeMilliseconds < startMilliseconds ||
+    timeMilliseconds > endMilliseconds ||
+    endMilliseconds <= startMilliseconds
+  ) {
+    return 0
+  }
+
+  const pulseDurationMilliseconds = endMilliseconds - startMilliseconds
+  const centerMilliseconds = (startMilliseconds + endMilliseconds) / 2
+  const offsetMilliseconds = timeMilliseconds - centerMilliseconds
+  const bandwidthRadiansPerMillisecond =
+    transmitBandwidthAngularRadiansPerMillisecond(transmitFrequencyBand)
+  const sincEnvelope = sinc(
+    (bandwidthRadiansPerMillisecond * offsetMilliseconds) / 2,
+  )
+  const hammingWindow =
+    0.54 +
+    0.46 *
+      Math.cos((2 * Math.PI * offsetMilliseconds) / pulseDurationMilliseconds)
+
+  return (
+    pulse.amplitude *
+    MAXIMUM_RF_B1_TESLA *
+    sincEnvelope *
+    hammingWindow
+  )
+}
+
+export function rfPulseAreaTeslaSecondsAt(
+  pulse: GradientPulse,
+  transmitFrequencyBand: TransmitFrequencyBand,
+  timeMilliseconds = pulse.end * GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  maximumStepMilliseconds = 0.005,
+) {
+  const startMilliseconds = pulse.start * durationMilliseconds
+  const endMilliseconds = Math.min(
+    pulse.end * durationMilliseconds,
+    Math.max(startMilliseconds, timeMilliseconds),
+  )
+  const intervalMilliseconds = endMilliseconds - startMilliseconds
+  if (intervalMilliseconds <= 0) return 0
+
+  const stepCount = Math.max(
+    1,
+    Math.ceil(intervalMilliseconds / maximumStepMilliseconds),
+  )
+  const stepMilliseconds = intervalMilliseconds / stepCount
+  let areaTeslaMilliseconds = 0
+  for (let step = 0; step < stepCount; step += 1) {
+    areaTeslaMilliseconds +=
+      rfPulseB1TeslaAt(
+        pulse,
+        transmitFrequencyBand,
+        startMilliseconds + (step + 0.5) * stepMilliseconds,
+        durationMilliseconds,
+      ) * stepMilliseconds
+  }
+  return areaTeslaMilliseconds / 1000
+}
+
+export function rfPulseNominalFlipAngleRadiansAt(
+  pulse: GradientPulse,
+  transmitFrequencyBand: TransmitFrequencyBand,
+  timeMilliseconds = pulse.end * GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  transmitFieldScale = 1,
+) {
+  return (
+    PROTON_GYROMAGNETIC_RATIO *
+    transmitFieldScale *
+    rfPulseAreaTeslaSecondsAt(
+      pulse,
+      transmitFrequencyBand,
+      timeMilliseconds,
+      durationMilliseconds,
+    )
+  )
+}
+
+export function calibrateRfPulseForFlipAngle(
+  pulse: GradientPulse,
+  transmitFrequencyBand: TransmitFrequencyBand,
+  targetFlipAngleRadians = Math.PI / 2,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+) {
+  const unitPulse = { ...pulse, amplitude: 1 }
+  const unitFlipAngle = rfPulseNominalFlipAngleRadiansAt(
+    unitPulse,
+    transmitFrequencyBand,
+    unitPulse.end * durationMilliseconds,
+    durationMilliseconds,
+  )
+  return {
+    ...pulse,
+    amplitude:
+      Math.abs(unitFlipAngle) < 1e-12
+        ? 0
+        : Math.max(-1, Math.min(1, targetFlipAngleRadians / unitFlipAngle)),
+  }
+}
+
+const DEFAULT_TRANSMIT_BANDWIDTH_RADIANS_PER_MILLISECOND =
+  PROTON_GYROMAGNETIC_RATIO *
+  MAXIMUM_GRADIENT_TESLA_PER_METER *
+  DEFAULT_SLICE_SELECTION_AMPLITUDE *
+  DEFAULT_SLICE_THICKNESS_MILLIMETERS *
+  1e-6
+const DEFAULT_RF_CALIBRATION_BAND: TransmitFrequencyBand = {
+  lowerAngularFrequencyKilradiansPerSecond: 0,
+  upperAngularFrequencyKilradiansPerSecond:
+    DEFAULT_TRANSMIT_BANDWIDTH_RADIANS_PER_MILLISECOND,
+}
+const DEFAULT_RF_EXCITATION_PULSE = calibrateRfPulseForFlipAngle(
+  { start: DEFAULT_RF_START, end: DEFAULT_RF_END, amplitude: 1 },
+  DEFAULT_RF_CALIBRATION_BAND,
+)
 
 export const DEFAULT_RF_EXCITATION_PULSES: ReadonlyArray<GradientPulse> = [
-  { start: 0.08, end: 0.34, amplitude: 1 },
+  DEFAULT_RF_EXCITATION_PULSE,
 ]
 
 export const DEFAULT_SLICE_SELECTION_PULSES: ReadonlyArray<GradientPulse> = [
   {
-    start: 0.08,
-    end: 0.34,
+    start: DEFAULT_RF_START,
+    end: DEFAULT_RF_END,
     amplitude: DEFAULT_SLICE_SELECTION_AMPLITUDE,
   },
   {
-    start: 0.34,
-    end: 0.43,
-    amplitude: -DEFAULT_SLICE_SELECTION_AMPLITUDE,
+    start: DEFAULT_RF_END,
+    end: DEFAULT_REPHASING_END,
+    amplitude:
+      (-0.5 *
+        DEFAULT_SLICE_SELECTION_AMPLITUDE *
+        (DEFAULT_RF_END - DEFAULT_RF_START)) /
+      (DEFAULT_REPHASING_END - DEFAULT_RF_END),
   },
 ]
 
@@ -105,6 +276,38 @@ export function copyGradientPulses(
   pulses: ReadonlyArray<GradientPulse>,
 ) {
   return pulses.map((pulse) => ({ ...pulse }))
+}
+
+export function sliceRephasingAreaRatio(
+  pulses: ReadonlyArray<GradientPulse>,
+) {
+  const [selection, rephasing] = pulses
+  if (!selection || !rephasing) return null
+  const selectionArea =
+    selection.amplitude * Math.max(0, selection.end - selection.start)
+  const rephasingArea =
+    rephasing.amplitude * Math.max(0, rephasing.end - rephasing.start)
+  return Math.abs(selectionArea) < 1e-12
+    ? null
+    : Math.abs(rephasingArea / selectionArea)
+}
+
+export function matchHalfAreaSliceRephasing(
+  pulses: ReadonlyArray<GradientPulse>,
+) {
+  const matched = copyGradientPulses(pulses)
+  const [selection, rephasing] = matched
+  if (!selection || !rephasing) return matched
+  const rephasingDuration = Math.max(0, rephasing.end - rephasing.start)
+  if (rephasingDuration <= 1e-12) return matched
+
+  const targetAmplitude =
+    (-0.5 *
+      selection.amplitude *
+      Math.max(0, selection.end - selection.start)) /
+    rephasingDuration
+  rephasing.amplitude = Math.max(-1, Math.min(1, targetAmplitude))
+  return matched
 }
 
 function normalizedPulseAreaAt(
@@ -296,65 +499,263 @@ export function gradientPhaseRadiansAt(
   )
 }
 
-export function sliceSelectionExcitationScaleAt(
-  layer: number,
-  gridSize: number,
+export interface SliceSelectiveRfMagnetization {
+  xFraction: number
+  yFraction: number
+  zFraction: number
+  nominalFlipAngleRadians: number
+}
+
+function rotateMagnetization(
+  x: number,
+  y: number,
+  z: number,
+  angularVelocityX: number,
+  angularVelocityY: number,
+  angularVelocityZ: number,
+  durationMilliseconds: number,
+) {
+  const angularVelocity = Math.hypot(
+    angularVelocityX,
+    angularVelocityY,
+    angularVelocityZ,
+  )
+  if (angularVelocity < 1e-15 || durationMilliseconds <= 0) {
+    return { x, y, z }
+  }
+
+  const axisX = angularVelocityX / angularVelocity
+  const axisY = angularVelocityY / angularVelocity
+  const axisZ = angularVelocityZ / angularVelocity
+  const angle = angularVelocity * durationMilliseconds
+  const cosine = Math.cos(angle)
+  const sine = Math.sin(angle)
+  const oneMinusCosine = 1 - cosine
+  const dot = axisX * x + axisY * y + axisZ * z
+
+  return {
+    x:
+      x * cosine +
+      (axisY * z - axisZ * y) * sine +
+      axisX * dot * oneMinusCosine,
+    y:
+      y * cosine +
+      (axisZ * x - axisX * z) * sine +
+      axisY * dot * oneMinusCosine,
+    z:
+      z * cosine +
+      (axisX * y - axisY * x) * sine +
+      axisZ * dot * oneMinusCosine,
+  }
+}
+
+/**
+ * Integrates the rotating-frame Bloch equation while RF and G_SS act
+ * simultaneously. RF is along +y, so an on-resonance positive pulse tips +z
+ * toward +x, matching the lab's existing arrow convention.
+ */
+export function sliceSelectiveRfMagnetizationAt(
+  state: FidEnsembleState,
+  spinPacket: FidSpinPacketState,
+  timeMilliseconds: number,
   excitationPulse: GradientPulse,
   transmitFrequencyBand: TransmitFrequencyBand,
   sliceSelectionPulses: ReadonlyArray<GradientPulse>,
   durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
   gradientImperfections = false,
-) {
+  maximumStepMilliseconds = RF_BLOCH_MAXIMUM_STEP_MILLISECONDS,
+): SliceSelectiveRfMagnetization {
+  const excitationStartMilliseconds =
+    excitationPulse.start * durationMilliseconds
+  const excitationEndMilliseconds = excitationPulse.end * durationMilliseconds
+  const integrationEndMilliseconds = Math.min(
+    excitationEndMilliseconds,
+    Math.max(excitationStartMilliseconds, timeMilliseconds),
+  )
+  const intervalMilliseconds =
+    integrationEndMilliseconds - excitationStartMilliseconds
+  if (intervalMilliseconds <= 0) {
+    return {
+      xFraction: 0,
+      yFraction: 0,
+      zFraction: 1,
+      nominalFlipAngleRadians: 0,
+    }
+  }
+
   const effectiveExcitationTimeMilliseconds =
     ((excitationPulse.start + excitationPulse.end) / 2) *
     durationMilliseconds
-  const sliceGradientAmplitude = appliedGradientAmplitudeAt(
+  const nominalSliceGradientAmplitude = appliedGradientAmplitudeAt(
     sliceSelectionPulses,
     effectiveExcitationTimeMilliseconds,
     durationMilliseconds,
     gradientImperfections,
   )
+  const gridCenter = (state.gridSize - 1) / 2
+  const nominalAngularFrequencyPerLayer =
+    PROTON_GYROMAGNETIC_RATIO *
+    MAXIMUM_GRADIENT_TESLA_PER_METER *
+    Math.abs(nominalSliceGradientAmplitude) *
+    1e-6
+  const bandCenterAngularFrequency =
+    (transmitFrequencyBand.lowerAngularFrequencyKilradiansPerSecond +
+      transmitFrequencyBand.upperAngularFrequencyKilradiansPerSecond) /
+    2
+  const rfCarrierOffsetRadiansPerMillisecond =
+    Math.abs(nominalSliceGradientAmplitude) < 1e-9
+      ? bandCenterAngularFrequency
+      : bandCenterAngularFrequency -
+        nominalAngularFrequencyPerLayer * gridCenter
+  const stepCount = Math.max(
+    1,
+    Math.ceil(
+      intervalMilliseconds / Math.max(1e-4, maximumStepMilliseconds),
+    ),
+  )
+  const stepMilliseconds = intervalMilliseconds / stepCount
+  let xFraction = 0
+  let yFraction = 0
+  let zFraction = 1
 
-  // Treat the RF waveform as an ideal hard angular-frequency passband. G_SS
-  // maps that band onto position; its sign decides which edge is the
-  // lower-frequency edge, while its magnitude controls slice thickness.
-  if (Math.abs(sliceGradientAmplitude) < 1e-6) {
-    return transmitFrequencyBand.lowerAngularFrequencyKilradiansPerSecond <=
-      0 &&
-      transmitFrequencyBand.upperAngularFrequencyKilradiansPerSecond >= 0
-      ? 1
-      : 0
+  for (let step = 0; step < stepCount; step += 1) {
+    const sampleTimeMilliseconds =
+      excitationStartMilliseconds + (step + 0.5) * stepMilliseconds
+    const b1Tesla = rfPulseB1TeslaAt(
+      excitationPulse,
+      transmitFrequencyBand,
+      sampleTimeMilliseconds,
+      durationMilliseconds,
+    )
+    const sliceGradientAmplitude = appliedGradientAmplitudeAt(
+      sliceSelectionPulses,
+      sampleTimeMilliseconds,
+      durationMilliseconds,
+      gradientImperfections,
+    )
+    const gradientDetuningRadiansPerMillisecond =
+      PROTON_GYROMAGNETIC_RATIO *
+      MAXIMUM_GRADIENT_TESLA_PER_METER *
+      sliceGradientAmplitude *
+      (state.layer - gridCenter) *
+      1e-6
+    const angularVelocityY =
+      (PROTON_GYROMAGNETIC_RATIO *
+        b1Tesla *
+        state.transmitFieldScale) /
+      1000
+    const angularVelocityZ =
+      gradientDetuningRadiansPerMillisecond -
+      rfCarrierOffsetRadiansPerMillisecond +
+      spinPacket.angularFrequencyOffsetRadiansPerMillisecond
+    const rotated = rotateMagnetization(
+      xFraction,
+      yFraction,
+      zFraction,
+      0,
+      angularVelocityY,
+      angularVelocityZ,
+      stepMilliseconds,
+    )
+
+    const transverseDecay =
+      state.transverseRelaxationTimeMilliseconds === 0
+        ? 0
+        : Math.exp(
+            -stepMilliseconds /
+              state.transverseRelaxationTimeMilliseconds,
+          )
+    xFraction = rotated.x * transverseDecay
+    yFraction = rotated.y * transverseDecay
+    zFraction =
+      state.longitudinalRelaxationTimeMilliseconds === 0
+        ? 1
+        : 1 +
+          (rotated.z - 1) *
+            Math.exp(
+              -stepMilliseconds /
+                state.longitudinalRelaxationTimeMilliseconds,
+            )
   }
 
-  const mappedAngularFrequency =
-    sliceMappingAngularFrequencyKilradiansPerSecondAt(
-      layer,
-      gridSize,
-      sliceGradientAmplitude,
-    )
-  const lowerAngularFrequency = Math.min(
-    transmitFrequencyBand.lowerAngularFrequencyKilradiansPerSecond,
-    transmitFrequencyBand.upperAngularFrequencyKilradiansPerSecond,
-  )
-  const upperAngularFrequency = Math.max(
-    transmitFrequencyBand.lowerAngularFrequencyKilradiansPerSecond,
-    transmitFrequencyBand.upperAngularFrequencyKilradiansPerSecond,
-  )
-  const maximumAngularFrequency =
-    maximumSliceMappingAngularFrequencyKilradiansPerSecond(gridSize)
-  const edgeTolerance = maximumAngularFrequency * 1e-12
-  const lowerBoundarySelected =
-    lowerAngularFrequency <= edgeTolerance
-      ? mappedAngularFrequency >= -edgeTolerance
-      : mappedAngularFrequency > lowerAngularFrequency + edgeTolerance
-  const upperBoundarySelected =
-    upperAngularFrequency >= maximumAngularFrequency - edgeTolerance
-      ? mappedAngularFrequency <= maximumAngularFrequency + edgeTolerance
-      : mappedAngularFrequency < upperAngularFrequency - edgeTolerance
+  return {
+    xFraction,
+    yFraction,
+    zFraction,
+    nominalFlipAngleRadians: rfPulseNominalFlipAngleRadiansAt(
+      excitationPulse,
+      transmitFrequencyBand,
+      integrationEndMilliseconds,
+      durationMilliseconds,
+      state.transmitFieldScale,
+    ),
+  }
+}
 
-  return lowerBoundarySelected && upperBoundarySelected
-    ? 1
-    : 0
+interface SliceRfCacheContext {
+  excitationPulse: GradientPulse
+  gradientImperfections: boolean
+  integrationTimeMilliseconds: number
+  sliceSelectionPulses: ReadonlyArray<GradientPulse>
+  transmitFrequencyBand: TransmitFrequencyBand
+}
+
+let sliceRfCacheContext: SliceRfCacheContext | null = null
+let sliceRfCache = new Map<string, SliceSelectiveRfMagnetization>()
+
+function cachedSliceSelectiveRfMagnetizationAt(
+  state: FidEnsembleState,
+  spinPacket: FidSpinPacketState,
+  integrationTimeMilliseconds: number,
+  excitationPulse: GradientPulse,
+  transmitFrequencyBand: TransmitFrequencyBand,
+  sliceSelectionPulses: ReadonlyArray<GradientPulse>,
+  durationMilliseconds: number,
+  gradientImperfections: boolean,
+) {
+  if (
+    !sliceRfCacheContext ||
+    sliceRfCacheContext.excitationPulse !== excitationPulse ||
+    sliceRfCacheContext.gradientImperfections !== gradientImperfections ||
+    sliceRfCacheContext.integrationTimeMilliseconds !==
+      integrationTimeMilliseconds ||
+    sliceRfCacheContext.sliceSelectionPulses !== sliceSelectionPulses ||
+    sliceRfCacheContext.transmitFrequencyBand !== transmitFrequencyBand
+  ) {
+    sliceRfCacheContext = {
+      excitationPulse,
+      gradientImperfections,
+      integrationTimeMilliseconds,
+      sliceSelectionPulses,
+      transmitFrequencyBand,
+    }
+    sliceRfCache = new Map()
+  }
+
+  const cacheKey = [
+    state.layer,
+    state.gridSize,
+    state.transmitFieldScale,
+    state.longitudinalRelaxationTimeMilliseconds,
+    state.transverseRelaxationTimeMilliseconds,
+    spinPacket.angularFrequencyOffsetRadiansPerMillisecond,
+    durationMilliseconds,
+  ].join(':')
+  const cached = sliceRfCache.get(cacheKey)
+  if (cached) return cached
+
+  const calculated = sliceSelectiveRfMagnetizationAt(
+    state,
+    spinPacket,
+    integrationTimeMilliseconds,
+    excitationPulse,
+    transmitFrequencyBand,
+    sliceSelectionPulses,
+    durationMilliseconds,
+    gradientImperfections,
+  )
+  sliceRfCache.set(cacheKey, calculated)
+  return calculated
 }
 
 export function gradientEnsembleMagnetizationStateAt(
@@ -393,123 +794,109 @@ export function gradientEnsembleMagnetizationStateAt(
     }
   }
 
-  const sliceExcitationScale = sliceSelectionExcitationScaleAt(
-    state.layer,
-    state.gridSize,
-    excitationPulse,
-    transmitFrequencyBand,
-    sliceSelectionPulses,
-    durationMilliseconds,
-    gradientImperfections,
-  )
   const excitationStartMilliseconds =
     excitationPulse.start * durationMilliseconds
   const excitationEndMilliseconds =
     excitationPulse.end * durationMilliseconds
-  const excitationProgress = Math.min(
-    1,
-    Math.max(
-      0,
-      (boundedTimeMilliseconds - excitationStartMilliseconds) /
-        Math.max(
-          Number.EPSILON,
-          excitationEndMilliseconds - excitationStartMilliseconds,
-        ),
-    ),
+  const integrationTimeMilliseconds = Math.min(
+    boundedTimeMilliseconds,
+    excitationEndMilliseconds,
   )
-  const flipAngleRadians =
-    excitationPulse.amplitude *
-    (Math.PI / 2) *
-    sliceExcitationScale *
-    excitationProgress
-
-  if (excitationProgress < 1) {
-    const transverseFraction = Math.sin(flipAngleRadians)
-    const longitudinalFraction = Math.cos(flipAngleRadians)
-    return {
-      excited: Math.abs(transverseFraction) > 1e-6,
-      xFraction: transverseFraction,
-      yFraction: 0,
-      zFraction: longitudinalFraction,
-      transverseFraction: Math.abs(transverseFraction),
-      longitudinalFraction,
-      precessionPhaseRadians: transverseFraction < 0 ? Math.PI : 0,
-      flipAngleRadians,
-    }
-  }
-
-  const effectiveExcitationTimeMilliseconds =
-    ((excitationPulse.start + excitationPulse.end) / 2) *
-    durationMilliseconds
   const relaxationTimeMilliseconds = Math.max(
     0,
     boundedTimeMilliseconds - excitationEndMilliseconds,
   )
-  const initialTransverseFraction = Math.sin(flipAngleRadians)
-  const initialLongitudinalFraction = Math.cos(flipAngleRadians)
-  const transverseFraction =
-    state.transverseRelaxationTimeMilliseconds === 0
-      ? 0
-      : initialTransverseFraction *
-        Math.exp(
-          -relaxationTimeMilliseconds /
-            state.transverseRelaxationTimeMilliseconds,
-        )
-  const longitudinalFraction =
-    state.longitudinalRelaxationTimeMilliseconds === 0
-      ? 1
-      : 1 +
-        (initialLongitudinalFraction - 1) *
-          Math.exp(
-            -relaxationTimeMilliseconds /
-              state.longitudinalRelaxationTimeMilliseconds,
-          )
   let packetXFraction = 0
   let packetYFraction = 0
+  let packetZFraction = 0
   let totalPacketWeight = 0
+  let flipAngleRadians = 0
 
   state.spinPackets.forEach((spinPacket) => {
-    const packetPhaseRadians = gradientPhaseRadiansAt(
-      state.column + spinPacket.offsetXMillimeters,
-      state.row - spinPacket.offsetYMillimeters,
-      state.layer,
-      state.gridSize,
-      spinPacket.angularFrequencyOffsetRadiansPerMillisecond,
-      boundedTimeMilliseconds,
+    const rfMagnetization = cachedSliceSelectiveRfMagnetizationAt(
+      state,
+      spinPacket,
+      integrationTimeMilliseconds,
+      excitationPulse,
+      transmitFrequencyBand,
       sliceSelectionPulses,
-      phaseEncodingPulses,
-      readoutPulses,
       durationMilliseconds,
       gradientImperfections,
-      effectiveExcitationTimeMilliseconds,
     )
-    packetXFraction +=
-      Math.cos(packetPhaseRadians) * spinPacket.weight
-    packetYFraction +=
-      Math.sin(packetPhaseRadians) * spinPacket.weight
+    let xFraction = rfMagnetization.xFraction
+    let yFraction = rfMagnetization.yFraction
+    let zFraction = rfMagnetization.zFraction
+    flipAngleRadians = rfMagnetization.nominalFlipAngleRadians
+
+    if (relaxationTimeMilliseconds > 0) {
+      const packetPhaseRadians = gradientPhaseRadiansAt(
+        state.column + spinPacket.offsetXMillimeters,
+        state.row - spinPacket.offsetYMillimeters,
+        state.layer,
+        state.gridSize,
+        spinPacket.angularFrequencyOffsetRadiansPerMillisecond,
+        boundedTimeMilliseconds,
+        sliceSelectionPulses,
+        phaseEncodingPulses,
+        readoutPulses,
+        durationMilliseconds,
+        gradientImperfections,
+        excitationEndMilliseconds,
+      )
+      const transverseDecay =
+        state.transverseRelaxationTimeMilliseconds === 0
+          ? 0
+          : Math.exp(
+              -relaxationTimeMilliseconds /
+                state.transverseRelaxationTimeMilliseconds,
+            )
+      const cosine = Math.cos(packetPhaseRadians)
+      const sine = Math.sin(packetPhaseRadians)
+      const previousX = xFraction
+      const previousY = yFraction
+      xFraction = transverseDecay *
+        (previousX * cosine - previousY * sine)
+      yFraction = transverseDecay *
+        (previousX * sine + previousY * cosine)
+      zFraction =
+        state.longitudinalRelaxationTimeMilliseconds === 0
+          ? 1
+          : 1 +
+            (zFraction - 1) *
+              Math.exp(
+                -relaxationTimeMilliseconds /
+                  state.longitudinalRelaxationTimeMilliseconds,
+              )
+    }
+
+    packetXFraction += xFraction * spinPacket.weight
+    packetYFraction += yFraction * spinPacket.weight
+    packetZFraction += zFraction * spinPacket.weight
     totalPacketWeight += spinPacket.weight
   })
 
   if (totalPacketWeight > 0 && totalPacketWeight !== 1) {
     packetXFraction /= totalPacketWeight
     packetYFraction /= totalPacketWeight
+    packetZFraction /= totalPacketWeight
   }
 
-  const xFraction = transverseFraction * packetXFraction
-  const yFraction = transverseFraction * packetYFraction
-  const coherentTransverseFraction = Math.hypot(xFraction, yFraction)
+  const coherentTransverseFraction = Math.hypot(
+    packetXFraction,
+    packetYFraction,
+  )
   const precessionPhaseRadians =
     coherentTransverseFraction < 1e-12
       ? 0
-      : Math.atan2(yFraction, xFraction)
+      : Math.atan2(packetYFraction, packetXFraction)
 
   return {
-    excited: Math.abs(initialTransverseFraction) > 1e-6,
-    xFraction,
-    yFraction,
-    zFraction: longitudinalFraction,
+    excited: coherentTransverseFraction > 0.02,
+    xFraction: packetXFraction,
+    yFraction: packetYFraction,
+    zFraction: packetZFraction,
     transverseFraction: coherentTransverseFraction,
-    longitudinalFraction,
+    longitudinalFraction: packetZFraction,
     precessionPhaseRadians,
     flipAngleRadians,
   }

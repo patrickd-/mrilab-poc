@@ -28,6 +28,8 @@ import {
   gradientEnsembleMagnetizationStateAt,
   gradientPhaseRadiansAt,
   MAXIMUM_GRADIENT_TESLA_PER_METER,
+  MAXIMUM_RF_B1_TESLA,
+  rfPulseB1TeslaAt,
   type GradientPulse,
   type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
@@ -1666,8 +1668,19 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
 
         if (activeGradientRfPulse) {
           const effectivePulseTimeMilliseconds =
-            ((activeGradientRfPulse.start + activeGradientRfPulse.end) / 2) *
-            GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+            gradientAnimation.timeMilliseconds
+          const instantaneousB1Tesla = rfPulseB1TeslaAt(
+            activeGradientRfPulse,
+            gradientAnimation.transmitFrequencyBand,
+            effectivePulseTimeMilliseconds,
+            GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+          )
+          const normalizedB1 = instantaneousB1Tesla / MAXIMUM_RF_B1_TESLA
+          if (Math.abs(normalizedB1) < 1e-5) {
+            hideB1PulseArrows()
+            renderedGradientRfPulseKey = null
+            return
+          }
           const referenceFramePhase =
             referenceFrameRef.current === 'laboratory-slowed'
               ? SLOWED_LAB_PRECESSION_RADIANS_PER_MILLISECOND *
@@ -1675,7 +1688,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               : 0
           const pulseAxisPhase =
             referenceFramePhase +
-            (activeGradientRfPulse.amplitude < 0 ? Math.PI : 0)
+            (instantaneousB1Tesla < 0 ? Math.PI : 0)
           b1ArrowDirection.set(
             Math.cos(pulseAxisPhase),
             Math.sin(pulseAxisPhase),
@@ -1685,13 +1698,13 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             b1ArrowLocalDirection,
             b1ArrowDirection,
           )
-          const pulseKey = `${activeGradientRfPulse.start}:${activeGradientRfPulse.end}:${activeGradientRfPulse.amplitude}:${referenceFrameRef.current}`
+          const pulseKey = `${activeGradientRfPulse.start}:${activeGradientRfPulse.end}:${Math.sign(instantaneousB1Tesla)}:${referenceFrameRef.current}:${referenceFramePhase.toFixed(4)}`
           if (renderedGradientRfPulseKey !== pulseKey) {
             writeB1ArrowMatrices()
             renderedGradientRfPulseKey = pulseKey
           }
           b1ArrowMaterial.opacity =
-            0.92 * Math.abs(activeGradientRfPulse.amplitude)
+            0.92 * Math.min(1, Math.abs(normalizedB1))
           showB1PulseArrows()
           return
         }

@@ -11,6 +11,7 @@ import {
   DEFAULT_RF_EXCITATION_PULSES,
   DEFAULT_SLICE_SELECTION_PULSES,
   GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  sliceRephasingAreaRatio,
   type GradientPulse,
 } from '../simulation/gradientEncoding'
 import GradientEncodingExperimentPanel, {
@@ -76,6 +77,33 @@ describe('gradient waveform editing constraints', () => {
     expect(result).not.toBe(source)
     expect(result[0]).not.toBe(source[0])
   })
+
+  it('keeps the slice rewinder at half the selection area unless its amplitude is edited', () => {
+    const matched = updatePulses(
+      DEFAULT_SLICE_SELECTION_PULSES,
+      0,
+      'top',
+      0,
+      0.4,
+      true,
+      true,
+    )
+    const manuallyOverridden = updatePulses(
+      DEFAULT_SLICE_SELECTION_PULSES,
+      1,
+      'top',
+      0,
+      -0.2,
+      true,
+      true,
+    )
+
+    expect(sliceRephasingAreaRatio(matched)).toBeCloseTo(0.5, 12)
+    expect(sliceRephasingAreaRatio(manuallyOverridden)).not.toBeCloseTo(
+      0.5,
+      2,
+    )
+  })
 })
 
 function panelProps(
@@ -127,6 +155,19 @@ describe('GradientEncodingExperimentPanel', () => {
       ),
     ).toHaveLength(8)
     expect(container.querySelectorAll('.gradient-playhead')).toHaveLength(0)
+
+    const rfPath = container.querySelector(
+      '.gradient-input-rf .gradient-waveform',
+    )
+    expect(rfPath?.getAttribute('d')?.match(/\bL\b/g)?.length).toBeGreaterThan(
+      100,
+    )
+    expect(
+      screen.getByLabelText('RF pulse derived properties').textContent,
+    ).toMatch(/T.?RF.? = 5\.20 ms.*BW = 0\.741 kHz.*TBW = 3\.85.*90\.0°.*4\.33 µT/s)
+    expect(
+      screen.getByLabelText('Slice rephasing area').textContent,
+    ).toContain('0.500')
   })
 
   it('routes play, pause, reset, and speed controls by playback status', async () => {
@@ -213,6 +254,16 @@ describe('GradientEncodingExperimentPanel', () => {
     const changedReadout = vi.mocked(props.onReadoutPulsesChange).mock.calls[0][0]
     expect(changedReadout[0].end).toBeCloseTo(0.53, 12)
     expect(changedReadout[1].start).toBe(changedReadout[0].end)
+
+    fireEvent.keyDown(
+      screen.getByRole('slider', {
+        name: /Slice selection gradient, pulse 1, top handle/,
+      }),
+      { key: 'ArrowDown' },
+    )
+    const changedSlice = vi.mocked(props.onSliceSelectionPulsesChange).mock
+      .calls[0][0]
+    expect(sliceRephasingAreaRatio(changedSlice)).toBeCloseTo(0.5, 12)
   })
 
   it('edits a pulse with pointer dragging and shares its timing guide', () => {

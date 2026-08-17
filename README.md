@@ -45,15 +45,17 @@ normal, while Block View and Stacked View remain unrestricted.
   RF rotations to each ensemble's magnetization state.
 - `src/workers/fidSimulation.worker.ts` advances simulated time and samples the
   aggregate signal away from the rendering thread.
-- `src/simulation/gradientEncoding.ts` applies slice-selection,
-  phase-encoding, and readout gradients to each ensemble's transverse phase;
-  its RF-gated sequence is paced for inspection by
+- `src/simulation/gradientEncoding.ts` integrates simultaneous windowed-sinc
+  RF and slice-selection fields with the Bloch equation, then applies
+  phase-encoding and readout gradients to each ensemble's transverse phase;
+  its sequence is paced for inspection by
   `src/hooks/useGradientEncodingPlayback.ts`.
 - Slice View can overlay a translucent, spatially smoothed 3D surface for
   laboratory/rotating-frame frequency, phase, or transverse amplitude. During
-  Gradient Encoding the frequency surfaces use a fixed 2.704 kHz full-gradient
-  edge scale, so G_PE tilts only the phase axis, G_RO tilts only the readout
-  axis, and changing pulse amplitude changes slope proportionally. Other
+  Gradient Encoding the frequency surfaces use an approximately 81.1 kHz
+  full-gradient edge scale (30 mT/m over 63.5 mm), so G_PE tilts only the phase
+  axis, G_RO tilts only the readout axis, and changing pulse amplitude changes
+  slope proportionally. Other
   experiments retain local frequency auto-ranging to expose ppm-scale B0
   structure.
 - `src/components/FidExperimentPanel.tsx`,
@@ -94,8 +96,10 @@ the voxel, while a tissue-dependent static frequency spread supplies the
 reversible part of T2* decay. RF 180° pulses therefore refocus those static
 offsets rather than treating the shortened FID as irreversible T2 decay.
 `B1 inhomogeneity` applies a smooth transmit-field profile whose peak flip-angle
-deviation grows from 4% at 1.5 T to 15% at 7 T. RF pulses remain instantaneous,
-but excitation and refocusing angles are no longer spatially perfect.
+deviation grows from 4% at 1.5 T to 15% at 7 T. Ping and spin-echo RF pulses
+remain instantaneous, but excitation and refocusing angles are no longer
+spatially perfect; gradient slice selection instead integrates the finite RF
+waveform throughout its duration.
 `Gradient imperfections` passes commanded gradients through a causal response
 with a 0.04 ms fast coil time constant and a 4% component decaying over 0.8 ms.
 The gradient editor shows the resulting applied waveform as a dashed yellow
@@ -111,20 +115,31 @@ simulation path use the same local values, and T2* is constrained not to exceed
 T2.
 
 The Gradient Encoding timing diagram shares one 20 ms clock across editable RF,
-G_SS, G_PE, and G_RO rows. The RF row exposes only coral relative-B1 amplitude
-and timing. A frequency-to-position mapping below G_SS plots angular frequency
-against the slice's 0–127 mm position. Its green line uses the effective first
-G_SS lobe, while two independently draggable yellow boundaries define the
-transmit bandwidth. Their intersections project onto a yellow spatial band,
-with `delta z = delta omega / (gamma |G_SS|)`. The default 0.155 krad/s band
-excites the 1 mm isocenter plane represented by Slice View. Negative G_SS
-reverses the spatial mapping; zero G_SS selects the whole volume only when the
-transmit band contains zero angular-frequency offset. Magnetization rotates
-progressively throughout the RF interval rather than jumping at its end. In
-Block View this makes the selected horizontal mid-plane distinguishable from
-the two orthogonal context faces. RF ends as phase encoding begins; G_SS then
-reverses for half of the G_PE interval, while readout prephasing leads into a
-positive lobe with the same duration as the RF pulse.
+G_SS, G_PE, and G_RO rows. The RF row draws a Hamming-windowed sinc envelope;
+its physical peak B1, duration, transmit bandwidth, time-bandwidth product, and
+nominal flip angle are displayed together. Changing pulse width therefore
+changes both the sinc truncation and RF area—it no longer just changes how fast
+a fixed 90° rotation completes. Reset calibrates the current transmit band to a
+nominal 90° pulse when the 12 µT peak-B1 limit permits it.
+
+A frequency-to-position mapping below G_SS plots angular frequency against the
+slice's 0–127 mm position. Its green line uses the effective first G_SS lobe,
+while two independently draggable yellow boundaries define the transmit
+bandwidth. Their intersections project onto a yellow spatial band, with `delta
+z = delta omega / (gamma |G_SS|)`. At the 30 mT/m full scale, the default 17.4
+mT/m selection gradient and 4.655 krad/s (0.741 kHz) band excite the 1 mm
+isocenter plane represented by Slice View. Negative G_SS reverses the spatial
+mapping; zero G_SS selects the whole volume only when the transmit band contains
+zero angular-frequency offset.
+
+The Bloch integrator applies B1, G_SS, T1, and T2 simultaneously during RF, so
+Block View shows progressive tilt and through-slice phase dispersion before the
+pulse has ended. The following opposite G_SS lobe defaults to exactly half the
+selection-lobe area, approximating the conventional slice-refocusing moment;
+editing the selection timing or amplitude keeps that ratio matched unless the
+rewinder amplitude is deliberately overridden. RF ends as phase encoding
+begins, while readout prephasing leads into a positive lobe with the same
+duration as the RF pulse.
 
 The brain T2* values use [published 1.5/3/7 T measurements](https://pubmed.ncbi.nlm.nih.gov/17459640/).
 CSF uses the 333.5 ms and 168 ms values from a [compiled 3/7 T quantitative-MRI
