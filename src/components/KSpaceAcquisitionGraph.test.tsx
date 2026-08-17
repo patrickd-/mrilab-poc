@@ -42,6 +42,7 @@ function renderGraph(
       durationMilliseconds={20}
       encodingStartTimeMilliseconds={6.8}
       gradientImperfections={false}
+      gridSize={128}
       phaseEncodingPulses={phaseEncodingPulses}
       readoutPulses={readoutPulses}
       status="idle"
@@ -81,6 +82,7 @@ describe('KSpaceAcquisitionGraph', () => {
         durationMilliseconds={20}
         encodingStartTimeMilliseconds={6.8}
         gradientImperfections={false}
+        gridSize={128}
         phaseEncodingPulses={phaseEncodingPulses}
         readoutPulses={readoutPulses}
         status="running"
@@ -120,6 +122,18 @@ describe('KSpaceAcquisitionGraph', () => {
     expect(
       screen.getByText(/1 acquisition · 4 samples · max \|S\| 1\.00/),
     ).not.toBeNull()
+  })
+
+  it('shades the Cartesian Nyquist support used by the reconstruction grid', () => {
+    const { container } = renderGraph()
+    const support = container.querySelector<SVGRectElement>(
+      '.k-space-reconstruction-support',
+    )
+
+    expect(support?.getAttribute('data-k-min')).toBe('-500')
+    expect(support?.getAttribute('data-k-max-exclusive')).toBe('500')
+    expect(Number(support?.getAttribute('width'))).toBeGreaterThan(0)
+    expect(screen.getByText(/128 × 128 Nyquist support/i)).not.toBeNull()
   })
 
   it('renders a single ADC sample as a grayscale point', () => {

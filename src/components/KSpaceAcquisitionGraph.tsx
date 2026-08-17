@@ -5,6 +5,7 @@ import {
 } from '../hooks/useGradientAcquisition'
 import type { GradientPlaybackStatus } from '../hooks/useGradientEncodingPlayback'
 import {
+  cartesianKSpaceBoundsForGrid,
   gradientKSpaceCyclesPerMeterAt,
   type GradientPulse,
 } from '../simulation/gradientEncoding'
@@ -16,6 +17,7 @@ interface KSpaceAcquisitionGraphProps {
   durationMilliseconds: number
   encodingStartTimeMilliseconds: number
   gradientImperfections: boolean
+  gridSize: number
   phaseEncodingPulses: ReadonlyArray<GradientPulse>
   readoutPulses: ReadonlyArray<GradientPulse>
   status: GradientPlaybackStatus
@@ -29,7 +31,7 @@ const GRAPH = {
   size: 300,
 }
 const AXIS_SAMPLE_COUNT = 160
-const MINIMUM_EXTENT_CYCLES_PER_METER = 1000
+const MINIMUM_EXTENT_CYCLES_PER_METER = 500
 
 function niceSymmetricExtent(maximumAbsoluteValue: number) {
   const boundedMaximum = Math.max(
@@ -70,10 +72,12 @@ function KSpaceAcquisitionGraph({
   durationMilliseconds,
   encodingStartTimeMilliseconds,
   gradientImperfections,
+  gridSize,
   phaseEncodingPulses,
   readoutPulses,
   status,
 }: KSpaceAcquisitionGraphProps) {
+  const reconstructionSupport = cartesianKSpaceBoundsForGrid(gridSize)
   const { extent, maximumMagnitude, points, segments } = useMemo(() => {
     const points = acquisitionRuns.flatMap((run) => run.points)
     const plannedPoints = Array.from(
@@ -184,6 +188,34 @@ function KSpaceAcquisitionGraph({
         role="img"
         aria-label={`K-space trajectory with ${points.length} ADC-acquired complex signal samples; cursor at kx ${formatKSpaceAxisValue(currentKxCyclesPerMeter)} and ky ${formatKSpaceAxisValue(currentKyCyclesPerMeter)} cycles per millimeter`}
       >
+        <rect
+          className="k-space-reconstruction-support"
+          x={xForKx(reconstructionSupport.minimumKCyclesPerMeter)}
+          y={yForKy(
+            reconstructionSupport.upperEdgeExclusiveCyclesPerMeter,
+          )}
+          width={
+            xForKx(
+              reconstructionSupport.upperEdgeExclusiveCyclesPerMeter,
+            ) - xForKx(reconstructionSupport.minimumKCyclesPerMeter)
+          }
+          height={
+            yForKy(reconstructionSupport.minimumKCyclesPerMeter) -
+            yForKy(
+              reconstructionSupport.upperEdgeExclusiveCyclesPerMeter,
+            )
+          }
+          data-k-min={reconstructionSupport.minimumKCyclesPerMeter}
+          data-k-max-exclusive={
+            reconstructionSupport.upperEdgeExclusiveCyclesPerMeter
+          }
+          aria-hidden="true"
+        >
+          <title>
+            {gridSize} × {gridSize} reconstruction Nyquist support; samples
+            outside this square alias into it
+          </title>
+        </rect>
         <g className="k-space-acquisition-grid" aria-hidden="true">
           {[-1, -0.5, 0, 0.5, 1].map((fraction) => (
             <g key={fraction}>
@@ -304,10 +336,16 @@ function KSpaceAcquisitionGraph({
       </svg>
 
       <footer>
-        <div className="k-space-signal-key" aria-hidden="true">
-          <span>Weak |S|</span>
-          <i />
-          <span>Strong |S|</span>
+        <div className="k-space-footer-keys" aria-hidden="true">
+          <div className="k-space-signal-key">
+            <span>Weak |S|</span>
+            <i />
+            <span>Strong |S|</span>
+          </div>
+          <div className="k-space-reconstruction-key">
+            <i />
+            <span>{gridSize} × {gridSize} Nyquist support</span>
+          </div>
         </div>
         <strong>
           {acquisitionRuns.length} acquisition

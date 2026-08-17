@@ -26,6 +26,14 @@ export interface GradientSignalPoint {
   timeMilliseconds: number
 }
 
+export interface CartesianKSpaceBounds {
+  fieldOfViewMillimeters: number
+  kSpaceStepCyclesPerMeter: number
+  maximumKCyclesPerMeter: number
+  minimumKCyclesPerMeter: number
+  upperEdgeExclusiveCyclesPerMeter: number
+}
+
 export const GRADIENT_SEQUENCE_DURATION_MILLISECONDS = 20
 export const MAXIMUM_GRADIENT_TESLA_PER_METER = 30e-3
 export const MAXIMUM_RF_B1_TESLA = 25e-6
@@ -531,6 +539,34 @@ export function gradientKSpaceCyclesPerMeterAt(
       gradientAreaSinceEncodingStart) /
     (2 * Math.PI)
   )
+}
+
+export function cartesianKSpaceBoundsForGrid(
+  gridSize: number,
+  voxelSizeMillimeters = 1,
+): CartesianKSpaceBounds {
+  if (!Number.isInteger(gridSize) || gridSize < 2) {
+    throw new RangeError('Grid size must be an integer of at least 2')
+  }
+  if (
+    !Number.isFinite(voxelSizeMillimeters) ||
+    voxelSizeMillimeters <= 0
+  ) {
+    throw new RangeError('Voxel size must be greater than zero')
+  }
+
+  const fieldOfViewMillimeters = gridSize * voxelSizeMillimeters
+  const kSpaceStepCyclesPerMeter = 1000 / fieldOfViewMillimeters
+  return {
+    fieldOfViewMillimeters,
+    kSpaceStepCyclesPerMeter,
+    maximumKCyclesPerMeter:
+      (Math.ceil(gridSize / 2) - 1) * kSpaceStepCyclesPerMeter,
+    minimumKCyclesPerMeter:
+      -Math.floor(gridSize / 2) * kSpaceStepCyclesPerMeter,
+    upperEdgeExclusiveCyclesPerMeter:
+      Math.ceil(gridSize / 2) * kSpaceStepCyclesPerMeter,
+  }
 }
 
 export function spatialEncodingBasisAt(

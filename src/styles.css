@@ -1634,6 +1634,13 @@ a:focus-visible {
   height: auto;
 }
 
+.k-space-reconstruction-support {
+  fill: rgba(145, 230, 179, 0.09);
+  stroke: rgba(145, 230, 179, 0.46);
+  stroke-dasharray: 4 3;
+  stroke-width: 1;
+}
+
 .k-space-acquisition-grid line {
   stroke: var(--line-soft);
   stroke-width: 1;
@@ -1715,9 +1722,27 @@ a:focus-visible {
   align-items: center;
 }
 
+.k-space-footer-keys {
+  display: grid;
+  gap: 6px;
+}
+
 .k-space-signal-key i {
   height: 3px;
   background: linear-gradient(90deg, #1a1a1a, #fff);
+}
+
+.k-space-reconstruction-key {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.k-space-reconstruction-key i {
+  width: 14px;
+  height: 8px;
+  border: 1px dashed rgba(145, 230, 179, 0.7);
+  background: rgba(145, 230, 179, 0.16);
 }
 
 .inverse-fourier-reconstruction {

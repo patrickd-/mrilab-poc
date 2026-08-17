@@ -1,5 +1,6 @@
 import {
   ADC_DWELL_TIME_MILLISECONDS,
+  cartesianKSpaceBoundsForGrid,
   DEFAULT_ADC_PULSES,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
@@ -172,15 +173,17 @@ export function calibrateGradientEncoding(
     sequenceDurationMilliseconds
   const adcStartTimeMilliseconds = adcPulse.start * sequenceDurationMilliseconds
   const adcEndTimeMilliseconds = adcPulse.end * sequenceDurationMilliseconds
-  const fieldOfViewMillimeters =
-    options.gridSize * options.voxelSizeMillimeters
-  const kSpaceStepCyclesPerMeter = 1000 / fieldOfViewMillimeters
-  const minimumKCyclesPerMeter =
-    -Math.floor(options.gridSize / 2) * kSpaceStepCyclesPerMeter
-  const maximumKCyclesPerMeter =
-    (Math.ceil(options.gridSize / 2) - 1) * kSpaceStepCyclesPerMeter
-  const readoutUpperEdgeExclusiveCyclesPerMeter =
-    Math.ceil(options.gridSize / 2) * kSpaceStepCyclesPerMeter
+  const {
+    fieldOfViewMillimeters,
+    kSpaceStepCyclesPerMeter,
+    maximumKCyclesPerMeter,
+    minimumKCyclesPerMeter,
+    upperEdgeExclusiveCyclesPerMeter:
+      readoutUpperEdgeExclusiveCyclesPerMeter,
+  } = cartesianKSpaceBoundsForGrid(
+    options.gridSize,
+    options.voxelSizeMillimeters,
+  )
 
   const solvedReadout = solveTwoPulseAmplitudes(
     readoutPrephaser,

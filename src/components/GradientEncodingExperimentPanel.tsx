@@ -1118,6 +1118,7 @@ function GradientEncodingExperimentPanel({
             durationMilliseconds={durationMilliseconds}
             encodingStartTimeMilliseconds={encodingStartTimeMilliseconds}
             gradientImperfections={gradientImperfections}
+            gridSize={gridSize}
             phaseEncodingPulses={
               enabledChannels['phase-encoding']
                 ? phaseEncodingPulses
