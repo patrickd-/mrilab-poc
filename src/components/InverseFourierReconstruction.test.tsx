@@ -104,7 +104,7 @@ describe('inverse Fourier reconstruction', () => {
       ).toBe(true)
       expect(
         screen.getByRole('img', {
-          name: /partial mri magnitude reconstruction from 1 acquisition and 1 complex k-space sample/i,
+          name: /partial magnitude mr image from 1 acquisition and 1 complex k-space sample/i,
         }),
       ).not.toBeNull()
 
@@ -134,7 +134,7 @@ describe('inverse Fourier reconstruction', () => {
       ).toBe(true)
       expect(
         screen.getByRole('img', {
-          name: /partial mri magnitude reconstruction from 2 acquisitions and 2 complex k-space samples/i,
+          name: /partial magnitude mr image from 2 acquisitions and 2 complex k-space samples/i,
         }),
       ).not.toBeNull()
 

@@ -178,7 +178,7 @@ describe('GradientEncodingExperimentPanel', () => {
     expect(screen.getByText('Inverse Fourier Transform')).not.toBeNull()
     expect(
       screen.getByRole('img', {
-        name: /Partial MRI magnitude reconstruction from 0 acquisitions/i,
+        name: /Partial magnitude MR image from 0 acquisitions/i,
       }),
     ).not.toBeNull()
     expect(

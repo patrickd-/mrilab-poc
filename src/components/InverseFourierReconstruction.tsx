@@ -204,7 +204,7 @@ function InverseFourierReconstruction({
     <figure className="inverse-fourier-reconstruction">
       <figcaption>
         <div>
-          <strong>Magnitude reconstruction</strong>
+          <strong>Magnitude MR image</strong>
           <span>Complex inverse Fourier sum</span>
         </div>
         <small>
@@ -218,7 +218,7 @@ function InverseFourierReconstruction({
         width={gridSize}
         height={gridSize}
         role="img"
-        aria-label={`Partial MRI magnitude reconstruction from ${acquisitionLabel} and ${sampleLabel} at ${voxelSizeMillimeters.toFixed(3)} millimeter voxels`}
+        aria-label={`Partial magnitude MR image from ${acquisitionLabel} and ${sampleLabel} at ${voxelSizeMillimeters.toFixed(3)} millimeter voxels`}
       />
       <footer>
         <span>0</span>
