@@ -70,6 +70,10 @@ offsets rather than treating the shortened FID as irreversible T2 decay.
 `B1 inhomogeneity` applies a smooth transmit-field profile whose peak flip-angle
 deviation grows from 4% at 1.5 T to 15% at 7 T. RF pulses remain instantaneous,
 but excitation and refocusing angles are no longer spatially perfect.
+`Gradient imperfections` passes commanded gradients through a causal response
+with a 0.04 ms fast coil time constant and a 4% component decaying over 0.8 ms.
+The gradient editor shows the resulting applied waveform as a dashed yellow
+trace, and that response—not the ideal command—drives phase accumulation.
 
 The brain T2* values use [published 1.5/3/7 T measurements](https://pubmed.ncbi.nlm.nih.gov/17459640/).
 CSF uses the 333.5 ms and 168 ms values from a [compiled 3/7 T quantitative-MRI

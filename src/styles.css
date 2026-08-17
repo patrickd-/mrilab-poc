@@ -1053,6 +1053,17 @@ a:focus-visible {
   pointer-events: none;
 }
 
+.gradient-applied-waveform {
+  fill: none;
+  stroke: var(--yellow);
+  stroke-dasharray: 4 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
 .gradient-handle-stroke {
   stroke: var(--cyan);
   stroke-linecap: square;

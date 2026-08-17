@@ -23,8 +23,8 @@ import {
   type RfPulseEvent,
 } from '../simulation/fid'
 import {
+  appliedGradientAmplitudeAt,
   GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
-  gradientAmplitudeAt,
   gradientEnsembleMagnetizationStateAt,
   gradientPhaseRadiansAt,
   MAXIMUM_GRADIENT_TESLA_PER_METER,
@@ -113,6 +113,7 @@ interface LabSceneProps {
   gradientEncodingActive: boolean
   gradientEncodingSelected: boolean
   gradientEncodingEnsembleStates: ReadonlyArray<FidEnsembleState>
+  gradientImperfections: boolean
   gradientEncodingTimeMilliseconds: number
   gradientPhaseEncodingPulses: ReadonlyArray<GradientPulse>
   gradientReadoutPulses: ReadonlyArray<GradientPulse>
@@ -149,6 +150,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientEncodingActive,
       gradientEncodingSelected,
       gradientEncodingEnsembleStates,
+      gradientImperfections,
       gradientEncodingTimeMilliseconds,
       gradientPhaseEncodingPulses,
       gradientReadoutPulses,
@@ -199,6 +201,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       selected: gradientEncodingSelected,
       phaseEncodingPulses: gradientPhaseEncodingPulses,
       readoutPulses: gradientReadoutPulses,
+      imperfections: gradientImperfections,
       states: gradientEncodingEnsembleStates,
       timeMilliseconds: gradientEncodingTimeMilliseconds,
     })
@@ -333,6 +336,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         selected: gradientEncodingSelected,
         phaseEncodingPulses: gradientPhaseEncodingPulses,
         readoutPulses: gradientReadoutPulses,
+        imperfections: gradientImperfections,
         states: gradientEncodingEnsembleStates,
         timeMilliseconds: gradientEncodingTimeMilliseconds,
       }
@@ -342,6 +346,7 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientEncodingActive,
       gradientEncodingSelected,
       gradientEncodingEnsembleStates,
+      gradientImperfections,
       gradientEncodingTimeMilliseconds,
       gradientPhaseEncodingPulses,
       gradientReadoutPulses,
@@ -949,6 +954,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                   timeMilliseconds,
                   gradientAnimation.phaseEncodingPulses,
                   gradientAnimation.readoutPulses,
+                  GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+                  gradientAnimation.imperfections,
                 )
               : fidEnsembleMagnetizationStateAt(
                   state,
@@ -1104,26 +1111,22 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
           )
         })
 
-        const normalizedGradientTime = Math.min(
-          1,
-          Math.max(
-            0,
-            timeMilliseconds /
-              GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
-          ),
-        )
         const phaseEncodingAmplitude =
           renderingGradientEncoding && simulationActive
-            ? gradientAmplitudeAt(
+            ? appliedGradientAmplitudeAt(
                 gradientAnimation.phaseEncodingPulses,
-                normalizedGradientTime,
+                timeMilliseconds,
+                GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+                gradientAnimation.imperfections,
               )
             : 0
         const readoutAmplitude =
           renderingGradientEncoding && simulationActive
-            ? gradientAmplitudeAt(
+            ? appliedGradientAmplitudeAt(
                 gradientAnimation.readoutPulses,
-                normalizedGradientTime,
+                timeMilliseconds,
+                GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+                gradientAnimation.imperfections,
               )
             : 0
 
@@ -1200,6 +1203,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                       timeMilliseconds,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,
+                      GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+                      gradientAnimation.imperfections,
                     ).precessionPhaseRadians
                   : gradientPhaseRadiansAt(
                       column,
@@ -1212,6 +1217,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                       timeMilliseconds,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,
+                      GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+                      gradientAnimation.imperfections,
                     )
               } else if (simulationActive) {
                 const state = sliceGraphStateLookup[index]
@@ -1241,6 +1248,8 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                       timeMilliseconds,
                       gradientAnimation.phaseEncodingPulses,
                       gradientAnimation.readoutPulses,
+                      GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+                      gradientAnimation.imperfections,
                     )
                   : fidEnsembleMagnetizationStateAt(
                       state,

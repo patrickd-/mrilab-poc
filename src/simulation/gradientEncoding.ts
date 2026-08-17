@@ -12,6 +12,9 @@ export interface GradientPulse {
 
 export const GRADIENT_SEQUENCE_DURATION_MILLISECONDS = 20
 export const MAXIMUM_GRADIENT_TESLA_PER_METER = 1e-3
+const GRADIENT_FAST_RESPONSE_TIME_MILLISECONDS = 0.04
+const GRADIENT_EDDY_RESPONSE_TIME_MILLISECONDS = 0.8
+const GRADIENT_EDDY_RESPONSE_FRACTION = 0.04
 
 export const DEFAULT_PHASE_ENCODING_PULSES: ReadonlyArray<GradientPulse> = [
   { start: 0.12, end: 0.32, amplitude: 0.52 },
@@ -41,6 +44,44 @@ function normalizedPulseAreaAt(
   }, 0)
 }
 
+function gradientStepResponse(elapsedMilliseconds: number) {
+  if (elapsedMilliseconds <= 0) return 0
+
+  return (
+    1 -
+    (1 - GRADIENT_EDDY_RESPONSE_FRACTION) *
+      Math.exp(
+        -elapsedMilliseconds / GRADIENT_FAST_RESPONSE_TIME_MILLISECONDS,
+      ) -
+    GRADIENT_EDDY_RESPONSE_FRACTION *
+      Math.exp(
+        -elapsedMilliseconds / GRADIENT_EDDY_RESPONSE_TIME_MILLISECONDS,
+      )
+  )
+}
+
+function integratedGradientStepResponse(elapsedMilliseconds: number) {
+  if (elapsedMilliseconds <= 0) return 0
+
+  return (
+    elapsedMilliseconds -
+    (1 - GRADIENT_EDDY_RESPONSE_FRACTION) *
+      GRADIENT_FAST_RESPONSE_TIME_MILLISECONDS *
+      (1 -
+        Math.exp(
+          -elapsedMilliseconds /
+            GRADIENT_FAST_RESPONSE_TIME_MILLISECONDS,
+        )) -
+    GRADIENT_EDDY_RESPONSE_FRACTION *
+      GRADIENT_EDDY_RESPONSE_TIME_MILLISECONDS *
+      (1 -
+        Math.exp(
+          -elapsedMilliseconds /
+            GRADIENT_EDDY_RESPONSE_TIME_MILLISECONDS,
+        ))
+  )
+}
+
 export function gradientAmplitudeAt(
   pulses: ReadonlyArray<GradientPulse>,
   normalizedTime: number,
@@ -54,6 +95,73 @@ export function gradientAmplitudeAt(
   )
 }
 
+export function appliedGradientAmplitudeAt(
+  pulses: ReadonlyArray<GradientPulse>,
+  timeMilliseconds: number,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  imperfections = false,
+) {
+  const boundedTimeMilliseconds = Math.min(
+    durationMilliseconds,
+    Math.max(0, timeMilliseconds),
+  )
+  if (!imperfections) {
+    return gradientAmplitudeAt(
+      pulses,
+      boundedTimeMilliseconds / durationMilliseconds,
+    )
+  }
+
+  return pulses.reduce((amplitude, pulse) => {
+    const startMilliseconds = pulse.start * durationMilliseconds
+    const endMilliseconds = pulse.end * durationMilliseconds
+    return (
+      amplitude +
+      pulse.amplitude *
+        (gradientStepResponse(
+          boundedTimeMilliseconds - startMilliseconds,
+        ) -
+          gradientStepResponse(
+            boundedTimeMilliseconds - endMilliseconds,
+          ))
+    )
+  }, 0)
+}
+
+function gradientAreaSecondsAt(
+  pulses: ReadonlyArray<GradientPulse>,
+  timeMilliseconds: number,
+  durationMilliseconds: number,
+  imperfections: boolean,
+) {
+  if (!imperfections) {
+    return (
+      normalizedPulseAreaAt(
+        pulses,
+        timeMilliseconds / durationMilliseconds,
+      ) *
+      (durationMilliseconds / 1000)
+    )
+  }
+
+  const areaMilliseconds = pulses.reduce((area, pulse) => {
+    const startMilliseconds = pulse.start * durationMilliseconds
+    const endMilliseconds = pulse.end * durationMilliseconds
+    return (
+      area +
+      pulse.amplitude *
+        (integratedGradientStepResponse(
+          timeMilliseconds - startMilliseconds,
+        ) -
+          integratedGradientStepResponse(
+            timeMilliseconds - endMilliseconds,
+          ))
+    )
+  }, 0)
+
+  return areaMilliseconds / 1000
+}
+
 export function gradientPhaseRadiansAt(
   column: number,
   row: number,
@@ -63,18 +171,26 @@ export function gradientPhaseRadiansAt(
   phaseEncodingPulses: ReadonlyArray<GradientPulse>,
   readoutPulses: ReadonlyArray<GradientPulse>,
   durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  gradientImperfections = false,
 ) {
   const boundedTimeMilliseconds = Math.min(
     durationMilliseconds,
     Math.max(0, timeMilliseconds),
   )
-  const normalizedTime = boundedTimeMilliseconds / durationMilliseconds
   const phaseEncodingAreaSeconds =
-    normalizedPulseAreaAt(phaseEncodingPulses, normalizedTime) *
-    (durationMilliseconds / 1000)
+    gradientAreaSecondsAt(
+      phaseEncodingPulses,
+      boundedTimeMilliseconds,
+      durationMilliseconds,
+      gradientImperfections,
+    )
   const readoutAreaSeconds =
-    normalizedPulseAreaAt(readoutPulses, normalizedTime) *
-    (durationMilliseconds / 1000)
+    gradientAreaSecondsAt(
+      readoutPulses,
+      boundedTimeMilliseconds,
+      durationMilliseconds,
+      gradientImperfections,
+    )
   const gridCenter = (gridSize - 1) / 2
   const positionXMeters = (column - gridCenter) * 1e-3
   const positionYMeters = (gridCenter - row) * 1e-3
@@ -97,6 +213,7 @@ export function gradientEnsembleMagnetizationStateAt(
   phaseEncodingPulses: ReadonlyArray<GradientPulse>,
   readoutPulses: ReadonlyArray<GradientPulse>,
   durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  gradientImperfections = false,
 ): FidEnsembleMagnetizationState {
   const boundedTimeMilliseconds = Math.min(
     durationMilliseconds,
@@ -131,6 +248,7 @@ export function gradientEnsembleMagnetizationStateAt(
       phaseEncodingPulses,
       readoutPulses,
       durationMilliseconds,
+      gradientImperfections,
     )
     packetXFraction +=
       Math.cos(packetPhaseRadians) * spinPacket.weight

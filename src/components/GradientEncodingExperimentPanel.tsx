@@ -9,6 +9,7 @@ import type {
   GradientPlaybackStatus,
 } from '../hooks/useGradientEncodingPlayback'
 import {
+  appliedGradientAmplitudeAt,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
   type GradientPulse,
@@ -28,6 +29,8 @@ interface DragState {
 
 interface EditableGradientGraphProps {
   description: string
+  durationMilliseconds: number
+  gradientImperfections: boolean
   guideTime: number | null
   label: 'PE' | 'RO'
   linkedPulses?: boolean
@@ -41,6 +44,7 @@ interface EditableGradientGraphProps {
 
 interface GradientEncodingExperimentPanelProps {
   durationMilliseconds: number
+  gradientImperfections: boolean
   onPause: () => void
   onPhaseEncodingPulsesChange: (pulses: GradientPulse[]) => void
   onPhaseEncodingReset: () => void
@@ -178,6 +182,8 @@ function updatePulses(
 
 function EditableGradientGraph({
   description,
+  durationMilliseconds,
+  gradientImperfections,
   guideTime,
   label,
   linkedPulses = false,
@@ -316,6 +322,20 @@ function EditableGradientGraph({
       )} H ${timeToX(pulse.end)} V ${baselineY}`
     }, `M ${timeToX(firstPulse.start)} ${baselineY}`)
   }
+  const appliedWaveformPath = gradientImperfections
+    ? Array.from({ length: 161 }, (_, index) => {
+        const normalizedTime = index / 160
+        const amplitude = appliedGradientAmplitudeAt(
+          pulses,
+          normalizedTime * durationMilliseconds,
+          durationMilliseconds,
+          true,
+        )
+        return `${index === 0 ? 'M' : 'L'} ${timeToX(
+          normalizedTime,
+        )} ${amplitudeToY(amplitude)}`
+      }).join(' ')
+    : ''
 
   return (
     <div className={`gradient-input gradient-input-${label.toLowerCase()}`}>
@@ -455,6 +475,13 @@ function EditableGradientGraph({
           d={`${waveformPath} H ${GRAPH.left + plotWidth}`}
           aria-hidden="true"
         />
+        {gradientImperfections && (
+          <path
+            className="gradient-applied-waveform"
+            d={appliedWaveformPath}
+            aria-hidden="true"
+          />
+        )}
 
         {pulses.flatMap((pulse, pulseIndex) => {
           const startX = timeToX(pulse.start)
@@ -547,6 +574,7 @@ function EditableGradientGraph({
 
 function GradientEncodingExperimentPanel({
   durationMilliseconds,
+  gradientImperfections,
   onPause,
   onPhaseEncodingPulsesChange,
   onPhaseEncodingReset,
@@ -580,11 +608,15 @@ function GradientEncodingExperimentPanel({
         Drag a pulse top to move it or change amplitude. Drag either side to
         adjust timing. Gray lines mark the default encoding steps. The 20 ms
         window maps full scale to ±1 mT/m.
+        {gradientImperfections &&
+          ' Dashed yellow shows the applied gradient response.'}
       </p>
 
       <div className="gradient-timing-diagram">
         <EditableGradientGraph
           description="Phase encoding gradient"
+          durationMilliseconds={durationMilliseconds}
+          gradientImperfections={gradientImperfections}
           guideTime={timingGuideTime}
           label="PE"
           pulses={phaseEncodingPulses}
@@ -596,6 +628,8 @@ function GradientEncodingExperimentPanel({
         />
         <EditableGradientGraph
           description="Readout gradient"
+          durationMilliseconds={durationMilliseconds}
+          gradientImperfections={gradientImperfections}
           guideTime={timingGuideTime}
           label="RO"
           linkedPulses

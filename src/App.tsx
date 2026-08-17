@@ -242,6 +242,9 @@ function App() {
   const b1Inhomogeneity = enabledRealismOptions.includes(
     'b1-inhomogeneity',
   )
+  const gradientImperfections = enabledRealismOptions.includes(
+    'gradient-imperfections',
+  )
   const magneticProperties = selectedEnsemble?.magneticProperties(
     fieldStrengthTesla,
     fieldUniformity,
@@ -417,6 +420,7 @@ function App() {
           }
           gradientEncodingSelected={gradientExperimentSelected}
           gradientEncodingEnsembleStates={gradientEnsembleStates}
+          gradientImperfections={gradientImperfections}
           gradientEncodingTimeMilliseconds={
             gradientPlayback.timeMilliseconds
           }
@@ -612,6 +616,7 @@ function App() {
                 durationMilliseconds={
                   GRADIENT_SEQUENCE_DURATION_MILLISECONDS
                 }
+                gradientImperfections={gradientImperfections}
                 phaseEncodingPulses={phaseEncodingPulses}
                 readoutPulses={readoutPulses}
                 speed={gradientPlayback.speed}

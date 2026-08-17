@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 export type RealismOptionId =
   | 'b0-inhomogeneity'
   | 'b1-inhomogeneity'
+  | 'gradient-imperfections'
   | 'intravoxel-dephasing'
 
 const REALISM_OPTIONS: ReadonlyArray<{
@@ -11,6 +12,7 @@ const REALISM_OPTIONS: ReadonlyArray<{
 }> = [
   { id: 'b0-inhomogeneity', label: 'B0 inhomogeneity' },
   { id: 'b1-inhomogeneity', label: 'B1 inhomogeneity' },
+  { id: 'gradient-imperfections', label: 'Gradient imperfections' },
   { id: 'intravoxel-dephasing', label: 'Intravoxel dephasing' },
 ]
 
