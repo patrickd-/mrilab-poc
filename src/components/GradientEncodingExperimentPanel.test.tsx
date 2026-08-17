@@ -171,10 +171,40 @@ describe('GradientEncodingExperimentPanel', () => {
     )
     expect(
       screen.getByLabelText('RF pulse derived properties').textContent,
-    ).toMatch(/T.?RF.? = 5\.20 ms.*BW = 0\.741 kHz.*TBW = 3\.85.*90\.0°.*4\.33 µT/s)
+    ).toMatch(
+      /T.?RF.? = 5\.20 ms.*BW = 0\.741 kHz.*TBW = 3\.85.*90\.0°.*4\.33 \/ 25 µT.*90° target.*4\.33 µT/s,
+    )
     expect(
       screen.getByLabelText('Slice rephasing area').textContent,
     ).toContain('0.500')
+  })
+
+  it('warns when a 90-degree pulse exceeds the available peak B1', () => {
+    const defaultBand = createDefaultTransmitFrequencyBand(128)
+    const center =
+      (defaultBand.lowerAngularFrequencyKilradiansPerSecond +
+        defaultBand.upperAngularFrequencyKilradiansPerSecond) /
+      2
+    const width =
+      defaultBand.upperAngularFrequencyKilradiansPerSecond -
+      defaultBand.lowerAngularFrequencyKilradiansPerSecond
+
+    render(
+      <GradientEncodingExperimentPanel
+        {...panelProps({
+          transmitFrequencyBand: {
+            lowerAngularFrequencyKilradiansPerSecond:
+              center - width * 4,
+            upperAngularFrequencyKilradiansPerSecond:
+              center + width * 4,
+          },
+        })}
+      />,
+    )
+
+    expect(
+      screen.getByText(/exceeds limit; reduce bandwidth or \|GSS\|/i),
+    ).not.toBeNull()
   })
 
   it('routes play, pause, reset, and speed controls by playback status', async () => {

@@ -120,7 +120,11 @@ its physical peak B1, duration, transmit bandwidth, time-bandwidth product, and
 nominal flip angle are displayed together. Changing pulse width therefore
 changes both the sinc truncation and RF area—it no longer just changes how fast
 a fixed 90° rotation completes. Reset calibrates the current transmit band to a
-nominal 90° pulse when the 12 µT peak-B1 limit permits it.
+nominal 90° pulse when the 25 µT peak-B1 limit permits it. This educational
+ceiling is consistent with [published scanner-scale B1 examples](https://pmc.ncbi.nlm.nih.gov/articles/PMC4589956/).
+The panel reports both the current peak B1 and the peak required for 90°; if a
+very broad transmit band exceeds the limit, reducing |G_SS| provides a thicker
+slice without demanding the same RF bandwidth.
 Each timing row can also be bypassed independently with its checked-by-default
 On control. Bypassing a channel removes it from the applied sequence without
 discarding its editable waveform.

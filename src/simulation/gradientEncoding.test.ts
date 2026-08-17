@@ -20,6 +20,7 @@ import {
   rfPulseAreaTeslaSecondsAt,
   rfPulseB1TeslaAt,
   rfPulseNominalFlipAngleRadiansAt,
+  rfPeakB1TeslaForFlipAngle,
   rfPulseTimeBandwidthProduct,
   sliceMappingAngularFrequencyKilradiansPerSecondAt,
   sliceSelectiveRfMagnetizationAt,
@@ -464,6 +465,70 @@ describe('windowed-sinc RF excitation', () => {
       calibrateRfPulseForFlipAngle(shortenedPulse, DEFAULT_BAND).amplitude,
     ).toBeGreaterThan(shortenedPulse.amplitude)
   })
+
+  it('calibrates a five-millimeter slice within the scanner-scale B1 limit', () => {
+    const center =
+      (DEFAULT_BAND.lowerAngularFrequencyKilradiansPerSecond +
+        DEFAULT_BAND.upperAngularFrequencyKilradiansPerSecond) /
+      2
+    const defaultWidth =
+      DEFAULT_BAND.upperAngularFrequencyKilradiansPerSecond -
+      DEFAULT_BAND.lowerAngularFrequencyKilradiansPerSecond
+    const fiveMillimeterBand = {
+      lowerAngularFrequencyKilradiansPerSecond:
+        center - (defaultWidth * 5) / 2,
+      upperAngularFrequencyKilradiansPerSecond:
+        center + (defaultWidth * 5) / 2,
+    }
+    const requiredPeakB1 = rfPeakB1TeslaForFlipAngle(
+      EXCITATION_PULSE,
+      fiveMillimeterBand,
+    )
+    const calibrated = calibrateRfPulseForFlipAngle(
+      { ...EXCITATION_PULSE, amplitude: 1 },
+      fiveMillimeterBand,
+    )
+
+    expect(requiredPeakB1 * 1e6).toBeCloseTo(21.76, 1)
+    expect(requiredPeakB1).toBeLessThan(MAXIMUM_RF_B1_TESLA)
+    expect(calibrated.amplitude).toBeLessThan(1)
+    expect(
+      rfPulseNominalFlipAngleRadiansAt(
+        calibrated,
+        fiveMillimeterBand,
+      ),
+    ).toBeCloseTo(Math.PI / 2, 8)
+  })
+
+  it('reports when a very wide slice exceeds the peak B1 limit', () => {
+    const center =
+      (DEFAULT_BAND.lowerAngularFrequencyKilradiansPerSecond +
+        DEFAULT_BAND.upperAngularFrequencyKilradiansPerSecond) /
+      2
+    const defaultWidth =
+      DEFAULT_BAND.upperAngularFrequencyKilradiansPerSecond -
+      DEFAULT_BAND.lowerAngularFrequencyKilradiansPerSecond
+    const eightMillimeterBand = {
+      lowerAngularFrequencyKilradiansPerSecond:
+        center - defaultWidth * 4,
+      upperAngularFrequencyKilradiansPerSecond:
+        center + defaultWidth * 4,
+    }
+    const requiredPeakB1 = rfPeakB1TeslaForFlipAngle(
+      EXCITATION_PULSE,
+      eightMillimeterBand,
+    )
+    const limited = calibrateRfPulseForFlipAngle(
+      { ...EXCITATION_PULSE, amplitude: 1 },
+      eightMillimeterBand,
+    )
+
+    expect(requiredPeakB1).toBeGreaterThan(MAXIMUM_RF_B1_TESLA)
+    expect(limited.amplitude).toBe(1)
+    expect(
+      rfPulseNominalFlipAngleRadiansAt(limited, eightMillimeterBand),
+    ).toBeLessThan(Math.PI / 2)
+  })
 })
 
 describe('slice-selective Bloch evolution', () => {
@@ -525,6 +590,42 @@ describe('slice-selective Bloch evolution', () => {
     const magnetization = rfStateAt(63.5, rfEndMilliseconds)
 
     expect(magnetization.nominalFlipAngleRadians).toBeCloseTo(Math.PI / 2, 8)
+    expect(magnetization.xFraction).toBeCloseTo(1, 4)
+    expect(magnetization.yFraction).toBeCloseTo(0, 4)
+    expect(magnetization.zFraction).toBeCloseTo(0, 4)
+  })
+
+  it('reaches 90 degrees in the Bloch solver for a calibrated five-millimeter slice', () => {
+    const centerFrequency =
+      (DEFAULT_BAND.lowerAngularFrequencyKilradiansPerSecond +
+        DEFAULT_BAND.upperAngularFrequencyKilradiansPerSecond) /
+      2
+    const defaultBandwidth =
+      DEFAULT_BAND.upperAngularFrequencyKilradiansPerSecond -
+      DEFAULT_BAND.lowerAngularFrequencyKilradiansPerSecond
+    const fiveMillimeterBand = {
+      lowerAngularFrequencyKilradiansPerSecond:
+        centerFrequency - (defaultBandwidth * 5) / 2,
+      upperAngularFrequencyKilradiansPerSecond:
+        centerFrequency + (defaultBandwidth * 5) / 2,
+    }
+    const calibratedPulse = calibrateRfPulseForFlipAngle(
+      { ...EXCITATION_PULSE, amplitude: 1 },
+      fiveMillimeterBand,
+    )
+    const state = {
+      ...stateAtLayer(63.5),
+      ...effectivelyNoRelaxation,
+    }
+    const magnetization = sliceSelectiveRfMagnetizationAt(
+      state,
+      packet,
+      rfEndMilliseconds,
+      calibratedPulse,
+      fiveMillimeterBand,
+      DEFAULT_SLICE_SELECTION_PULSES,
+    )
+
     expect(magnetization.xFraction).toBeCloseTo(1, 4)
     expect(magnetization.yFraction).toBeCloseTo(0, 4)
     expect(magnetization.zFraction).toBeCloseTo(0, 4)

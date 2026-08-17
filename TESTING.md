@@ -67,7 +67,8 @@ window.
 - orthogonal phase/readout axes and polarity;
 - frequency-to-position mapping for positive, negative, and zero G_SS;
 - Hamming-windowed sinc symmetry and zero spacing, physical peak B1 and RF
-  area, time-bandwidth product, pulse-width-dependent flip, and 90° calibration;
+  area, time-bandwidth product, pulse-width-dependent flip, 90° calibration,
+  achievable five-millimetre slices, and explicit over-limit wide bands;
 - simultaneous RF/G_SS Bloch evolution, progressive tilt, through-slice phase
   dispersion during RF, and rejection of out-of-band layers;
 - the default half-area G_SS rewinder, reduced post-RF phase slope with the

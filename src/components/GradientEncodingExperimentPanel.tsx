@@ -20,6 +20,7 @@ import {
   MAXIMUM_RF_B1_TESLA,
   rfPulseB1TeslaAt,
   rfPulseNominalFlipAngleRadiansAt,
+  rfPeakB1TeslaForFlipAngle,
   rfPulseTimeBandwidthProduct,
   sliceRephasingAreaRatio,
   transmitBandwidthAngularRadiansPerMillisecond,
@@ -760,6 +761,17 @@ function GradientEncodingExperimentPanel({
   const rfPeakB1Microtesla = rfExcitationPulse
     ? Math.abs(rfExcitationPulse.amplitude) * MAXIMUM_RF_B1_TESLA * 1e6
     : 0
+  const rfPeakB1ForNinetyDegreesMicrotesla = rfExcitationPulse
+    ? rfPeakB1TeslaForFlipAngle(
+        rfExcitationPulse,
+        transmitFrequencyBand,
+        Math.PI / 2,
+        durationMilliseconds,
+      ) * 1e6
+    : 0
+  const rfNinetyDegreeTargetAvailable =
+    rfPeakB1ForNinetyDegreesMicrotesla <=
+    MAXIMUM_RF_B1_TESLA * 1e6 + 1e-6
   const rfNominalFlipDegrees = rfExcitationPulse
     ? (rfPulseNominalFlipAngleRadiansAt(
         rfExcitationPulse,
@@ -840,7 +852,8 @@ function GradientEncodingExperimentPanel({
           product and nominal flip. G<sub>SS</sub> acts during RF; its opposite
           rewinder defaults to half the selection-lobe area. Gradient full
           scale is ±
-          {MAXIMUM_GRADIENT_TESLA_PER_METER * 1e3} mT/m.
+          {MAXIMUM_GRADIENT_TESLA_PER_METER * 1e3} mT/m. RF Reset recalibrates
+          the current bandwidth to 90° when it fits within the B₁ limit.
           {gradientImperfections &&
             ' Dashed yellow shows the applied gradient response.'}
         </p>
@@ -875,7 +888,23 @@ function GradientEncodingExperimentPanel({
             <span>TBW = {rfTimeBandwidthProduct.toFixed(2)}</span>
             <strong>
               α<sub>nominal</sub> = {rfNominalFlipDegrees.toFixed(1)}° · B
-              <sub>1, peak</sub> = {rfPeakB1Microtesla.toFixed(2)} µT
+              <sub>1, peak</sub> = {rfPeakB1Microtesla.toFixed(2)} /{' '}
+              {(MAXIMUM_RF_B1_TESLA * 1e6).toFixed(0)} µT
+            </strong>
+            <strong
+              className={
+                rfNinetyDegreeTargetAvailable
+                  ? 'rf-pulse-target'
+                  : 'rf-pulse-limit-warning'
+              }
+            >
+              90° target: B<sub>1, peak</sub> ={' '}
+              {Number.isFinite(rfPeakB1ForNinetyDegreesMicrotesla)
+                ? rfPeakB1ForNinetyDegreesMicrotesla.toFixed(2)
+                : '—'}{' '}
+              µT
+              {!rfNinetyDegreeTargetAvailable &&
+                ' · exceeds limit; reduce bandwidth or |GSS|'}
             </strong>
           </div>
           <EditableGradientGraph

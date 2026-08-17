@@ -1325,6 +1325,14 @@ a:focus-visible {
   font-weight: 500;
 }
 
+.rf-pulse-meta .rf-pulse-target {
+  color: var(--green);
+}
+
+.rf-pulse-meta .rf-pulse-limit-warning {
+  color: var(--yellow);
+}
+
 .rf-pulse-meta sub,
 .slice-rephasing-meta sub {
   font-size: 0.7em;

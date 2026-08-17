@@ -18,7 +18,7 @@ export interface TransmitFrequencyBand {
 
 export const GRADIENT_SEQUENCE_DURATION_MILLISECONDS = 20
 export const MAXIMUM_GRADIENT_TESLA_PER_METER = 30e-3
-export const MAXIMUM_RF_B1_TESLA = 12e-6
+export const MAXIMUM_RF_B1_TESLA = 25e-6
 export const RF_BLOCH_MAXIMUM_STEP_MILLISECONDS = 0.02
 const GRADIENT_FAST_RESPONSE_TIME_MILLISECONDS = 0.04
 const GRADIENT_EDDY_RESPONSE_TIME_MILLISECONDS = 0.8
@@ -61,7 +61,7 @@ export function rfPulseTimeBandwidthProduct(
 
 /**
  * Hamming-windowed sinc RF envelope. The configured transmit bandwidth sets
- * the sinc zero spacing; pulse.amplitude scales a physical 12 µT peak limit.
+ * the sinc zero spacing; pulse.amplitude scales a physical 25 µT peak limit.
  */
 export function rfPulseB1TeslaAt(
   pulse: GradientPulse,
@@ -172,6 +172,26 @@ export function calibrateRfPulseForFlipAngle(
         ? 0
         : Math.max(-1, Math.min(1, targetFlipAngleRadians / unitFlipAngle)),
   }
+}
+
+export function rfPeakB1TeslaForFlipAngle(
+  pulse: GradientPulse,
+  transmitFrequencyBand: TransmitFrequencyBand,
+  targetFlipAngleRadians = Math.PI / 2,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+) {
+  const unitFlipAngle = rfPulseNominalFlipAngleRadiansAt(
+    { ...pulse, amplitude: 1 },
+    transmitFrequencyBand,
+    pulse.end * durationMilliseconds,
+    durationMilliseconds,
+  )
+  return Math.abs(unitFlipAngle) < 1e-12
+    ? Number.POSITIVE_INFINITY
+    : Math.abs(
+        (targetFlipAngleRadians / unitFlipAngle) *
+          MAXIMUM_RF_B1_TESLA,
+      )
 }
 
 const DEFAULT_TRANSMIT_BANDWIDTH_RADIANS_PER_MILLISECOND =
