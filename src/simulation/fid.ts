@@ -61,6 +61,12 @@ export interface FidEnsembleState {
   spinPackets: ReadonlyArray<FidSpinPacketState>
 }
 
+export interface FidRealismOptions {
+  b1Inhomogeneity?: boolean
+  intravoxelDephasing?: boolean
+  tissueHeterogeneity?: boolean
+}
+
 export type RfPulseKind = '90-y' | '180-x'
 
 export interface RfPulseEvent {
@@ -259,15 +265,21 @@ export function createFidEnsembleStates(
   ensembles: ReadonlyArray<HydrogenEnsemble>,
   fieldStrengthTesla: SupportedFieldStrengthTesla,
   fieldUniformity: FieldUniformity,
-  intravoxelDephasing = false,
-  b1Inhomogeneity = false,
+  {
+    b1Inhomogeneity = false,
+    intravoxelDephasing = false,
+    tissueHeterogeneity = false,
+  }: FidRealismOptions = {},
 ) {
   const states: FidEnsembleState[] = []
 
   ensembles.forEach((ensemble) => {
     if (ensemble.samplePreset === 'air') return
 
-    const sampleProperties = ensemble.sampleProperties(fieldStrengthTesla)
+    const sampleProperties = ensemble.sampleProperties(
+      fieldStrengthTesla,
+      tissueHeterogeneity,
+    )
     const magneticProperties = ensemble.magneticProperties(
       fieldStrengthTesla,
       fieldUniformity,

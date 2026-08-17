@@ -78,6 +78,11 @@ trace, and that response—not the ideal command—drives phase accumulation.
 the independent I and Q voltage channels at a normalized SNR of 80. It affects
 FID/echo measurements and fitted echo peaks, but not the underlying arrows or
 longitudinal magnetization.
+`Tissue heterogeneity` replaces each tissue preset's single relaxation values
+with smooth, deterministic local values: T1 varies by up to 5%, while T2 and
+the refocusable T2* ratio vary by up to 8%. The selected-cell readout and every
+simulation path use the same local values, and T2* is constrained not to exceed
+T2.
 
 The brain T2* values use [published 1.5/3/7 T measurements](https://pubmed.ncbi.nlm.nih.gov/17459640/).
 CSF uses the 333.5 ms and 168 ms values from a [compiled 3/7 T quantitative-MRI

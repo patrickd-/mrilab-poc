@@ -203,6 +203,10 @@ function ScientificValue({
   )
 }
 
+function formatRelaxationTime(value: number) {
+  return value === 0 ? 0 : Number(value.toPrecision(4))
+}
+
 function App() {
   const ensembles = useMemo(() => createHydrogenEnsembles(GRID_SIZE), [])
   const sceneRef = useRef<LabSceneHandle>(null)
@@ -246,12 +250,16 @@ function App() {
     'gradient-imperfections',
   )
   const receiverNoise = enabledRealismOptions.includes('receiver-noise')
+  const tissueHeterogeneity = enabledRealismOptions.includes(
+    'tissue-heterogeneity',
+  )
   const magneticProperties = selectedEnsemble?.magneticProperties(
     fieldStrengthTesla,
     fieldUniformity,
   )
   const sampleProperties = selectedEnsemble?.sampleProperties(
     fieldStrengthTesla,
+    tissueHeterogeneity,
   )
   const stackedEnsembleCount = useMemo(
     () =>
@@ -273,7 +281,10 @@ function App() {
             ensembles,
             fieldStrengthTesla,
             fieldUniformity,
-            intravoxelDephasing,
+            {
+              intravoxelDephasing,
+              tissueHeterogeneity,
+            },
           )
         : [],
     [
@@ -283,6 +294,7 @@ function App() {
       fieldUniformity,
       gradientExperimentSelected,
       intravoxelDephasing,
+      tissueHeterogeneity,
     ],
   )
   const fidSimulation = useFidSimulation({
@@ -294,6 +306,7 @@ function App() {
     intravoxelDephasing,
     b1Inhomogeneity,
     receiverNoise,
+    tissueHeterogeneity,
     initialPulseKind: selectedExperiment === 'spin-echo' ? '90-y' : null,
     millisecondsPerTick: Number(simulationTimeStep),
   })
@@ -893,9 +906,9 @@ function App() {
                     <dd>
                       <span className="formula chalk-pink">
                         T<sub>1</sub> ≈{' '}
-                        {
-                          sampleProperties.longitudinalRelaxationTimeMilliseconds
-                        }
+                        {formatRelaxationTime(
+                          sampleProperties.longitudinalRelaxationTimeMilliseconds,
+                        )}
                       </span>
                       <small>ms</small>
                     </dd>
@@ -905,9 +918,9 @@ function App() {
                     <dd>
                       <span className="formula chalk-yellow">
                         T<sub>2</sub> ≈{' '}
-                        {
-                          sampleProperties.transverseRelaxationTimeMilliseconds
-                        }
+                        {formatRelaxationTime(
+                          sampleProperties.transverseRelaxationTimeMilliseconds,
+                        )}
                       </span>
                       <small>ms</small>
                     </dd>

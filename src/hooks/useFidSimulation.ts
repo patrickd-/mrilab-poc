@@ -52,6 +52,7 @@ interface UseFidSimulationOptions {
   intravoxelDephasing: boolean
   b1Inhomogeneity: boolean
   receiverNoise: boolean
+  tissueHeterogeneity: boolean
   initialPulseKind: RfPulseKind | null
   millisecondsPerTick: number
 }
@@ -65,6 +66,7 @@ export function useFidSimulation({
   intravoxelDephasing,
   b1Inhomogeneity,
   receiverNoise,
+  tissueHeterogeneity,
   initialPulseKind,
   millisecondsPerTick,
 }: UseFidSimulationOptions) {
@@ -75,8 +77,11 @@ export function useFidSimulation({
             ensembles,
             fieldStrengthTesla,
             fieldUniformity,
-            intravoxelDephasing,
-            b1Inhomogeneity,
+            {
+              b1Inhomogeneity,
+              intravoxelDephasing,
+              tissueHeterogeneity,
+            },
           )
         : [],
     [
@@ -87,6 +92,7 @@ export function useFidSimulation({
       fieldUniformity,
       intravoxelDephasing,
       b1Inhomogeneity,
+      tissueHeterogeneity,
     ],
   )
   const workerRef = useRef<Worker | null>(null)

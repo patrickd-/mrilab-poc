@@ -99,6 +99,29 @@ const RELAXATION_TIMES_MS: Readonly<
   },
 }
 
+const TISSUE_HETEROGENEITY_PHASE: Readonly<Record<SamplePresetId, number>> = {
+  air: 0,
+  'cortical-bone': 0.7,
+  'cerebrospinal-fluid': 1.9,
+  'gray-matter': 3.1,
+  'white-matter': 4.4,
+}
+
+function smoothTissueVariationAt(
+  column: number,
+  row: number,
+  gridSize: number,
+  phase: number,
+) {
+  const x = ((column + 0.5) / gridSize) * 2 * Math.PI
+  const y = ((row + 0.5) / gridSize) * 2 * Math.PI
+  return (
+    (Math.sin(1.35 * x + phase) * Math.cos(0.9 * y - 0.7 * phase) +
+      0.5 * Math.sin(2.1 * y - 1.7 * x + 0.5 * phase)) /
+    1.5
+  )
+}
+
 export interface FieldDirection {
   x: number
   y: number
@@ -207,21 +230,61 @@ export class HydrogenEnsemble {
     )
   }
 
-  sampleProperties(fieldStrengthTesla: SupportedFieldStrengthTesla) {
+  sampleProperties(
+    fieldStrengthTesla: SupportedFieldStrengthTesla,
+    tissueHeterogeneity = false,
+  ) {
     const preset = SAMPLE_PRESETS.find(
       (candidate) => candidate.id === this.samplePreset,
     )!
     const relaxationTimes =
       RELAXATION_TIMES_MS[fieldStrengthTesla][this.samplePreset]
+    const tissuePhase = TISSUE_HETEROGENEITY_PHASE[this.samplePreset]
+    const t1Variation = tissueHeterogeneity
+      ? smoothTissueVariationAt(
+          this.column,
+          this.row,
+          this.gridSize,
+          tissuePhase,
+        )
+      : 0
+    const t2Variation = tissueHeterogeneity
+      ? smoothTissueVariationAt(
+          this.column,
+          this.row,
+          this.gridSize,
+          tissuePhase + 2.1,
+        )
+      : 0
+    const t2StarVariation = tissueHeterogeneity
+      ? smoothTissueVariationAt(
+          this.column,
+          this.row,
+          this.gridSize,
+          tissuePhase + 4.2,
+        )
+      : 0
+    const longitudinalRelaxationTimeMilliseconds =
+      relaxationTimes.t1 * (1 + 0.05 * t1Variation)
+    const transverseRelaxationTimeMilliseconds =
+      relaxationTimes.t2 * (1 + 0.08 * t2Variation)
+    const baseT2StarRatio =
+      relaxationTimes.t2 === 0
+        ? 0
+        : relaxationTimes.t2Star / relaxationTimes.t2
+    const effectiveTransverseRelaxationTimeMilliseconds =
+      baseT2StarRatio >= 0.999
+        ? transverseRelaxationTimeMilliseconds
+        : transverseRelaxationTimeMilliseconds *
+          Math.min(1, baseT2StarRatio * (1 + 0.08 * t2StarVariation))
 
     return {
       temperatureCelsius: preset.temperatureCelsius,
       temperatureKelvin: preset.temperatureCelsius + 273.15,
       totalProtonCount: preset.totalProtonCount,
-      longitudinalRelaxationTimeMilliseconds: relaxationTimes.t1,
-      transverseRelaxationTimeMilliseconds: relaxationTimes.t2,
-      effectiveTransverseRelaxationTimeMilliseconds:
-        relaxationTimes.t2Star,
+      longitudinalRelaxationTimeMilliseconds,
+      transverseRelaxationTimeMilliseconds,
+      effectiveTransverseRelaxationTimeMilliseconds,
     }
   }
 
