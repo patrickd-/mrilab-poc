@@ -45,6 +45,7 @@ import {
   magneticFieldHeight,
   phaseHeight,
   rotatingFrequencyHeight,
+  sliceFieldSurfaceScale,
   sliceMagneticField,
   smoothGridValues,
 } from './sceneMath'
@@ -60,10 +61,6 @@ const SLICE_GRAPH_BASE_HEIGHT = 10
 const SLICE_GRAPH_HEIGHT = 5.6
 const FULL_SCALE_COMBINED_GRADIENT_FIELD_OFFSET_TESLA =
   MAXIMUM_GRADIENT_TESLA_PER_METER * GRID_SIZE * 1e-3
-const FULL_SCALE_COMBINED_GRADIENT_FREQUENCY_OFFSET_HERTZ =
-  larmorFrequencyOffsetHertzFromFieldOffsetTesla(
-    FULL_SCALE_COMBINED_GRADIENT_FIELD_OFFSET_TESLA,
-  )
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
 const SAMPLE_SPHERE_COLORS: Readonly<Record<SamplePresetId, THREE.Color>> = {
   air: new THREE.Color('#526c78'),
@@ -1473,7 +1470,6 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                 spatialGradient.yProfile,
               )))
 
-        let maximumAbsoluteFrequencyOffsetHertz = 0
         let maximumAbsoluteFieldOffsetTesla = 0
         if (
           graphMode === 'frequency-laboratory' ||
@@ -1507,11 +1503,19 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
                 magneticField.fieldOffsetsTesla[index],
               )
           }
-          maximumAbsoluteFrequencyOffsetHertz =
-            larmorFrequencyOffsetHertzFromFieldOffsetTesla(
-              maximumAbsoluteFieldOffsetTesla,
-            )
         }
+        const minimumFieldHeightScaleTesla =
+          renderingGradientEncoding || spatialGradientApplied
+            ? FULL_SCALE_COMBINED_GRADIENT_FIELD_OFFSET_TESLA
+            : 0
+        const fieldHeightScaleTesla = sliceFieldSurfaceScale(
+          maximumAbsoluteFieldOffsetTesla,
+          minimumFieldHeightScaleTesla,
+        )
+        const frequencyHeightScaleHertz =
+          larmorFrequencyOffsetHertzFromFieldOffsetTesla(
+            fieldHeightScaleTesla,
+          )
 
         for (let row = 0; row < GRID_SIZE; row += 1) {
           for (let column = 0; column < GRID_SIZE; column += 1) {
@@ -1527,29 +1531,17 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
               // gradients use one fixed summed-field scale so their slopes
               // stay comparable. Ppm-only B0 variation retains local
               // auto-ranging when no spatial gradient is present.
-              const frequencyHeightScaleHertz =
-                renderingGradientEncoding || spatialGradientApplied
-                  ? FULL_SCALE_COMBINED_GRADIENT_FREQUENCY_OFFSET_HERTZ
-                  : maximumAbsoluteFrequencyOffsetHertz
               normalizedHeight = laboratoryFrequencyHeight(
                 fieldStrengthTeslaRef.current,
                 frequencyOffsetHertz,
                 frequencyHeightScaleHertz,
               )
             } else if (graphMode === 'frequency-rotating') {
-              const frequencyHeightScaleHertz =
-                renderingGradientEncoding || spatialGradientApplied
-                  ? FULL_SCALE_COMBINED_GRADIENT_FREQUENCY_OFFSET_HERTZ
-                  : maximumAbsoluteFrequencyOffsetHertz
               normalizedHeight = rotatingFrequencyHeight(
                 frequencyOffsetHertz,
                 frequencyHeightScaleHertz,
               )
             } else if (graphMode === 'magnetic-field') {
-              const fieldHeightScaleTesla =
-                renderingGradientEncoding || spatialGradientApplied
-                  ? FULL_SCALE_COMBINED_GRADIENT_FIELD_OFFSET_TESLA
-                  : maximumAbsoluteFieldOffsetTesla
               normalizedHeight = magneticFieldHeight(
                 fieldStrengthTeslaRef.current,
                 magneticFieldOffsetTesla,

@@ -1,14 +1,11 @@
 import {
-  useEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
-  combinedSpatialFieldOffsetMilliteslaAt,
   createDefaultSpatialGradientProfiles,
-  DEFAULT_SPATIAL_GRADIENT_FIELD_OF_VIEW_MILLIMETERS,
   gradientStrengthMilliteslaPerMeter,
   maximumEndpointFieldOffsetMillitesla,
   type SpatialGradientProfile,
@@ -60,115 +57,9 @@ const GRAPH = {
   width: 460,
 }
 const KEYBOARD_FIELD_STEP_MILLITESLA = 0.08
-const PREVIEW_SIZE = 128
-const MAGNETIC_FIELD_HEIGHT_PALETTE = [
-  [68, 1, 84],
-  [59, 82, 139],
-  [33, 145, 140],
-  [94, 201, 98],
-  [253, 231, 37],
-] as const
-const ZERO_SPATIAL_GRADIENT_PROFILE: SpatialGradientProfile = {
-  endFieldOffsetMillitesla: 0,
-  startFieldOffsetMillitesla: 0,
-}
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
-}
-
-export function magneticFieldHeightColor(
-  normalizedHeight: number,
-): readonly [number, number, number] {
-  const palettePosition =
-    clamp(normalizedHeight, 0, 1) *
-    (MAGNETIC_FIELD_HEIGHT_PALETTE.length - 1)
-  const lowerIndex = Math.min(
-    MAGNETIC_FIELD_HEIGHT_PALETTE.length - 2,
-    Math.floor(palettePosition),
-  )
-  const interpolation = palettePosition - lowerIndex
-  const lower = MAGNETIC_FIELD_HEIGHT_PALETTE[lowerIndex]
-  const upper = MAGNETIC_FIELD_HEIGHT_PALETTE[lowerIndex + 1]
-
-  return [
-    Math.round(lower[0] + (upper[0] - lower[0]) * interpolation),
-    Math.round(lower[1] + (upper[1] - lower[1]) * interpolation),
-    Math.round(lower[2] + (upper[2] - lower[2]) * interpolation),
-  ]
-}
-
-export function createGradientHeightmap(
-  xProfile: SpatialGradientProfile,
-  yProfile: SpatialGradientProfile,
-  size = PREVIEW_SIZE,
-  displayMagnitudeMillitesla =
-    maximumEndpointFieldOffsetMillitesla(
-      DEFAULT_SPATIAL_GRADIENT_FIELD_OF_VIEW_MILLIMETERS,
-    ) * 2,
-) {
-  const safeSize = Math.max(1, Math.floor(size))
-  const safeDisplayMagnitudeMillitesla = Math.max(
-    Number.EPSILON,
-    Math.abs(displayMagnitudeMillitesla),
-  )
-  const fieldOffsets = new Float64Array(safeSize ** 2)
-  let minimumFieldOffsetMillitesla = Number.POSITIVE_INFINITY
-  let maximumFieldOffsetMillitesla = Number.NEGATIVE_INFINITY
-
-  for (let row = 0; row < safeSize; row += 1) {
-    const normalizedY =
-      safeSize === 1 ? 0.5 : 1 - row / (safeSize - 1)
-
-    for (let column = 0; column < safeSize; column += 1) {
-      const normalizedX =
-        safeSize === 1 ? 0.5 : column / (safeSize - 1)
-      const fieldOffset = combinedSpatialFieldOffsetMilliteslaAt(
-        xProfile,
-        yProfile,
-        normalizedX,
-        normalizedY,
-      )
-      const index = row * safeSize + column
-      fieldOffsets[index] = fieldOffset
-      minimumFieldOffsetMillitesla = Math.min(
-        minimumFieldOffsetMillitesla,
-        fieldOffset,
-      )
-      maximumFieldOffsetMillitesla = Math.max(
-        maximumFieldOffsetMillitesla,
-        fieldOffset,
-      )
-    }
-  }
-
-  const rgba = new Uint8ClampedArray(safeSize ** 2 * 4)
-
-  fieldOffsets.forEach((fieldOffset, index) => {
-    const normalizedHeight = clamp(
-      (fieldOffset + safeDisplayMagnitudeMillitesla) /
-        (2 * safeDisplayMagnitudeMillitesla),
-      0,
-      1,
-    )
-    const [red, green, blue] =
-      magneticFieldHeightColor(normalizedHeight)
-    const pixelOffset = index * 4
-    rgba[pixelOffset] = red
-    rgba[pixelOffset + 1] = green
-    rgba[pixelOffset + 2] = blue
-    rgba[pixelOffset + 3] = 255
-  })
-
-  return {
-    displayMaximumFieldOffsetMillitesla: safeDisplayMagnitudeMillitesla,
-    displayMinimumFieldOffsetMillitesla:
-      -safeDisplayMagnitudeMillitesla,
-    maximumFieldOffsetMillitesla,
-    minimumFieldOffsetMillitesla,
-    rgba,
-    size: safeSize,
-  }
 }
 
 function formatFieldOffset(value: number) {
@@ -503,92 +394,6 @@ function SpatialGradientGraph({
   )
 }
 
-function GradientHeightmap({
-  displayMagnitudeMillitesla,
-  fieldOfViewMillimeters,
-  xProfile,
-  yProfile,
-}: {
-  displayMagnitudeMillitesla: number
-  fieldOfViewMillimeters: number
-  xProfile: SpatialGradientProfile
-  yProfile: SpatialGradientProfile
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const heightmap = createGradientHeightmap(
-    xProfile,
-    yProfile,
-    PREVIEW_SIZE,
-    displayMagnitudeMillitesla,
-  )
-
-  useEffect(() => {
-    const context = canvasRef.current?.getContext('2d')
-    if (!context) return
-    const imageData = context.createImageData(
-      heightmap.size,
-      heightmap.size,
-    )
-    imageData.data.set(heightmap.rgba)
-    context.putImageData(imageData, 0, 0)
-  }, [heightmap])
-
-  return (
-    <figure className="spatial-gradient-heightmap">
-      <figcaption>
-        <div>
-          <strong>Magnetic gradient heightmap</strong>
-          <span>ΔB₀(x,y) = ΔBₓ(x) + ΔBᵧ(y)</span>
-        </div>
-        <small>
-          Actual {formatFieldOffset(
-            heightmap.minimumFieldOffsetMillitesla,
-          )}…{formatFieldOffset(
-            heightmap.maximumFieldOffsetMillitesla,
-          )} mT · {fieldOfViewMillimeters} × {fieldOfViewMillimeters} mm
-        </small>
-      </figcaption>
-      <div className="spatial-gradient-heightmap-plot">
-        <span className="spatial-gradient-heightmap-y" aria-hidden="true">
-          y ↑
-        </span>
-        <canvas
-          ref={canvasRef}
-          width={heightmap.size}
-          height={heightmap.size}
-          role="img"
-          aria-label={`Magnetic gradient color heightmap with actual field offsets from ${formatFieldOffset(
-            heightmap.minimumFieldOffsetMillitesla,
-          )} to ${formatFieldOffset(
-            heightmap.maximumFieldOffsetMillitesla,
-          )} millitesla on a fixed ${formatFieldOffset(
-            heightmap.displayMinimumFieldOffsetMillitesla,
-          )} to ${formatFieldOffset(
-            heightmap.displayMaximumFieldOffsetMillitesla,
-          )} millitesla scale`}
-        />
-        <span className="spatial-gradient-heightmap-x" aria-hidden="true">
-          x →
-        </span>
-      </div>
-      <footer>
-        <span>
-          {formatFieldOffset(
-            heightmap.displayMinimumFieldOffsetMillitesla,
-          )} mT
-        </span>
-        <i aria-hidden="true" />
-        <span>
-          {formatFieldOffset(
-            heightmap.displayMaximumFieldOffsetMillitesla,
-          )} mT
-        </span>
-        <strong>Fixed field scale</strong>
-      </footer>
-    </figure>
-  )
-}
-
 function GradientEncodingExperimentPanel({
   fieldOfViewMillimeters,
   onXEnabledChange,
@@ -619,8 +424,8 @@ function GradientEncodingExperimentPanel({
       <p className="gradient-input-instructions">
         Drag either endpoint to define the linear ΔB₀ profile across each
         spatial axis. The line slope is the applied gradient strength; the
-        color map combines G<sub>x</sub> and G<sub>y</sub> across the
-        sample plane.
+        enabled G<sub>x</sub> and G<sub>y</sub> profiles are summed directly
+        in the 3D magnetic-field and frequency surfaces.
       </p>
 
       <div className="spatial-gradient-stack">
@@ -643,16 +448,6 @@ function GradientEncodingExperimentPanel({
           onChange={onYProfileChange}
           onEnabledChange={onYEnabledChange}
           onReset={() => onYProfileChange(defaults.y)}
-        />
-        <GradientHeightmap
-          displayMagnitudeMillitesla={maximumFieldOffset * 2}
-          fieldOfViewMillimeters={fieldOfViewMillimeters}
-          xProfile={
-            xEnabled ? xProfile : ZERO_SPATIAL_GRADIENT_PROFILE
-          }
-          yProfile={
-            yEnabled ? yProfile : ZERO_SPATIAL_GRADIENT_PROFILE
-          }
         />
       </div>
     </section>

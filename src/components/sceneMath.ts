@@ -174,6 +174,17 @@ export function larmorFrequencyOffsetHertzFromFieldOffsetTesla(
   )
 }
 
+export function sliceFieldSurfaceScale(
+  maximumAbsoluteFieldOffsetTesla: number,
+  minimumGradientScaleTesla = 0,
+) {
+  const largestExpectedMagnitude = Math.max(
+    Math.abs(maximumAbsoluteFieldOffsetTesla),
+    Math.abs(minimumGradientScaleTesla),
+  )
+  return largestExpectedMagnitude * 1.02
+}
+
 /**
  * Adds static B0 variation, active GRE gradients, and optional fundamental
  * spatial profiles into one longitudinal field offset for every ensemble.

@@ -10,6 +10,7 @@ import {
   phaseHeight,
   rotatingFrequencyHeight,
   sliceFrequencyField,
+  sliceFieldSurfaceScale,
   sliceMagneticField,
   smoothGridValues,
 } from './sceneMath'
@@ -181,6 +182,20 @@ describe('slice magnetic-field surface', () => {
     )
     expect(larmorFrequencyOffsetHertzFromFieldOffsetTesla(-1e-3)).toBeLessThan(
       0,
+    )
+  })
+
+  it('keeps display headroom above summed field extrema', () => {
+    expect(sliceFieldSurfaceScale(0.00512, 0.00512)).toBeCloseTo(
+      0.0052224,
+      12,
+    )
+    expect(sliceFieldSurfaceScale(0.0052, 0.00512)).toBeGreaterThan(
+      0.0052,
+    )
+    expect(sliceFieldSurfaceScale(1e-6, 0.00512)).toBeCloseTo(
+      0.0052224,
+      12,
     )
   })
 })
