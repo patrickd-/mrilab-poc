@@ -418,6 +418,31 @@ function App() {
       tissueHeterogeneity,
     ],
   )
+  const spatialProjectionEnsembleStates = useMemo(
+    () => {
+      if (!spatialGradientExperimentSelected) return []
+      if (renderMode !== 'block') return spatialGradientEnsembleStates
+      return createFidEnsembleStates(
+        ensembles,
+        fieldStrengthTesla,
+        fieldUniformity,
+        {
+          includeAirEnsembles: true,
+          tissueHeterogeneity,
+        },
+      )
+    },
+    [
+      ensembleRevision,
+      ensembles,
+      fieldStrengthTesla,
+      fieldUniformity,
+      renderMode,
+      spatialGradientEnsembleStates,
+      spatialGradientExperimentSelected,
+      tissueHeterogeneity,
+    ],
+  )
   const spatialGradientPlayback = useSpatialGradientPlayback({
     active: spatialGradientExperimentSelected,
   })
@@ -879,7 +904,7 @@ function App() {
 
             {selectedExperiment === 'gradient-encoding' && (
               <GradientEncodingExperimentPanel
-                ensembleStates={spatialGradientEnsembleStates}
+                ensembleStates={spatialProjectionEnsembleStates}
                 fieldOfViewMillimeters={GRID_SIZE}
                 playbackSpeed={spatialGradientPlayback.speed}
                 playbackStatus={spatialGradientPlayback.status}

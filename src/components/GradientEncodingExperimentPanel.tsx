@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -19,6 +20,14 @@ import type {
   SpatialGradientPlaybackSpeed,
   SpatialGradientPlaybackStatus,
 } from '../hooks/useSpatialGradientPlayback'
+import {
+  addBackprojection,
+  backprojectionGrayscalePixels,
+  backprojectSpatialProjection,
+  spatialProjectionAngleBin,
+  SPATIAL_RECONSTRUCTION_ANGLE_BIN_COUNT,
+  SPATIAL_RECONSTRUCTION_GRID_SIZE,
+} from '../simulation/spatialReconstruction'
 import DarkSelect from './DarkSelect'
 
 export {
@@ -374,6 +383,137 @@ function FourierSpectrumGraph({
         <path className="spatial-spectrum-fill" d={fillPath} />
         <path className="spatial-spectrum-line" d={spectrumPath} />
       </svg>
+    </div>
+  )
+}
+
+function SpatialBackprojectionReconstruction({
+  centerFieldOffsetMillitesla,
+  fieldOfViewMillimeters,
+  projection,
+  sourceKey,
+  xGradientMilliteslaPerMeter,
+  yGradientMilliteslaPerMeter,
+}: {
+  centerFieldOffsetMillitesla: number
+  fieldOfViewMillimeters: number
+  projection: SpatialFourierProjection
+  sourceKey: ReadonlyArray<FidEnsembleState>
+  xGradientMilliteslaPerMeter: number
+  yGradientMilliteslaPerMeter: number
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const accumulatorRef = useRef(
+    new Float64Array(
+      SPATIAL_RECONSTRUCTION_GRID_SIZE *
+        SPATIAL_RECONSTRUCTION_GRID_SIZE,
+    ),
+  )
+  const acquiredAnglesRef = useRef(
+    new Uint8Array(SPATIAL_RECONSTRUCTION_ANGLE_BIN_COUNT),
+  )
+  const sourceKeyRef = useRef(sourceKey)
+  const acquiredProjectionCountRef = useRef(0)
+  const [acquiredProjectionCount, setAcquiredProjectionCount] =
+    useState(0)
+  const [imageRevision, setImageRevision] = useState(0)
+
+  const clearReconstruction = () => {
+    accumulatorRef.current.fill(0)
+    acquiredAnglesRef.current.fill(0)
+    acquiredProjectionCountRef.current = 0
+    setAcquiredProjectionCount(0)
+    setImageRevision((revision) => revision + 1)
+  }
+
+  useEffect(() => {
+    if (sourceKeyRef.current === sourceKey) return
+    sourceKeyRef.current = sourceKey
+    clearReconstruction()
+  }, [sourceKey])
+
+  useEffect(() => {
+    const angleBin = spatialProjectionAngleBin(
+      xGradientMilliteslaPerMeter,
+      yGradientMilliteslaPerMeter,
+    )
+    if (angleBin === null || acquiredAnglesRef.current[angleBin]) return
+
+    const backprojection = backprojectSpatialProjection(
+      projection,
+      {
+        centerFieldOffsetMillitesla,
+        xGradientMilliteslaPerMeter,
+        yGradientMilliteslaPerMeter,
+      },
+      fieldOfViewMillimeters,
+      SPATIAL_RECONSTRUCTION_GRID_SIZE,
+    )
+    addBackprojection(accumulatorRef.current, backprojection)
+    acquiredAnglesRef.current[angleBin] = 1
+    acquiredProjectionCountRef.current += 1
+    setAcquiredProjectionCount(acquiredProjectionCountRef.current)
+    setImageRevision((revision) => revision + 1)
+  }, [
+    centerFieldOffsetMillitesla,
+    fieldOfViewMillimeters,
+    projection,
+    sourceKey,
+    xGradientMilliteslaPerMeter,
+    yGradientMilliteslaPerMeter,
+  ])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const context = canvas?.getContext('2d')
+    if (!canvas || !context) return
+
+    const imageData = context.createImageData(
+      SPATIAL_RECONSTRUCTION_GRID_SIZE,
+      SPATIAL_RECONSTRUCTION_GRID_SIZE,
+    )
+    imageData.data.set(
+      backprojectionGrayscalePixels(accumulatorRef.current),
+    )
+    context.putImageData(imageData, 0, 0)
+  }, [imageRevision])
+
+  const coveragePercentage =
+    (acquiredProjectionCount /
+      SPATIAL_RECONSTRUCTION_ANGLE_BIN_COUNT) *
+    100
+
+  return (
+    <div className="spatial-reconstruction-shell">
+      <header>
+        <div>
+          <strong>Accumulated unfiltered backprojection</strong>
+          <span>Proton-weighted projection density</span>
+        </div>
+        <button
+          className="gradient-input-reset"
+          type="button"
+          aria-label="Reset backprojection reconstruction"
+          disabled={acquiredProjectionCount === 0}
+          onClick={clearReconstruction}
+        >
+          Reset
+        </button>
+      </header>
+      <canvas
+        ref={canvasRef}
+        width={SPATIAL_RECONSTRUCTION_GRID_SIZE}
+        height={SPATIAL_RECONSTRUCTION_GRID_SIZE}
+        role="img"
+        aria-label="Accumulated two-dimensional backprojection reconstruction"
+      />
+      <footer>
+        <span>
+          {acquiredProjectionCount} /{' '}
+          {SPATIAL_RECONSTRUCTION_ANGLE_BIN_COUNT} angular projections
+        </span>
+        <strong>{coveragePercentage.toFixed(1)}% angular coverage</strong>
+      </footer>
     </div>
   )
 }
@@ -884,6 +1024,30 @@ function GradientEncodingExperimentPanel({
             projection={projection}
           />
         </div>
+      </section>
+
+      <section className="fundamental-gradient-section spatial-reconstruction-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">03</span>
+            <h2>2D Reconstruction by Backprojection</h2>
+          </div>
+        </div>
+
+        <p className="gradient-input-instructions">
+          Each newly explored gradient angle spreads its F(ω) projection
+          back across the slice, perpendicular to G. The accumulated smears
+          form an unfiltered two-dimensional projection reconstruction.
+        </p>
+
+        <SpatialBackprojectionReconstruction
+          centerFieldOffsetMillitesla={centerFieldOffsetMillitesla}
+          fieldOfViewMillimeters={fieldOfViewMillimeters}
+          projection={projection}
+          sourceKey={ensembleStates}
+          xGradientMilliteslaPerMeter={xGradientStrength}
+          yGradientMilliteslaPerMeter={yGradientStrength}
+        />
       </section>
     </>
   )

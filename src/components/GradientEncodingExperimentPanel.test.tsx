@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createHydrogenEnsembles } from '../models/HydrogenEnsemble'
 import { createFidEnsembleStates } from '../simulation/fid'
 import GradientEncodingExperimentPanel, {
@@ -17,6 +17,22 @@ const TEST_ENSEMBLE_STATES = createFidEnsembleStates(
   'uniform',
   { includeAirEnsembles: true },
 )
+
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+    () =>
+      ({
+        createImageData: (width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+        }),
+        putImageData: vi.fn(),
+      }) as unknown as CanvasRenderingContext2D,
+  )
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 function StatefulGradientEncodingExperimentPanel() {
   const defaults = createDefaultSpatialGradientProfiles(128)
@@ -102,6 +118,35 @@ describe('GradientEncodingExperimentPanel', () => {
     ).not.toBeNull()
     expect(screen.getByText('1D Fourier Transform Projection')).not.toBeNull()
     expect(screen.getByText(/r∥ · mm along G/)).not.toBeNull()
+    expect(
+      screen.getByText('2D Reconstruction by Backprojection'),
+    ).not.toBeNull()
+    expect(
+      screen.getByRole('img', {
+        name: 'Accumulated two-dimensional backprojection reconstruction',
+      }),
+    ).not.toBeNull()
+    expect(screen.getByText('1 / 180 angular projections')).not.toBeNull()
+  })
+
+  it('accumulates distinct gradient angles and can reset the backprojection', () => {
+    render(<StatefulGradientEncodingExperimentPanel />)
+    expect(screen.getByText('1 / 180 angular projections')).not.toBeNull()
+
+    fireEvent.keyDown(
+      screen.getByRole('slider', {
+        name: 'G y gradient 128 millimeter endpoint',
+      }),
+      { key: 'ArrowUp' },
+    )
+    expect(screen.getByText('2 / 180 angular projections')).not.toBeNull()
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Reset backprojection reconstruction',
+      }),
+    )
+    expect(screen.getByText('0 / 180 angular projections')).not.toBeNull()
   })
 
   it('recomputes both Fourier-linked plots when a gradient is toggled', () => {

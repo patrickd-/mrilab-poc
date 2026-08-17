@@ -27,6 +27,7 @@ export interface SpatialSignalPoint {
 
 export interface SpatialSpectrumPoint {
   angularFrequencyRadiansPerSecond: number
+  density: number
   frequencyKilohertz: number
   magnitude: number
 }
@@ -244,6 +245,7 @@ export function createSpatialFourierProjection(
         normalizedFrequency * maximumAngularFrequencyRadiansPerSecond
       return {
         angularFrequencyRadiansPerSecond,
+        density: centeredSpectrum[index],
         frequencyKilohertz:
           angularFrequencyRadiansPerSecond / (2 * Math.PI * 1000),
         magnitude: centeredSpectrum[index] / maximumSpectrumMagnitude,

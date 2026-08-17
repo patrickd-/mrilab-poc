@@ -1047,6 +1047,66 @@ a:focus-visible {
   stroke-width: 1.7;
 }
 
+.spatial-reconstruction-shell {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #080b0e;
+}
+
+.spatial-reconstruction-shell > header,
+.spatial-reconstruction-shell > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.spatial-reconstruction-shell > header {
+  min-height: 48px;
+  padding: 7px 9px 7px 13px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.spatial-reconstruction-shell > header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.spatial-reconstruction-shell > header strong {
+  color: var(--white);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.spatial-reconstruction-shell > header span {
+  color: var(--muted);
+  font-size: 7px;
+}
+
+.spatial-reconstruction-shell canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  background: #000;
+}
+
+.spatial-reconstruction-shell > footer {
+  min-height: 36px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 7px;
+}
+
+.spatial-reconstruction-shell > footer strong {
+  color: var(--green);
+  font-size: 8px;
+  font-weight: 500;
+}
+
 .spatial-gradient-input {
   min-width: 0;
 }
