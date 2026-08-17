@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { PROTON_GYROMAGNETIC_RATIO } from '../models/HydrogenEnsemble'
 import type { FidEnsembleState } from './fid'
 import {
+  adcGateActiveAt,
   appliedGradientAmplitudeAt,
   calibrateRfPulseForFlipAngle,
   copyGradientPulses,
   createDefaultTransmitFrequencyBand,
+  DEFAULT_ADC_PULSES,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
   DEFAULT_RF_EXCITATION_PULSES,
@@ -15,6 +17,7 @@ import {
   gradientEnsembleMagnetizationStateAt,
   gradientKSpaceCyclesPerMeterAt,
   gradientPhaseRadiansAt,
+  gradientSignalPointAt,
   MAXIMUM_GRADIENT_TESLA_PER_METER,
   MAXIMUM_RF_B1_TESLA,
   maximumSliceMappingAngularFrequencyKilradiansPerSecond,
@@ -61,6 +64,25 @@ describe('gradient waveform primitives', () => {
       rf.end - rf.start,
       12,
     )
+    expect(DEFAULT_ADC_PULSES[0]).toMatchObject({
+      start: readoutPositive.start,
+      end: readoutPositive.end,
+      amplitude: 1,
+    })
+  })
+
+  it('treats ADC as a digital gate with an exclusive end boundary', () => {
+    const adc = DEFAULT_ADC_PULSES[0]
+    const startMilliseconds =
+      adc.start * GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+    const endMilliseconds =
+      adc.end * GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+
+    expect(
+      adcGateActiveAt(DEFAULT_ADC_PULSES, startMilliseconds - 1e-6),
+    ).toBe(false)
+    expect(adcGateActiveAt(DEFAULT_ADC_PULSES, startMilliseconds)).toBe(true)
+    expect(adcGateActiveAt(DEFAULT_ADC_PULSES, endMilliseconds)).toBe(false)
   })
 
   it('copies pulse objects rather than sharing mutable references', () => {
@@ -834,6 +856,79 @@ describe('gradient-encoding magnetization state', () => {
       precessionPhaseRadians: 0,
       flipAngleRadians: 0,
     })
+  })
+
+  it('aggregates the actual gradient-encoded complex receiver signal', () => {
+    const rfEndMilliseconds =
+      DEFAULT_RF_EXCITATION_PULSES[0].end *
+      GRADIENT_SEQUENCE_DURATION_MILLISECONDS
+    const signal = gradientSignalPointAt(
+      [
+        centeredState({
+          longitudinalRelaxationTimeMilliseconds: 1e12,
+          transverseRelaxationTimeMilliseconds: 1e12,
+        }),
+      ],
+      rfEndMilliseconds,
+      DEFAULT_RF_EXCITATION_PULSES,
+      DEFAULT_BAND,
+      DEFAULT_SLICE_SELECTION_PULSES,
+      DEFAULT_PHASE_ENCODING_PULSES,
+      DEFAULT_READOUT_PULSES,
+    )
+
+    expect(signal.normalizedInPhaseSignal).toBeCloseTo(1, 4)
+    expect(signal.normalizedQuadratureSignal).toBeCloseTo(0, 4)
+    expect(signal.normalizedMagnitude).toBeCloseTo(1, 4)
+    expect(signal.kxCyclesPerMeter).toBe(0)
+    expect(signal.kyCyclesPerMeter).toBe(0)
+  })
+
+  it('returns zero aggregate signal when there are no ensembles', () => {
+    const signal = gradientSignalPointAt(
+      [],
+      12,
+      DEFAULT_RF_EXCITATION_PULSES,
+      DEFAULT_BAND,
+      DEFAULT_SLICE_SELECTION_PULSES,
+      DEFAULT_PHASE_ENCODING_PULSES,
+      DEFAULT_READOUT_PULSES,
+    )
+
+    expect(signal.normalizedInPhaseSignal).toBe(0)
+    expect(signal.normalizedQuadratureSignal).toBe(0)
+    expect(signal.normalizedMagnitude).toBe(0)
+  })
+
+  it('applies deterministic receiver noise when the realism option is enabled', () => {
+    const noisySignal = gradientSignalPointAt(
+      [],
+      12,
+      DEFAULT_RF_EXCITATION_PULSES,
+      DEFAULT_BAND,
+      DEFAULT_SLICE_SELECTION_PULSES,
+      DEFAULT_PHASE_ENCODING_PULSES,
+      DEFAULT_READOUT_PULSES,
+      GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+      false,
+      true,
+    )
+
+    expect(noisySignal.normalizedMagnitude).toBeGreaterThan(0)
+    expect(noisySignal).toEqual(
+      gradientSignalPointAt(
+        [],
+        12,
+        DEFAULT_RF_EXCITATION_PULSES,
+        DEFAULT_BAND,
+        DEFAULT_SLICE_SELECTION_PULSES,
+        DEFAULT_PHASE_ENCODING_PULSES,
+        DEFAULT_READOUT_PULSES,
+        GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+        false,
+        true,
+      ),
+    )
   })
 
   it('tilts progressively throughout the RF interval', () => {

@@ -6,6 +6,7 @@ import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createDefaultTransmitFrequencyBand,
+  DEFAULT_ADC_PULSES,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
   DEFAULT_RF_EXCITATION_PULSES,
@@ -111,8 +112,11 @@ function panelProps(
   overrides: Partial<ComponentProps<typeof GradientEncodingExperimentPanel>> = {},
 ): ComponentProps<typeof GradientEncodingExperimentPanel> {
   return {
+    adcPulses: DEFAULT_ADC_PULSES,
+    adcSignalPoints: [],
     durationMilliseconds: GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
     enabledChannels: {
+      adc: true,
       rf: true,
       'slice-selection': true,
       'phase-encoding': true,
@@ -121,6 +125,8 @@ function panelProps(
     gradientImperfections: false,
     gridSize: 128,
     onPause: vi.fn(),
+    onAdcPulsesChange: vi.fn(),
+    onAdcReset: vi.fn(),
     onChannelEnabledChange: vi.fn(),
     onRfExcitationPulsesChange: vi.fn(),
     onRfExcitationReset: vi.fn(),
@@ -148,7 +154,7 @@ function panelProps(
 }
 
 describe('GradientEncodingExperimentPanel', () => {
-  it('renders all four editable waveforms and the eight PE reference levels', () => {
+  it('renders all five editable waveforms and the eight PE reference levels', () => {
     const { container } = render(
       <GradientEncodingExperimentPanel {...panelProps()} />,
     )
@@ -157,6 +163,17 @@ describe('GradientEncodingExperimentPanel', () => {
     expect(screen.getByRole('group', { name: 'Slice selection gradient editable waveform' })).not.toBeNull()
     expect(screen.getByRole('group', { name: 'Phase encoding gradient editable waveform' })).not.toBeNull()
     expect(screen.getByRole('group', { name: 'Readout gradient editable waveform' })).not.toBeNull()
+    expect(screen.getByRole('group', { name: 'Signal acquisition window editable waveform' })).not.toBeNull()
+    expect(
+      screen.getByRole('img', {
+        name: 'Complex signal samples acquired while the ADC gate is high',
+      }),
+    ).not.toBeNull()
+    expect(
+      screen.queryByRole('slider', {
+        name: /Signal acquisition window, pulse 1, top handle/,
+      }),
+    ).toBeNull()
     expect(
       container.querySelectorAll(
         '.gradient-input-pe .gradient-reference-waveforms path',
@@ -229,6 +246,7 @@ describe('GradientEncodingExperimentPanel', () => {
       <GradientEncodingExperimentPanel
         {...panelProps({
           enabledChannels: {
+            adc: true,
             rf: true,
             'slice-selection': true,
             'phase-encoding': false,
@@ -290,7 +308,7 @@ describe('GradientEncodingExperimentPanel', () => {
     rerender(<GradientEncodingExperimentPanel {...runningProps} />)
     await user.click(screen.getByRole('button', { name: 'Pause gradient sequence' }))
     expect(runningProps.onPause).toHaveBeenCalledOnce()
-    expect(document.querySelectorAll('.gradient-playhead')).toHaveLength(4)
+    expect(document.querySelectorAll('.gradient-playhead')).toHaveLength(5)
 
     await user.click(
       screen.getByRole('button', { name: 'Gradient sequence playback speed' }),
@@ -311,6 +329,9 @@ describe('GradientEncodingExperimentPanel', () => {
       screen.getByRole('button', { name: 'Reset rf excitation pulse' }),
     )
     await user.click(
+      screen.getByRole('button', { name: 'Reset signal acquisition window' }),
+    )
+    await user.click(
       screen.getByRole('button', { name: 'Reset slice selection gradient' }),
     )
     await user.click(
@@ -324,6 +345,7 @@ describe('GradientEncodingExperimentPanel', () => {
     )
 
     expect(props.onRfExcitationReset).toHaveBeenCalledOnce()
+    expect(props.onAdcReset).toHaveBeenCalledOnce()
     expect(props.onSliceSelectionReset).toHaveBeenCalledOnce()
     expect(props.onPhaseEncodingReset).toHaveBeenCalledOnce()
     expect(props.onReadoutReset).toHaveBeenCalledOnce()
@@ -336,6 +358,7 @@ describe('GradientEncodingExperimentPanel', () => {
     render(<GradientEncodingExperimentPanel {...props} />)
 
     const channelCheckboxes = [
+      ['adc', 'Enable signal acquisition window'],
       ['rf', 'Enable rf excitation pulse'],
       ['slice-selection', 'Enable slice selection gradient'],
       ['phase-encoding', 'Enable phase encoding gradient'],
@@ -385,6 +408,19 @@ describe('GradientEncodingExperimentPanel', () => {
 
     fireEvent.keyDown(
       screen.getByRole('slider', {
+        name: /Signal acquisition window, pulse 1, left handle/,
+      }),
+      { key: 'ArrowLeft' },
+    )
+    const changedAdc = vi.mocked(props.onAdcPulsesChange).mock.calls[0][0]
+    expect(changedAdc[0].start).toBeCloseTo(
+      DEFAULT_ADC_PULSES[0].start - 0.01,
+      12,
+    )
+    expect(changedAdc[0].amplitude).toBe(1)
+
+    fireEvent.keyDown(
+      screen.getByRole('slider', {
         name: /Slice selection gradient, pulse 1, top handle/,
       }),
       { key: 'ArrowDown' },
@@ -421,7 +457,7 @@ describe('GradientEncodingExperimentPanel', () => {
     topHandle.setPointerCapture = vi.fn()
 
     fireEvent.pointerEnter(graph, { clientX: 230, clientY: 90 })
-    expect(container.querySelectorAll('.gradient-timing-guide')).toHaveLength(4)
+    expect(container.querySelectorAll('.gradient-timing-guide')).toHaveLength(5)
 
     fireEvent.pointerDown(topHandle, {
       clientX: 180,

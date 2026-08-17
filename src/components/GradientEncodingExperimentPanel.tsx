@@ -8,9 +8,11 @@ import type {
   GradientPlaybackSpeed,
   GradientPlaybackStatus,
 } from '../hooks/useGradientEncodingPlayback'
+import { ADC_DWELL_TIME_MILLISECONDS } from '../hooks/useGradientAcquisition'
 import {
   appliedGradientAmplitudeAt,
   createDefaultTransmitFrequencyBand,
+  DEFAULT_ADC_PULSES,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
   DEFAULT_RF_EXCITATION_PULSES,
@@ -26,14 +28,17 @@ import {
   sliceRephasingAreaRatio,
   transmitBandwidthAngularRadiansPerMillisecond,
   type GradientPulse,
+  type GradientSignalPoint,
   type TransmitFrequencyBand,
 } from '../simulation/gradientEncoding'
 import DarkSelect from './DarkSelect'
+import GradientAcquisitionGraph from './GradientAcquisitionGraph'
 import KSpaceEncodingMaps from './KSpaceEncodingMaps'
 import SliceSelectionMappingGraph from './SliceSelectionMappingGraph'
 
 export type PulseHandle = 'left' | 'right' | 'top'
 export type GradientChannelId =
+  | 'adc'
   | 'rf'
   | 'slice-selection'
   | 'phase-encoding'
@@ -49,12 +54,13 @@ interface DragState {
 }
 
 interface EditableGradientGraphProps {
+  amplitudeEditable?: boolean
   channelEnabled: boolean
   description: string
   durationMilliseconds: number
   gradientImperfections: boolean
   guideTime: number | null
-  label: 'RF' | 'SS' | 'PE' | 'RO'
+  label: 'RF' | 'SS' | 'PE' | 'RO' | 'ADC'
   linkedPulses?: boolean
   maintainHalfAreaRephasing?: boolean
   onChange: (pulses: GradientPulse[]) => void
@@ -69,11 +75,15 @@ interface EditableGradientGraphProps {
 }
 
 interface GradientEncodingExperimentPanelProps {
+  adcPulses: ReadonlyArray<GradientPulse>
+  adcSignalPoints: ReadonlyArray<GradientSignalPoint>
   durationMilliseconds: number
   enabledChannels: Readonly<Record<GradientChannelId, boolean>>
   gradientImperfections: boolean
   gridSize: number
   onPause: () => void
+  onAdcPulsesChange: (pulses: GradientPulse[]) => void
+  onAdcReset: () => void
   onChannelEnabledChange: (
     channel: GradientChannelId,
     enabled: boolean,
@@ -130,6 +140,7 @@ const PHASE_ENCODING_REFERENCE_WAVEFORMS =
     })),
   )
 const READOUT_REFERENCE_WAVEFORMS = [DEFAULT_READOUT_PULSES]
+const ADC_REFERENCE_WAVEFORMS = [DEFAULT_ADC_PULSES]
 const RF_EXCITATION_REFERENCE_WAVEFORMS = [DEFAULT_RF_EXCITATION_PULSES]
 const SLICE_SELECTION_REFERENCE_WAVEFORMS = [
   DEFAULT_SLICE_SELECTION_PULSES,
@@ -230,6 +241,7 @@ export function updatePulses(
 }
 
 function EditableGradientGraph({
+  amplitudeEditable = true,
   channelEnabled,
   description,
   durationMilliseconds,
@@ -253,8 +265,13 @@ function EditableGradientGraph({
   const [activeHandle, setActiveHandle] = useState<string | null>(null)
   const plotWidth = GRAPH.width - GRAPH.left - GRAPH.right
   const plotHeight = GRAPH.height - GRAPH.top - GRAPH.bottom
-  const baselineY = GRAPH.top + plotHeight / 2
-  const amplitudeHeight = plotHeight / 2 - 8
+  const digitalGate = label === 'ADC'
+  const baselineY = digitalGate
+    ? GRAPH.top + plotHeight - 8
+    : GRAPH.top + plotHeight / 2
+  const amplitudeHeight = digitalGate
+    ? plotHeight - 16
+    : plotHeight / 2 - 8
   const timeToX = (time: number) => GRAPH.left + time * plotWidth
   const amplitudeToY = (amplitude: number) =>
     baselineY - amplitude * amplitudeHeight
@@ -433,6 +450,8 @@ function EditableGradientGraph({
         <strong className="formula">
           {label === 'RF' ? (
             <>B<sub>1</sub></>
+          ) : label === 'ADC' ? (
+            <>ADC</>
           ) : (
             <>G<sub>{label}</sub></>
           )}
@@ -493,7 +512,7 @@ function EditableGradientGraph({
               y2={GRAPH.top + plotHeight}
             />
           ))}
-          {[-1, -0.5, 0.5, 1].map((amplitude) => (
+          {(digitalGate ? [0.5, 1] : [-1, -0.5, 0.5, 1]).map((amplitude) => (
             <line
               key={`amplitude-${amplitude}`}
               x1={GRAPH.left}
@@ -520,7 +539,11 @@ function EditableGradientGraph({
           transform={`translate(13 ${baselineY}) rotate(-90)`}
           aria-hidden="true"
         >
-          {label === 'RF' ? 'B₁ · µT' : 'mT/m'}
+          {label === 'RF'
+            ? 'B₁ · µT'
+            : label === 'ADC'
+              ? 'gate'
+              : 'mT/m'}
         </text>
         <g className="gradient-reference-waveforms" aria-hidden="true">
           {referenceWaveforms.map((referencePulses, index) => (
@@ -624,13 +647,17 @@ function EditableGradientGraph({
               y1: amplitudeY,
               y2: baselineY,
             },
-            {
-              handle: 'top',
-              x1: startX,
-              x2: endX,
-              y1: amplitudeY,
-              y2: amplitudeY,
-            },
+            ...(amplitudeEditable
+              ? [
+                  {
+                    handle: 'top' as const,
+                    x1: startX,
+                    x2: endX,
+                    y1: amplitudeY,
+                    y2: amplitudeY,
+                  },
+                ]
+              : []),
           ]
 
           return handles.map((coordinates) => {
@@ -699,11 +726,15 @@ function EditableGradientGraph({
 }
 
 function GradientEncodingExperimentPanel({
+  adcPulses,
+  adcSignalPoints,
   durationMilliseconds,
   enabledChannels,
   gradientImperfections,
   gridSize,
   onPause,
+  onAdcPulsesChange,
+  onAdcReset,
   onChannelEnabledChange,
   onRfExcitationPulsesChange,
   onRfExcitationReset,
@@ -1025,6 +1056,47 @@ function GradientEncodingExperimentPanel({
             gridSize={gridSize}
             kxCyclesPerMeter={kxCyclesPerMeter}
             kyCyclesPerMeter={kyCyclesPerMeter}
+          />
+        </div>
+      </section>
+
+      <section className="gradient-k-space-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">03</span>
+            <h2>K-Space Exploration</h2>
+          </div>
+        </div>
+
+        <p className="gradient-input-instructions">
+          ADC is a receiver gate, not an applied field. Its edges set the
+          acquisition window; complex signal samples are recorded every{' '}
+          {ADC_DWELL_TIME_MILLISECONDS.toFixed(2)} ms while the gate is high.
+        </p>
+
+        <div className="gradient-timing-diagram">
+          <EditableGradientGraph
+            amplitudeEditable={false}
+            channelEnabled={enabledChannels.adc}
+            description="Signal acquisition window"
+            durationMilliseconds={durationMilliseconds}
+            gradientImperfections={false}
+            guideTime={timingGuideTime}
+            label="ADC"
+            pulses={adcPulses}
+            playheadTime={playheadTime}
+            referenceWaveforms={ADC_REFERENCE_WAVEFORMS}
+            onChange={onAdcPulsesChange}
+            onEnabledChange={(enabled) =>
+              onChannelEnabledChange('adc', enabled)
+            }
+            onGuideTimeChange={setTimingGuideTime}
+            onReset={onAdcReset}
+          />
+          <GradientAcquisitionGraph
+            adcPulses={adcPulses}
+            durationMilliseconds={durationMilliseconds}
+            points={adcSignalPoints}
           />
         </div>
       </section>

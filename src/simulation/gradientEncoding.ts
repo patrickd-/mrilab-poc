@@ -1,8 +1,9 @@
 import { PROTON_GYROMAGNETIC_RATIO } from '../models/HydrogenEnsemble'
-import type {
-  FidEnsembleMagnetizationState,
-  FidEnsembleState,
-  FidSpinPacketState,
+import {
+  receiverNoiseAt,
+  type FidEnsembleMagnetizationState,
+  type FidEnsembleState,
+  type FidSpinPacketState,
 } from './fid'
 
 export interface GradientPulse {
@@ -14,6 +15,15 @@ export interface GradientPulse {
 export interface TransmitFrequencyBand {
   lowerAngularFrequencyKilradiansPerSecond: number
   upperAngularFrequencyKilradiansPerSecond: number
+}
+
+export interface GradientSignalPoint {
+  kxCyclesPerMeter: number
+  kyCyclesPerMeter: number
+  normalizedInPhaseSignal: number
+  normalizedMagnitude: number
+  normalizedQuadratureSignal: number
+  timeMilliseconds: number
 }
 
 export const GRADIENT_SEQUENCE_DURATION_MILLISECONDS = 20
@@ -240,6 +250,14 @@ export const DEFAULT_READOUT_PULSES: ReadonlyArray<GradientPulse> = [
   { start: 0.52, end: 0.78, amplitude: 0.52 },
 ]
 
+export const DEFAULT_ADC_PULSES: ReadonlyArray<GradientPulse> = [
+  {
+    start: DEFAULT_READOUT_PULSES[1].start,
+    end: DEFAULT_READOUT_PULSES[1].end,
+    amplitude: 1,
+  },
+]
+
 export function sliceMappingAngularFrequencyKilradiansPerSecondAt(
   layer: number,
   gridSize: number,
@@ -391,6 +409,20 @@ export function gradientAmplitudeAt(
         ? amplitude + pulse.amplitude
         : amplitude,
     0,
+  )
+}
+
+export function adcGateActiveAt(
+  pulses: ReadonlyArray<GradientPulse>,
+  timeMilliseconds: number,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+) {
+  if (durationMilliseconds <= 0) return false
+  return (
+    gradientAmplitudeAt(
+      pulses,
+      Math.min(1, Math.max(0, timeMilliseconds / durationMilliseconds)),
+    ) > 0
   )
 }
 
@@ -981,5 +1013,95 @@ export function gradientEnsembleMagnetizationStateAt(
     longitudinalFraction: packetZFraction,
     precessionPhaseRadians,
     flipAngleRadians,
+  }
+}
+
+export function gradientSignalPointAt(
+  states: ReadonlyArray<FidEnsembleState>,
+  timeMilliseconds: number,
+  rfExcitationPulses: ReadonlyArray<GradientPulse>,
+  transmitFrequencyBand: TransmitFrequencyBand,
+  sliceSelectionPulses: ReadonlyArray<GradientPulse>,
+  phaseEncodingPulses: ReadonlyArray<GradientPulse>,
+  readoutPulses: ReadonlyArray<GradientPulse>,
+  durationMilliseconds = GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  gradientImperfections = false,
+  receiverNoise = false,
+): GradientSignalPoint {
+  let referenceSignal = 0
+  let inPhaseSignal = 0
+  let quadratureSignal = 0
+
+  states.forEach((state) => {
+    const magnetization = gradientEnsembleMagnetizationStateAt(
+      state,
+      timeMilliseconds,
+      rfExcitationPulses,
+      transmitFrequencyBand,
+      sliceSelectionPulses,
+      phaseEncodingPulses,
+      readoutPulses,
+      durationMilliseconds,
+      gradientImperfections,
+    )
+    const { x: fieldX, y: fieldY, z: fieldZ } = state.fieldDirection
+    const transverseBasisLength = Math.sqrt(
+      Math.max(0, 1 - fieldX ** 2),
+    )
+    const safeBasisLength = Math.max(transverseBasisLength, 1e-12)
+    const basisX = transverseBasisLength
+    const basisY = (-fieldX * fieldY) / safeBasisLength
+    const basisZ = (-fieldX * fieldZ) / safeBasisLength
+    const quadratureBasisX = fieldY * basisZ - fieldZ * basisY
+    const quadratureBasisY = fieldZ * basisX - fieldX * basisZ
+    const receiverX =
+      basisX * magnetization.xFraction +
+      quadratureBasisX * magnetization.yFraction
+    const receiverY =
+      basisY * magnetization.xFraction +
+      quadratureBasisY * magnetization.yFraction
+
+    referenceSignal +=
+      state.equilibriumMagnetization * transverseBasisLength
+    inPhaseSignal += state.equilibriumMagnetization * receiverX
+    quadratureSignal += state.equilibriumMagnetization * receiverY
+  })
+
+  const normalizedInPhaseSignalWithoutNoise =
+    referenceSignal === 0 ? 0 : inPhaseSignal / referenceSignal
+  const normalizedQuadratureSignalWithoutNoise =
+    referenceSignal === 0 ? 0 : quadratureSignal / referenceSignal
+  const noise = receiverNoise
+    ? receiverNoiseAt(timeMilliseconds)
+    : { inPhase: 0, quadrature: 0 }
+  const normalizedInPhaseSignal =
+    normalizedInPhaseSignalWithoutNoise + noise.inPhase
+  const normalizedQuadratureSignal =
+    normalizedQuadratureSignalWithoutNoise + noise.quadrature
+  const encodingStartTimeMilliseconds =
+    (rfExcitationPulses[0]?.end ?? 0) * durationMilliseconds
+
+  return {
+    kxCyclesPerMeter: gradientKSpaceCyclesPerMeterAt(
+      readoutPulses,
+      timeMilliseconds,
+      durationMilliseconds,
+      gradientImperfections,
+      encodingStartTimeMilliseconds,
+    ),
+    kyCyclesPerMeter: gradientKSpaceCyclesPerMeterAt(
+      phaseEncodingPulses,
+      timeMilliseconds,
+      durationMilliseconds,
+      gradientImperfections,
+      encodingStartTimeMilliseconds,
+    ),
+    normalizedInPhaseSignal,
+    normalizedMagnitude: Math.hypot(
+      normalizedInPhaseSignal,
+      normalizedQuadratureSignal,
+    ),
+    normalizedQuadratureSignal,
+    timeMilliseconds,
   }
 }

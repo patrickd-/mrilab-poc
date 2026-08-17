@@ -892,11 +892,13 @@ a:focus-visible {
 .t1-relaxation-section,
 .spin-echo-section,
 .gradient-slice-selection-section,
-.gradient-encoding-section {
+.gradient-encoding-section,
+.gradient-k-space-section {
   padding: 30px;
 }
 
-.gradient-slice-selection-section {
+.gradient-slice-selection-section,
+.gradient-encoding-section {
   border-bottom: 1px solid var(--line);
 }
 
@@ -1287,6 +1289,15 @@ a:focus-visible {
   color: var(--green);
 }
 
+.gradient-input-adc .gradient-input-heading strong {
+  color: var(--yellow);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
 .gradient-input-graph {
   display: block;
   width: 100%;
@@ -1365,6 +1376,10 @@ a:focus-visible {
   fill: rgba(145, 230, 179, 0.08);
 }
 
+.gradient-input-adc .gradient-pulse-fill {
+  fill: rgba(243, 211, 116, 0.09);
+}
+
 .gradient-waveform {
   fill: none;
   stroke: var(--white);
@@ -1378,6 +1393,10 @@ a:focus-visible {
   stroke: var(--coral);
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.gradient-input-adc .gradient-waveform {
+  stroke: var(--yellow);
 }
 
 .rf-pulse-meta,
@@ -1468,6 +1487,97 @@ a:focus-visible {
 
 .gradient-input-ss .gradient-handle-stroke {
   stroke: var(--green);
+}
+
+.gradient-input-adc .gradient-handle-stroke {
+  stroke: var(--yellow);
+}
+
+.gradient-acquisition-graph-shell {
+  border: 1px solid var(--line);
+  background: rgba(7, 9, 12, 0.52);
+}
+
+.gradient-acquisition-graph-shell > header,
+.gradient-acquisition-graph-shell > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.gradient-acquisition-graph-shell > header {
+  min-height: 38px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.gradient-acquisition-graph-shell > header strong {
+  color: var(--white);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.gradient-acquisition-graph-shell > footer {
+  border-top: 1px solid var(--line-soft);
+}
+
+.gradient-acquisition-legend {
+  display: flex;
+  gap: 12px;
+}
+
+.gradient-acquisition-legend .in-phase {
+  color: var(--coral);
+}
+
+.gradient-acquisition-legend .quadrature {
+  color: var(--cyan);
+}
+
+.gradient-acquisition-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.gradient-acquisition-grid line {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+}
+
+.gradient-acquisition-axis-labels {
+  fill: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+}
+
+.gradient-acquisition-x-axis-title,
+.gradient-acquisition-y-axis-title {
+  fill: var(--white);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10px;
+  font-style: italic;
+}
+
+.gradient-acquisition-i-path,
+.gradient-acquisition-q-path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.gradient-acquisition-i-path {
+  stroke: var(--coral);
+}
+
+.gradient-acquisition-q-path {
+  stroke: var(--cyan);
 }
 
 .gradient-handle-hit {
@@ -1973,7 +2083,8 @@ a:focus-visible {
   .spin-echo-section,
   .gradient-playback-controls-top,
   .gradient-slice-selection-section,
-  .gradient-encoding-section {
+  .gradient-encoding-section,
+  .gradient-k-space-section {
     padding-right: 20px;
     padding-left: 20px;
   }

@@ -1,4 +1,11 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import LabScene, {
   type EnsembleSelection,
   GRID_SIZE,
@@ -20,6 +27,7 @@ import SimulationControls, {
 } from './components/SimulationControls'
 import SpinEchoExperimentPanel from './components/SpinEchoExperimentPanel'
 import { useFidSimulation } from './hooks/useFidSimulation'
+import { useGradientAcquisition } from './hooks/useGradientAcquisition'
 import { useGradientEncodingPlayback } from './hooks/useGradientEncodingPlayback'
 import {
   createBlockSimulationEnsembles,
@@ -35,11 +43,13 @@ import {
   calibrateRfPulseForFlipAngle,
   copyGradientPulses,
   createDefaultTransmitFrequencyBand,
+  DEFAULT_ADC_PULSES,
   DEFAULT_PHASE_ENCODING_PULSES,
   DEFAULT_READOUT_PULSES,
   DEFAULT_RF_EXCITATION_PULSES,
   DEFAULT_SLICE_SELECTION_PULSES,
   GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  gradientSignalPointAt,
   type GradientPulse,
   type TransmitFrequencyBand,
 } from './simulation/gradientEncoding'
@@ -59,6 +69,7 @@ const EMPTY_GRADIENT_PULSES: ReadonlyArray<GradientPulse> = []
 const DEFAULT_GRADIENT_CHANNELS_ENABLED: Readonly<
   Record<GradientChannelId, boolean>
 > = {
+  adc: true,
   rf: true,
   'slice-selection': true,
   'phase-encoding': true,
@@ -259,6 +270,9 @@ function App() {
   const [phaseEncodingPulses, setPhaseEncodingPulses] = useState<
     GradientPulse[]
   >(() => copyGradientPulses(DEFAULT_PHASE_ENCODING_PULSES))
+  const [adcPulses, setAdcPulses] = useState<GradientPulse[]>(() =>
+    copyGradientPulses(DEFAULT_ADC_PULSES),
+  )
   const [readoutPulses, setReadoutPulses] = useState<GradientPulse[]>(() =>
     copyGradientPulses(DEFAULT_READOUT_PULSES),
   )
@@ -362,6 +376,56 @@ function App() {
   const gradientPlayback = useGradientEncodingPlayback({
     active: gradientExperimentSelected,
     durationMilliseconds: GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+  })
+  const appliedPhaseEncodingPulses = gradientChannelsEnabled[
+    'phase-encoding'
+  ]
+    ? phaseEncodingPulses
+    : EMPTY_GRADIENT_PULSES
+  const appliedReadoutPulses = gradientChannelsEnabled.readout
+    ? readoutPulses
+    : EMPTY_GRADIENT_PULSES
+  const appliedRfExcitationPulses = gradientChannelsEnabled.rf
+    ? rfExcitationPulses
+    : EMPTY_GRADIENT_PULSES
+  const appliedSliceSelectionPulses = gradientChannelsEnabled[
+    'slice-selection'
+  ]
+    ? sliceSelectionPulses
+    : EMPTY_GRADIENT_PULSES
+  const sampleGradientSignalAt = useCallback(
+    (timeMilliseconds: number) =>
+      gradientSignalPointAt(
+        gradientEnsembleStates,
+        timeMilliseconds,
+        appliedRfExcitationPulses,
+        transmitFrequencyBand,
+        appliedSliceSelectionPulses,
+        appliedPhaseEncodingPulses,
+        appliedReadoutPulses,
+        GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+        gradientImperfections,
+        receiverNoise,
+      ),
+    [
+      appliedPhaseEncodingPulses,
+      appliedReadoutPulses,
+      appliedRfExcitationPulses,
+      appliedSliceSelectionPulses,
+      gradientEnsembleStates,
+      gradientImperfections,
+      receiverNoise,
+      transmitFrequencyBand,
+    ],
+  )
+  const gradientSignalPoints = useGradientAcquisition({
+    active: gradientExperimentSelected,
+    adcEnabled: gradientChannelsEnabled.adc,
+    adcPulses,
+    durationMilliseconds: GRADIENT_SEQUENCE_DURATION_MILLISECONDS,
+    sampleAt: sampleGradientSignalAt,
+    status: gradientPlayback.status,
+    timeMilliseconds: gradientPlayback.timeMilliseconds,
   })
 
   useEffect(() => {
@@ -519,27 +583,11 @@ function App() {
           gradientEncodingTimeMilliseconds={
             gradientPlayback.timeMilliseconds
           }
-          gradientPhaseEncodingPulses={
-            gradientChannelsEnabled['phase-encoding']
-              ? phaseEncodingPulses
-              : EMPTY_GRADIENT_PULSES
-          }
-          gradientReadoutPulses={
-            gradientChannelsEnabled.readout
-              ? readoutPulses
-              : EMPTY_GRADIENT_PULSES
-          }
-          gradientRfExcitationPulses={
-            gradientChannelsEnabled.rf
-              ? rfExcitationPulses
-              : EMPTY_GRADIENT_PULSES
-          }
+          gradientPhaseEncodingPulses={appliedPhaseEncodingPulses}
+          gradientReadoutPulses={appliedReadoutPulses}
+          gradientRfExcitationPulses={appliedRfExcitationPulses}
           gradientTransmitFrequencyBand={transmitFrequencyBand}
-          gradientSliceSelectionPulses={
-            gradientChannelsEnabled['slice-selection']
-              ? sliceSelectionPulses
-              : EMPTY_GRADIENT_PULSES
-          }
+          gradientSliceSelectionPulses={appliedSliceSelectionPulses}
           referenceFrame={referenceFrame}
           renderMode={renderMode}
           sliceGraphMode={sliceGraphMode}
@@ -742,6 +790,8 @@ function App() {
 
             {selectedExperiment === 'gradient-encoding' && (
               <GradientEncodingExperimentPanel
+                adcPulses={adcPulses}
+                adcSignalPoints={gradientSignalPoints}
                 durationMilliseconds={
                   GRADIENT_SEQUENCE_DURATION_MILLISECONDS
                 }
@@ -756,6 +806,10 @@ function App() {
                 status={gradientPlayback.status}
                 timeMilliseconds={gradientPlayback.timeMilliseconds}
                 onPause={gradientPlayback.pause}
+                onAdcPulsesChange={setAdcPulses}
+                onAdcReset={() =>
+                  setAdcPulses(copyGradientPulses(DEFAULT_ADC_PULSES))
+                }
                 onChannelEnabledChange={changeGradientChannelEnabled}
                 onRfExcitationPulsesChange={setRfExcitationPulses}
                 transmitFrequencyBand={transmitFrequencyBand}
