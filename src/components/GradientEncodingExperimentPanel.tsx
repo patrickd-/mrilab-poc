@@ -1,337 +1,262 @@
 import {
-  useMemo,
+  useEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { useKSpaceAutoFill } from '../hooks/useKSpaceAutoFill'
-import type {
-  GradientPlaybackSpeed,
-  GradientPlaybackStatus,
-} from '../hooks/useGradientEncodingPlayback'
-import {
-  ADC_DWELL_TIME_MILLISECONDS,
-  type GradientAcquisitionRun,
-} from '../hooks/useGradientAcquisition'
-import {
-  appliedGradientAmplitudeAt,
-  createDefaultTransmitFrequencyBand,
-  DEFAULT_ADC_PULSES,
-  DEFAULT_PHASE_ENCODING_PULSES,
-  DEFAULT_READOUT_PULSES,
-  DEFAULT_RF_EXCITATION_PULSES,
-  DEFAULT_SLICE_SELECTION_PULSES,
-  gradientKSpaceCyclesPerMeterAt,
-  matchHalfAreaSliceRephasing,
-  MAXIMUM_GRADIENT_TESLA_PER_METER,
-  MAXIMUM_RF_B1_TESLA,
-  rfPulseB1TeslaAt,
-  rfPulseNominalFlipAngleRadiansAt,
-  rfPeakB1TeslaForFlipAngle,
-  rfPulseTimeBandwidthProduct,
-  sliceRephasingAreaRatio,
-  transmitBandwidthAngularRadiansPerMillisecond,
-  type GradientChannelId,
-  type GradientPulse,
-  type GradientSignalPoint,
-  type TransmitFrequencyBand,
-} from '../simulation/gradientEncoding'
-import { kSpaceCoverageForGrid } from '../simulation/kSpaceCoverage'
-import DarkSelect from './DarkSelect'
-import GradientAcquisitionGraph from './GradientAcquisitionGraph'
-import InverseFourierReconstruction from './InverseFourierReconstruction'
-import KSpaceAcquisitionGraph from './KSpaceAcquisitionGraph'
-import KSpaceEncodingMaps from './KSpaceEncodingMaps'
-import SliceSelectionMappingGraph from './SliceSelectionMappingGraph'
 
-export type { GradientChannelId } from '../simulation/gradientEncoding'
-
-export type PulseHandle = 'left' | 'right' | 'top'
-
-interface DragState {
-  handle: PulseHandle
-  initialPulses: GradientPulse[]
-  originAmplitude: number
-  originTime: number
-  pointerId: number
-  pulseIndex: number
+export interface SpatialGradientProfile {
+  endFieldOffsetMillitesla: number
+  startFieldOffsetMillitesla: number
 }
 
-interface EditableGradientGraphProps {
-  amplitudeEditable?: boolean
-  channelEnabled: boolean
-  description: string
-  durationMilliseconds: number
-  gradientImperfections: boolean
-  guideTime: number | null
-  label: 'RF' | 'SS' | 'PE' | 'RO' | 'ADC'
-  linkedPulses?: boolean
-  maintainHalfAreaRephasing?: boolean
-  onChange: (pulses: GradientPulse[]) => void
-  onEnabledChange: (enabled: boolean) => void
-  onGuideTimeChange: (time: number | null) => void
-  onReset: () => void
-  playheadTime: number | null
-  pulses: ReadonlyArray<GradientPulse>
-  referenceWaveforms: ReadonlyArray<ReadonlyArray<GradientPulse>>
-  rfReferenceTransmitFrequencyBand?: TransmitFrequencyBand
-  rfTransmitFrequencyBand?: TransmitFrequencyBand
-}
+type GradientAxis = 'x' | 'y'
+type GradientEndpoint = 'start' | 'end'
 
 interface GradientEncodingExperimentPanelProps {
-  adcAcquisitionRuns: ReadonlyArray<GradientAcquisitionRun>
-  adcPulses: ReadonlyArray<GradientPulse>
-  adcSignalPoints: ReadonlyArray<GradientSignalPoint>
-  durationMilliseconds: number
-  enabledChannels: Readonly<Record<GradientChannelId, boolean>>
-  gradientImperfections: boolean
-  gridSize: number
-  onPause: () => void
-  onAdcPulsesChange: (pulses: GradientPulse[]) => void
-  onAdcReset: () => void
-  onChannelEnabledChange: (
-    channel: GradientChannelId,
-    enabled: boolean,
-  ) => void
-  onRfExcitationPulsesChange: (pulses: GradientPulse[]) => void
-  onRfExcitationReset: () => void
-  onPhaseEncodingPulsesChange: (pulses: GradientPulse[]) => void
-  onPhaseEncodingReset: () => void
-  onReadoutPulsesChange: (pulses: GradientPulse[]) => void
-  onReadoutReset: () => void
-  onSliceSelectionPulsesChange: (pulses: GradientPulse[]) => void
-  onSliceSelectionReset: () => void
-  onTransmitFrequencyBandChange: (band: TransmitFrequencyBand) => void
-  onTransmitFrequencyBandReset: () => void
-  onSimulationReset: () => void
-  onSpeedChange: (speed: GradientPlaybackSpeed) => void
-  onStart: () => void
-  phaseEncodingPulses: ReadonlyArray<GradientPulse>
-  readoutPulses: ReadonlyArray<GradientPulse>
-  rfExcitationPulses: ReadonlyArray<GradientPulse>
-  sliceSelectionPulses: ReadonlyArray<GradientPulse>
-  speed: GradientPlaybackSpeed
-  status: GradientPlaybackStatus
-  timeMilliseconds: number
-  transmitFrequencyBand: TransmitFrequencyBand
+  fieldOfViewMillimeters?: number
+}
+
+interface SpatialGradientGraphProps {
+  axis: GradientAxis
+  fieldOfViewMillimeters: number
+  maximumFieldOffsetMillitesla: number
+  onChange: (profile: SpatialGradientProfile) => void
+  onReset: () => void
+  profile: SpatialGradientProfile
+}
+
+interface EndpointDragState {
+  endpoint: GradientEndpoint
+  pointerId: number
 }
 
 const GRAPH = {
+  bottom: 34,
+  height: 190,
+  left: 48,
+  right: 18,
+  top: 16,
   width: 460,
-  height: 180,
-  left: 42,
-  right: 16,
-  top: 18,
-  bottom: 30,
 }
-const MINIMUM_PULSE_DURATION = 0.025
-const KEYBOARD_TIME_STEP = 0.01
-const KEYBOARD_AMPLITUDE_STEP = 0.05
-const DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS = 1
-const PHASE_ENCODING_REFERENCE_LEVELS = [
-  -1,
-  -5 / 7,
-  -3 / 7,
-  -1 / 7,
-  1 / 7,
-  3 / 7,
-  5 / 7,
-  1,
-] as const
-const PHASE_ENCODING_REFERENCE_WAVEFORMS =
-  PHASE_ENCODING_REFERENCE_LEVELS.map((level) =>
-    DEFAULT_PHASE_ENCODING_PULSES.map((pulse) => ({
-      ...pulse,
-      amplitude: pulse.amplitude * level,
-    })),
-  )
-const READOUT_REFERENCE_WAVEFORMS = [DEFAULT_READOUT_PULSES]
-const ADC_REFERENCE_WAVEFORMS = [DEFAULT_ADC_PULSES]
-const RF_EXCITATION_REFERENCE_WAVEFORMS = [DEFAULT_RF_EXCITATION_PULSES]
-const SLICE_SELECTION_REFERENCE_WAVEFORMS = [
-  DEFAULT_SLICE_SELECTION_PULSES,
-]
-const GRADIENT_PLAYBACK_SPEED_OPTIONS: ReadonlyArray<{
-  id: GradientPlaybackSpeed
-  label: string
-}> = [
-  { id: '0.25', label: '0.25×' },
-  { id: '0.5', label: '0.5×' },
-  { id: '1', label: '1×' },
-  { id: '2', label: '2×' },
-  { id: '4', label: '4×' },
-]
+const DEFAULT_FIELD_OF_VIEW_MILLIMETERS = 128
+const MAXIMUM_GRADIENT_MILLITESLA_PER_METER = 40
+const KEYBOARD_FIELD_STEP_MILLITESLA = 0.08
+const PREVIEW_SIZE = 128
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
-export function updatePulses(
-  initialPulses: ReadonlyArray<GradientPulse>,
-  pulseIndex: number,
-  handle: PulseHandle,
-  deltaTime: number,
-  targetAmplitude: number,
-  linkedPulses: boolean,
-  maintainHalfAreaRephasing = false,
+export function maximumEndpointFieldOffsetMillitesla(
+  fieldOfViewMillimeters: number,
 ) {
-  const pulses = initialPulses.map((pulse) => ({ ...pulse }))
-  const pulse = pulses[pulseIndex]
-  const previousPulse = pulses[pulseIndex - 1]
-  const nextPulse = pulses[pulseIndex + 1]
+  return (
+    (MAXIMUM_GRADIENT_MILLITESLA_PER_METER *
+      fieldOfViewMillimeters) /
+    2000
+  )
+}
 
-  if (handle === 'left') {
-    if (linkedPulses && previousPulse) {
-      const boundary = clamp(
-        pulse.start + deltaTime,
-        previousPulse.start + MINIMUM_PULSE_DURATION,
-        pulse.end - MINIMUM_PULSE_DURATION,
-      )
-      previousPulse.end = boundary
-      pulse.start = boundary
-    } else {
-      pulse.start = clamp(
-        pulse.start + deltaTime,
-        0,
-        pulse.end - MINIMUM_PULSE_DURATION,
-      )
-    }
-  } else if (handle === 'right') {
-    if (linkedPulses && nextPulse) {
-      const boundary = clamp(
-        pulse.end + deltaTime,
-        pulse.start + MINIMUM_PULSE_DURATION,
-        nextPulse.end - MINIMUM_PULSE_DURATION,
-      )
-      pulse.end = boundary
-      nextPulse.start = boundary
-    } else {
-      pulse.end = clamp(
-        pulse.end + deltaTime,
-        pulse.start + MINIMUM_PULSE_DURATION,
-        1,
-      )
-    }
-  } else {
-    pulse.amplitude = clamp(targetAmplitude, -1, 1)
+export function createDefaultSpatialGradientProfiles(
+  fieldOfViewMillimeters = DEFAULT_FIELD_OF_VIEW_MILLIMETERS,
+) {
+  const maximumOffset = maximumEndpointFieldOffsetMillitesla(
+    fieldOfViewMillimeters,
+  )
 
-    if (linkedPulses && previousPulse) {
-      const adjustedDelta = clamp(
-        deltaTime,
-        previousPulse.start + MINIMUM_PULSE_DURATION - pulse.start,
-        1 - pulse.end,
+  return {
+    x: {
+      endFieldOffsetMillitesla: maximumOffset / 2,
+      startFieldOffsetMillitesla: -maximumOffset / 2,
+    },
+    y: {
+      endFieldOffsetMillitesla: 0,
+      startFieldOffsetMillitesla: 0,
+    },
+  } satisfies Record<GradientAxis, SpatialGradientProfile>
+}
+
+export function spatialFieldOffsetMilliteslaAt(
+  profile: SpatialGradientProfile,
+  normalizedPosition: number,
+) {
+  const position = clamp(normalizedPosition, 0, 1)
+  return (
+    profile.startFieldOffsetMillitesla +
+    (profile.endFieldOffsetMillitesla -
+      profile.startFieldOffsetMillitesla) *
+      position
+  )
+}
+
+export function combinedSpatialFieldOffsetMilliteslaAt(
+  xProfile: SpatialGradientProfile,
+  yProfile: SpatialGradientProfile,
+  normalizedX: number,
+  normalizedY: number,
+) {
+  return (
+    spatialFieldOffsetMilliteslaAt(xProfile, normalizedX) +
+    spatialFieldOffsetMilliteslaAt(yProfile, normalizedY)
+  )
+}
+
+export function gradientStrengthMilliteslaPerMeter(
+  profile: SpatialGradientProfile,
+  fieldOfViewMillimeters: number,
+) {
+  if (fieldOfViewMillimeters <= 0) return 0
+  return (
+    ((profile.endFieldOffsetMillitesla -
+      profile.startFieldOffsetMillitesla) *
+      1000) /
+    fieldOfViewMillimeters
+  )
+}
+
+export function createGradientHeightmap(
+  xProfile: SpatialGradientProfile,
+  yProfile: SpatialGradientProfile,
+  size = PREVIEW_SIZE,
+) {
+  const safeSize = Math.max(1, Math.floor(size))
+  const fieldOffsets = new Float64Array(safeSize ** 2)
+  let minimumFieldOffsetMillitesla = Number.POSITIVE_INFINITY
+  let maximumFieldOffsetMillitesla = Number.NEGATIVE_INFINITY
+
+  for (let row = 0; row < safeSize; row += 1) {
+    const normalizedY =
+      safeSize === 1 ? 0.5 : 1 - row / (safeSize - 1)
+
+    for (let column = 0; column < safeSize; column += 1) {
+      const normalizedX =
+        safeSize === 1 ? 0.5 : column / (safeSize - 1)
+      const fieldOffset = combinedSpatialFieldOffsetMilliteslaAt(
+        xProfile,
+        yProfile,
+        normalizedX,
+        normalizedY,
       )
-      pulse.start += adjustedDelta
-      pulse.end += adjustedDelta
-      previousPulse.end = pulse.start
-    } else if (linkedPulses && nextPulse) {
-      const adjustedDelta = clamp(
-        deltaTime,
-        -pulse.start,
-        nextPulse.end - MINIMUM_PULSE_DURATION - pulse.end,
+      const index = row * safeSize + column
+      fieldOffsets[index] = fieldOffset
+      minimumFieldOffsetMillitesla = Math.min(
+        minimumFieldOffsetMillitesla,
+        fieldOffset,
       )
-      pulse.start += adjustedDelta
-      pulse.end += adjustedDelta
-      nextPulse.start = pulse.end
-    } else {
-      const adjustedDelta = clamp(deltaTime, -pulse.start, 1 - pulse.end)
-      pulse.start += adjustedDelta
-      pulse.end += adjustedDelta
+      maximumFieldOffsetMillitesla = Math.max(
+        maximumFieldOffsetMillitesla,
+        fieldOffset,
+      )
     }
   }
 
-  return maintainHalfAreaRephasing &&
-    !(pulseIndex === 1 && handle === 'top')
-    ? matchHalfAreaSliceRephasing(pulses)
-    : pulses
+  const rgba = new Uint8ClampedArray(safeSize ** 2 * 4)
+  const fieldRangeMillitesla =
+    maximumFieldOffsetMillitesla - minimumFieldOffsetMillitesla
+
+  fieldOffsets.forEach((fieldOffset, index) => {
+    const grayscale =
+      fieldRangeMillitesla <= Number.EPSILON
+        ? 128
+        : Math.round(
+            ((fieldOffset - minimumFieldOffsetMillitesla) /
+              fieldRangeMillitesla) *
+              255,
+          )
+    const pixelOffset = index * 4
+    rgba[pixelOffset] = grayscale
+    rgba[pixelOffset + 1] = grayscale
+    rgba[pixelOffset + 2] = grayscale
+    rgba[pixelOffset + 3] = 255
+  })
+
+  return {
+    maximumFieldOffsetMillitesla,
+    minimumFieldOffsetMillitesla,
+    rgba,
+    size: safeSize,
+  }
 }
 
-function EditableGradientGraph({
-  amplitudeEditable = true,
-  channelEnabled,
-  description,
-  durationMilliseconds,
-  gradientImperfections,
-  guideTime,
-  label,
-  linkedPulses = false,
-  maintainHalfAreaRephasing = false,
+function formatFieldOffset(value: number) {
+  const normalizedValue = Math.abs(value) < 0.005 ? 0 : value
+  const sign = normalizedValue > 0 ? '+' : normalizedValue < 0 ? '−' : ''
+  return `${sign}${Math.abs(normalizedValue).toFixed(2)}`
+}
+
+function updateEndpoint(
+  profile: SpatialGradientProfile,
+  endpoint: GradientEndpoint,
+  fieldOffsetMillitesla: number,
+) {
+  return endpoint === 'start'
+    ? {
+        ...profile,
+        startFieldOffsetMillitesla: fieldOffsetMillitesla,
+      }
+    : {
+        ...profile,
+        endFieldOffsetMillitesla: fieldOffsetMillitesla,
+      }
+}
+
+function SpatialGradientGraph({
+  axis,
+  fieldOfViewMillimeters,
+  maximumFieldOffsetMillitesla,
   onChange,
-  onEnabledChange,
-  onGuideTimeChange,
   onReset,
-  playheadTime,
-  pulses,
-  referenceWaveforms,
-  rfReferenceTransmitFrequencyBand,
-  rfTransmitFrequencyBand,
-}: EditableGradientGraphProps) {
+  profile,
+}: SpatialGradientGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const dragRef = useRef<DragState | null>(null)
-  const [activeHandle, setActiveHandle] = useState<string | null>(null)
+  const dragRef = useRef<EndpointDragState | null>(null)
+  const [activeEndpoint, setActiveEndpoint] =
+    useState<GradientEndpoint | null>(null)
   const plotWidth = GRAPH.width - GRAPH.left - GRAPH.right
   const plotHeight = GRAPH.height - GRAPH.top - GRAPH.bottom
-  const digitalGate = label === 'ADC'
-  const baselineY = digitalGate
-    ? GRAPH.top + plotHeight - 8
-    : GRAPH.top + plotHeight / 2
-  const amplitudeHeight = digitalGate
-    ? plotHeight - 16
-    : plotHeight / 2 - 8
-  const timeToX = (time: number) => GRAPH.left + time * plotWidth
-  const amplitudeToY = (amplitude: number) =>
-    baselineY - amplitude * amplitudeHeight
+  const zeroY = GRAPH.top + plotHeight / 2
+  const amplitudeHeight = plotHeight / 2
+  const axisLabel = axis.toUpperCase()
+  const lineClassName = `spatial-gradient-line spatial-gradient-line-${axis}`
 
-  const pointerCoordinates = (clientX: number, clientY: number) => {
+  const positionToX = (normalizedPosition: number) =>
+    GRAPH.left + normalizedPosition * plotWidth
+  const fieldOffsetToY = (fieldOffsetMillitesla: number) =>
+    zeroY -
+    (fieldOffsetMillitesla / maximumFieldOffsetMillitesla) *
+      amplitudeHeight
+  const fieldOffsetFromClientY = (clientY: number) => {
     const bounds = svgRef.current?.getBoundingClientRect()
-    if (!bounds) return { amplitude: 0, time: 0 }
-
-    const svgX = ((clientX - bounds.left) / bounds.width) * GRAPH.width
+    if (!bounds) return 0
     const svgY = ((clientY - bounds.top) / bounds.height) * GRAPH.height
-    return {
-      amplitude: clamp((baselineY - svgY) / amplitudeHeight, -1, 1),
-      time: clamp((svgX - GRAPH.left) / plotWidth, 0, 1),
-    }
+    return clamp(
+      ((zeroY - svgY) / amplitudeHeight) *
+        maximumFieldOffsetMillitesla,
+      -maximumFieldOffsetMillitesla,
+      maximumFieldOffsetMillitesla,
+    )
   }
 
   const beginDrag = (
-    event: ReactPointerEvent<SVGLineElement>,
-    pulseIndex: number,
-    handle: PulseHandle,
+    event: ReactPointerEvent<SVGCircleElement>,
+    endpoint: GradientEndpoint,
   ) => {
     event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    const coordinates = pointerCoordinates(event.clientX, event.clientY)
-    onGuideTimeChange(coordinates.time)
-    dragRef.current = {
-      handle,
-      initialPulses: pulses.map((pulse) => ({ ...pulse })),
-      originAmplitude: coordinates.amplitude,
-      originTime: coordinates.time,
-      pointerId: event.pointerId,
-      pulseIndex,
-    }
-    setActiveHandle(`${pulseIndex}-${handle}`)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    dragRef.current = { endpoint, pointerId: event.pointerId }
+    setActiveEndpoint(endpoint)
   }
 
   const continueDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const coordinates = pointerCoordinates(event.clientX, event.clientY)
-    onGuideTimeChange(coordinates.time)
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
-    const initialPulse = drag.initialPulses[drag.pulseIndex]
     onChange(
-      updatePulses(
-        drag.initialPulses,
-        drag.pulseIndex,
-        drag.handle,
-        coordinates.time - drag.originTime,
-        initialPulse.amplitude +
-          coordinates.amplitude -
-          drag.originAmplitude,
-        linkedPulses,
-        maintainHalfAreaRephasing,
+      updateEndpoint(
+        profile,
+        drag.endpoint,
+        fieldOffsetFromClientY(event.clientY),
       ),
     )
   }
@@ -339,910 +264,368 @@ function EditableGradientGraph({
   const endDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (dragRef.current?.pointerId !== event.pointerId) return
     dragRef.current = null
-    setActiveHandle(null)
-
-    const bounds = svgRef.current?.getBoundingClientRect()
-    if (
-      !bounds ||
-      event.clientX < bounds.left ||
-      event.clientX > bounds.right ||
-      event.clientY < bounds.top ||
-      event.clientY > bounds.bottom
-    ) {
-      onGuideTimeChange(null)
-    }
+    setActiveEndpoint(null)
   }
 
   const handleKeyDown = (
-    event: ReactKeyboardEvent<SVGLineElement>,
-    pulseIndex: number,
-    handle: PulseHandle,
+    event: ReactKeyboardEvent<SVGCircleElement>,
+    endpoint: GradientEndpoint,
   ) => {
-    let deltaTime = 0
-    let targetAmplitude = pulses[pulseIndex].amplitude
-
-    if (event.key === 'ArrowLeft') deltaTime = -KEYBOARD_TIME_STEP
-    else if (event.key === 'ArrowRight') deltaTime = KEYBOARD_TIME_STEP
-    else if (handle === 'top' && event.key === 'ArrowUp') {
-      targetAmplitude += KEYBOARD_AMPLITUDE_STEP
-    } else if (handle === 'top' && event.key === 'ArrowDown') {
-      targetAmplitude -= KEYBOARD_AMPLITUDE_STEP
-    } else {
-      return
-    }
-
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
     event.preventDefault()
+    const currentValue =
+      endpoint === 'start'
+        ? profile.startFieldOffsetMillitesla
+        : profile.endFieldOffsetMillitesla
+    const direction = event.key === 'ArrowUp' ? 1 : -1
     onChange(
-      updatePulses(
-        pulses,
-        pulseIndex,
-        handle,
-        deltaTime,
-        targetAmplitude,
-        linkedPulses,
-        maintainHalfAreaRephasing,
+      updateEndpoint(
+        profile,
+        endpoint,
+        clamp(
+          currentValue + direction * KEYBOARD_FIELD_STEP_MILLITESLA,
+          -maximumFieldOffsetMillitesla,
+          maximumFieldOffsetMillitesla,
+        ),
       ),
     )
   }
 
-  const waveformPath = pulses.reduce((path, pulse) => {
-    return `${path} H ${timeToX(pulse.start)} V ${amplitudeToY(
-      pulse.amplitude,
-    )} H ${timeToX(pulse.end)} V ${baselineY}`
-  }, `M ${GRAPH.left} ${baselineY}`)
-  const referenceWaveformPath = (
-    referencePulses: ReadonlyArray<GradientPulse>,
-  ) => {
-    const firstPulse = referencePulses[0]
-    if (!firstPulse) return ''
+  const endpoints: ReadonlyArray<{
+    endpoint: GradientEndpoint
+    fieldOffsetMillitesla: number
+    normalizedPosition: number
+  }> = [
+    {
+      endpoint: 'start',
+      fieldOffsetMillitesla: profile.startFieldOffsetMillitesla,
+      normalizedPosition: 0,
+    },
+    {
+      endpoint: 'end',
+      fieldOffsetMillitesla: profile.endFieldOffsetMillitesla,
+      normalizedPosition: 1,
+    },
+  ]
+  const startY = fieldOffsetToY(profile.startFieldOffsetMillitesla)
+  const endY = fieldOffsetToY(profile.endFieldOffsetMillitesla)
+  const gradientStrength = gradientStrengthMilliteslaPerMeter(
+    profile,
+    fieldOfViewMillimeters,
+  )
 
-    return referencePulses.reduce((path, pulse) => {
-      return `${path} H ${timeToX(pulse.start)} V ${amplitudeToY(
-        pulse.amplitude,
-      )} H ${timeToX(pulse.end)} V ${baselineY}`
-    }, `M ${timeToX(firstPulse.start)} ${baselineY}`)
-  }
-  const rfWaveformPath = (
-    waveformPulses: ReadonlyArray<GradientPulse>,
-    transmitFrequencyBand: TransmitFrequencyBand,
-  ) => {
-    const segments = waveformPulses.map((pulse) => {
-      const sampleCount = 160
-      const points = Array.from({ length: sampleCount + 1 }, (_, index) => {
-        const normalizedPulseTime = index / sampleCount
-        const normalizedTime =
-          pulse.start + (pulse.end - pulse.start) * normalizedPulseTime
-        const b1Fraction =
-          rfPulseB1TeslaAt(
-            pulse,
-            transmitFrequencyBand,
-            normalizedTime * durationMilliseconds,
-            durationMilliseconds,
-          ) / MAXIMUM_RF_B1_TESLA
-        return `${index === 0 ? 'M' : 'L'} ${timeToX(
-          normalizedTime,
-        )} ${amplitudeToY(b1Fraction)}`
-      }).join(' ')
-      return `M ${timeToX(pulse.start)} ${baselineY} ${points} L ${timeToX(
-        pulse.end,
-      )} ${baselineY}`
-    })
-    return segments.join(' ')
-  }
-  const displayedWaveformPath =
-    label === 'RF' && rfTransmitFrequencyBand
-      ? rfWaveformPath(pulses, rfTransmitFrequencyBand)
-      : `${waveformPath} H ${GRAPH.left + plotWidth}`
-  const appliedWaveformPath = gradientImperfections
-    ? Array.from({ length: 161 }, (_, index) => {
-        const normalizedTime = index / 160
-        const amplitude = appliedGradientAmplitudeAt(
-          pulses,
-          normalizedTime * durationMilliseconds,
-          durationMilliseconds,
-          true,
-        )
-        return `${index === 0 ? 'M' : 'L'} ${timeToX(
-          normalizedTime,
-        )} ${amplitudeToY(amplitude)}`
-      }).join(' ')
-    : ''
   return (
-    <div
-      className={`gradient-input gradient-input-${label.toLowerCase()}${
-        channelEnabled ? '' : ' disabled'
-      }`}
-    >
+    <div className={`gradient-input spatial-gradient-input gradient-input-g${axis}`}>
       <header className="gradient-input-heading">
         <strong className="formula">
-          {label === 'RF' ? (
-            <>B<sub>1</sub></>
-          ) : label === 'ADC' ? (
-            <>ADC</>
-          ) : (
-            <>G<sub>{label}</sub></>
-          )}
+          G<sub>{axis}</sub>
         </strong>
-        <span>{description}</span>
-        <div className="gradient-input-actions">
-          <label className="gradient-channel-toggle">
-            <input
-              type="checkbox"
-              checked={channelEnabled}
-              aria-label={`Enable ${description.toLowerCase()}`}
-              onChange={(event) =>
-                onEnabledChange(event.currentTarget.checked)
-              }
-            />
-            <span>On</span>
-          </label>
-          <button
-            className="gradient-input-reset"
-            type="button"
-            title={`Reset ${description.toLowerCase()}`}
-            aria-label={`Reset ${description.toLowerCase()}`}
-            onClick={onReset}
-          >
-            Reset
-          </button>
-        </div>
+        <span>{axisLabel}-axis field profile</span>
+        <button
+          className="gradient-input-reset"
+          type="button"
+          aria-label={`Reset G ${axis} spatial gradient`}
+          onClick={onReset}
+        >
+          Reset
+        </button>
       </header>
 
       <svg
         ref={svgRef}
-        className="gradient-input-graph"
+        className="gradient-input-graph spatial-gradient-graph"
         viewBox={`0 0 ${GRAPH.width} ${GRAPH.height}`}
         role="group"
-        aria-label={`${description} editable waveform`}
+        aria-label={`G ${axis} spatial gradient editable line`}
         onPointerMove={continueDrag}
-        onPointerEnter={(event) =>
-          onGuideTimeChange(
-            pointerCoordinates(event.clientX, event.clientY).time,
-          )
-        }
-        onPointerLeave={() => {
-          if (!dragRef.current) onGuideTimeChange(null)
-        }}
         onPointerUp={endDrag}
-        onPointerCancel={(event) => {
-          endDrag(event)
-          onGuideTimeChange(null)
-        }}
+        onPointerCancel={endDrag}
       >
-        <g className="gradient-input-grid" aria-hidden="true">
-          {[0, 0.25, 0.5, 0.75, 1].map((time) => (
+        <g className="spatial-gradient-grid" aria-hidden="true">
+          {[0, 0.25, 0.5, 0.75, 1].map((position) => (
             <line
-              key={`time-${time}`}
-              x1={timeToX(time)}
+              key={`position-${position}`}
+              x1={positionToX(position)}
               y1={GRAPH.top}
-              x2={timeToX(time)}
+              x2={positionToX(position)}
               y2={GRAPH.top + plotHeight}
             />
           ))}
-          {(digitalGate ? [0.5, 1] : [-1, -0.5, 0.5, 1]).map((amplitude) => (
+          {[-1, -0.5, 0.5, 1].map((fieldFraction) => (
             <line
-              key={`amplitude-${amplitude}`}
+              key={`field-${fieldFraction}`}
               x1={GRAPH.left}
-              y1={amplitudeToY(amplitude)}
+              y1={fieldOffsetToY(
+                fieldFraction * maximumFieldOffsetMillitesla,
+              )}
               x2={GRAPH.left + plotWidth}
-              y2={amplitudeToY(amplitude)}
+              y2={fieldOffsetToY(
+                fieldFraction * maximumFieldOffsetMillitesla,
+              )}
             />
           ))}
         </g>
-
         <line
-          className="gradient-zero-axis"
+          className="spatial-gradient-zero-axis"
           x1={GRAPH.left}
-          y1={baselineY}
+          y1={zeroY}
           x2={GRAPH.left + plotWidth}
-          y2={baselineY}
+          y2={zeroY}
           aria-hidden="true"
         />
+        <polygon
+          className={`spatial-gradient-fill spatial-gradient-fill-${axis}`}
+          points={`${GRAPH.left},${zeroY} ${GRAPH.left},${startY} ${
+            GRAPH.left + plotWidth
+          },${endY} ${GRAPH.left + plotWidth},${zeroY}`}
+          aria-hidden="true"
+        />
+        <line
+          className={lineClassName}
+          x1={GRAPH.left}
+          y1={startY}
+          x2={GRAPH.left + plotWidth}
+          y2={endY}
+          aria-hidden="true"
+        />
+
+        {[-1, 0, 1].map((fieldFraction) => (
+          <text
+            className="spatial-gradient-axis-value"
+            key={`field-label-${fieldFraction}`}
+            x={GRAPH.left - 8}
+            y={
+              fieldOffsetToY(
+                fieldFraction * maximumFieldOffsetMillitesla,
+              ) + 3
+            }
+            textAnchor="end"
+            aria-hidden="true"
+          >
+            {formatFieldOffset(
+              fieldFraction * maximumFieldOffsetMillitesla,
+            )}
+          </text>
+        ))}
+        {[0, 0.5, 1].map((position) => (
+          <text
+            className="spatial-gradient-axis-value"
+            key={`position-label-${position}`}
+            x={positionToX(position)}
+            y={GRAPH.top + plotHeight + 18}
+            textAnchor="middle"
+            aria-hidden="true"
+          >
+            {Math.round(position * fieldOfViewMillimeters)}
+          </text>
+        ))}
         <text
-          className={`gradient-amplitude-label${
-            label === 'RF' ? ' rf-b1-amplitude-label' : ''
-          }`}
+          className="spatial-gradient-axis-title"
+          x={GRAPH.left + plotWidth / 2}
+          y={GRAPH.height - 3}
           textAnchor="middle"
-          transform={`translate(13 ${baselineY}) rotate(-90)`}
           aria-hidden="true"
         >
-          {label === 'RF'
-            ? 'B₁ · µT'
-            : label === 'ADC'
-              ? 'gate'
-              : 'mT/m'}
+          {axis} · mm
         </text>
-        <g className="gradient-reference-waveforms" aria-hidden="true">
-          {referenceWaveforms.map((referencePulses, index) => (
-            <path
-              key={index}
-              d={
-                label === 'RF' && rfReferenceTransmitFrequencyBand
-                  ? rfWaveformPath(
-                      referencePulses,
-                      rfReferenceTransmitFrequencyBand,
-                    )
-                  : referenceWaveformPath(referencePulses)
-              }
-            />
-          ))}
-        </g>
-        {guideTime !== null && (
-          <line
-            className="gradient-timing-guide"
-            x1={timeToX(guideTime)}
-            y1={GRAPH.top}
-            x2={timeToX(guideTime)}
-            y2={GRAPH.top + plotHeight}
-            aria-hidden="true"
-          />
-        )}
-        {playheadTime !== null && (
-          <line
-            className="gradient-playhead"
-            x1={timeToX(playheadTime)}
-            y1={GRAPH.top}
-            x2={timeToX(playheadTime)}
-            y2={GRAPH.top + plotHeight}
-            aria-hidden="true"
-          />
-        )}
         <text
-          className="gradient-time-label"
-          x={GRAPH.left + plotWidth + 2}
-          y={baselineY - 6}
+          className="spatial-gradient-axis-title"
+          textAnchor="middle"
+          transform={`translate(13 ${GRAPH.top + plotHeight / 2}) rotate(-90)`}
           aria-hidden="true"
         >
-          t
+          ΔB₀ · mT
         </text>
 
-        {label !== 'RF' && pulses.map((pulse, pulseIndex) => {
-          const x = timeToX(pulse.start)
-          const width = timeToX(pulse.end) - x
-          const amplitudeY = amplitudeToY(pulse.amplitude)
-          const y = Math.min(baselineY, amplitudeY)
-          const height = Math.max(1, Math.abs(baselineY - amplitudeY))
-
-          return (
-            <rect
-              key={`fill-${pulseIndex}`}
-              className="gradient-pulse-fill"
-              x={x}
-              y={y}
-              width={width}
-              height={height}
-              aria-hidden="true"
-            />
-          )
-        })}
-
-        <path
-          className="gradient-waveform"
-          d={displayedWaveformPath}
-          aria-hidden="true"
-        />
-        {gradientImperfections && (
-          <path
-            className="gradient-applied-waveform"
-            d={appliedWaveformPath}
-            aria-hidden="true"
-          />
-        )}
-
-        {pulses.flatMap((pulse, pulseIndex) => {
-          const startX = timeToX(pulse.start)
-          const endX = timeToX(pulse.end)
-          const amplitudeY = amplitudeToY(pulse.amplitude)
-          const handles: ReadonlyArray<{
-            handle: PulseHandle
-            x1: number
-            x2: number
-            y1: number
-            y2: number
-          }> = [
-            {
-              handle: 'left',
-              x1: startX,
-              x2: startX,
-              y1: baselineY,
-              y2: amplitudeY,
-            },
-            {
-              handle: 'right',
-              x1: endX,
-              x2: endX,
-              y1: amplitudeY,
-              y2: baselineY,
-            },
-            ...(amplitudeEditable
-              ? [
-                  {
-                    handle: 'top' as const,
-                    x1: startX,
-                    x2: endX,
-                    y1: amplitudeY,
-                    y2: amplitudeY,
-                  },
-                ]
-              : []),
-          ]
-
-          return handles.map((coordinates) => {
-            const { handle, ...lineCoordinates } = coordinates
-            const handleKey = `${pulseIndex}-${handle}`
-            const value =
-              handle === 'top'
-                ? label === 'RF'
-                  ? `${(
-                      pulse.amplitude *
-                      MAXIMUM_RF_B1_TESLA *
-                      1e6
-                    ).toFixed(2)} microtesla peak B1`
-                  : `${(
-                      pulse.amplitude *
-                      MAXIMUM_GRADIENT_TESLA_PER_METER *
-                      1e3
-                    ).toFixed(2)} mT/m`
-                : `${Math.round(
-                    (handle === 'left' ? pulse.start : pulse.end) * 100,
-                  )}%`
-            const numericValue =
-              handle === 'top'
-                ? pulse.amplitude
-                : handle === 'left'
-                  ? pulse.start
-                  : pulse.end
+        {endpoints.map(
+          ({ endpoint, fieldOffsetMillitesla, normalizedPosition }) => {
+            const x = positionToX(normalizedPosition)
+            const y = fieldOffsetToY(fieldOffsetMillitesla)
+            const positionMillimeters =
+              normalizedPosition * fieldOfViewMillimeters
 
             return (
-              <g
-                className={`gradient-handle gradient-handle-${handle}`}
-                key={handleKey}
-              >
-                <line
-                  className="gradient-handle-stroke"
-                  {...lineCoordinates}
+              <g className="spatial-gradient-endpoint" key={endpoint}>
+                <circle
+                  className={`spatial-gradient-endpoint-grip spatial-gradient-endpoint-grip-${axis}`}
+                  cx={x}
+                  cy={y}
+                  r="4"
+                  aria-hidden="true"
                 />
-                <line
-                  className={`gradient-handle-hit${
-                    activeHandle === handleKey ? ' active' : ''
+                <circle
+                  className={`spatial-gradient-endpoint-hit${
+                    activeEndpoint === endpoint ? ' active' : ''
                   }`}
-                  {...lineCoordinates}
+                  cx={x}
+                  cy={y}
+                  r="13"
                   role="slider"
                   tabIndex={0}
-                  aria-valuemin={handle === 'top' ? -1 : 0}
-                  aria-valuemax={1}
-                  aria-valuenow={numericValue}
-                  aria-valuetext={value}
-                  aria-label={`${description}, pulse ${pulseIndex + 1}, ${
-                    handle
-                  } handle: ${value}`}
-                  onPointerDown={(event) =>
-                    beginDrag(event, pulseIndex, handle)
-                  }
-                  onKeyDown={(event) =>
-                    handleKeyDown(event, pulseIndex, handle)
-                  }
+                  aria-label={`G ${axis} gradient ${positionMillimeters} millimeter endpoint`}
+                  aria-orientation="vertical"
+                  aria-valuemin={-maximumFieldOffsetMillitesla}
+                  aria-valuemax={maximumFieldOffsetMillitesla}
+                  aria-valuenow={fieldOffsetMillitesla}
+                  aria-valuetext={`${formatFieldOffset(
+                    fieldOffsetMillitesla,
+                  )} millitesla field offset`}
+                  onPointerDown={(event) => beginDrag(event, endpoint)}
+                  onKeyDown={(event) => handleKeyDown(event, endpoint)}
                 />
               </g>
             )
-          })
-        })}
+          },
+        )}
       </svg>
+
+      <footer className="spatial-gradient-meta">
+        <span>
+          0 mm {formatFieldOffset(profile.startFieldOffsetMillitesla)} mT
+        </span>
+        <span>
+          {fieldOfViewMillimeters} mm{' '}
+          {formatFieldOffset(profile.endFieldOffsetMillitesla)} mT
+        </span>
+        <strong>{formatFieldOffset(gradientStrength)} mT/m</strong>
+      </footer>
     </div>
   )
 }
 
-function GradientEncodingExperimentPanel({
-  adcAcquisitionRuns,
-  adcPulses,
-  adcSignalPoints,
-  durationMilliseconds,
-  enabledChannels,
-  gradientImperfections,
-  gridSize,
-  onPause,
-  onAdcPulsesChange,
-  onAdcReset,
-  onChannelEnabledChange,
-  onRfExcitationPulsesChange,
-  onRfExcitationReset,
-  onPhaseEncodingPulsesChange,
-  onPhaseEncodingReset,
-  onReadoutPulsesChange,
-  onReadoutReset,
-  onSliceSelectionPulsesChange,
-  onSliceSelectionReset,
-  onTransmitFrequencyBandChange,
-  onTransmitFrequencyBandReset,
-  onSimulationReset,
-  onSpeedChange,
-  onStart,
-  phaseEncodingPulses,
-  readoutPulses,
-  rfExcitationPulses,
-  sliceSelectionPulses,
-  speed,
-  status,
-  timeMilliseconds,
-  transmitFrequencyBand,
-}: GradientEncodingExperimentPanelProps) {
-  const [timingGuideTime, setTimingGuideTime] = useState<number | null>(null)
-  const [reconstructionVoxelSizeMillimeters, setReconstructionVoxelSize] =
-    useState(DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS)
-  const playheadTime =
-    status === 'idle'
-      ? null
-      : clamp(timeMilliseconds / durationMilliseconds, 0, 1)
-  const rfExcitationPulse = rfExcitationPulses[0]
-  const sliceMappingGradientAmplitude = rfExcitationPulse
-    ? appliedGradientAmplitudeAt(
-        sliceSelectionPulses,
-        ((rfExcitationPulse.start + rfExcitationPulse.end) / 2) *
-          durationMilliseconds,
-        durationMilliseconds,
-        gradientImperfections,
-      )
-    : 0
-  const defaultTransmitFrequencyBand =
-    createDefaultTransmitFrequencyBand(gridSize)
-  const rfDurationMilliseconds = rfExcitationPulse
-    ? (rfExcitationPulse.end - rfExcitationPulse.start) *
-      durationMilliseconds
-    : 0
-  const rfBandwidthKilohertz =
-    Math.abs(
-      transmitBandwidthAngularRadiansPerMillisecond(transmitFrequencyBand),
-    ) /
-    (2 * Math.PI)
-  const rfTimeBandwidthProduct = rfExcitationPulse
-    ? rfPulseTimeBandwidthProduct(
-        rfExcitationPulse,
-        transmitFrequencyBand,
-        durationMilliseconds,
-      )
-    : 0
-  const rfPeakB1Microtesla = rfExcitationPulse
-    ? Math.abs(rfExcitationPulse.amplitude) * MAXIMUM_RF_B1_TESLA * 1e6
-    : 0
-  const rfPeakB1ForNinetyDegreesMicrotesla = rfExcitationPulse
-    ? rfPeakB1TeslaForFlipAngle(
-        rfExcitationPulse,
-        transmitFrequencyBand,
-        Math.PI / 2,
-        durationMilliseconds,
-      ) * 1e6
-    : 0
-  const rfNinetyDegreeTargetAvailable =
-    rfPeakB1ForNinetyDegreesMicrotesla <=
-    MAXIMUM_RF_B1_TESLA * 1e6 + 1e-6
-  const rfNominalFlipDegrees = rfExcitationPulse
-    ? (rfPulseNominalFlipAngleRadiansAt(
-        rfExcitationPulse,
-        transmitFrequencyBand,
-        rfExcitationPulse.end * durationMilliseconds,
-        durationMilliseconds,
-      ) *
-        180) /
-      Math.PI
-    : 0
-  const rephasingAreaRatio = sliceRephasingAreaRatio(sliceSelectionPulses)
-  const rephasingAreaMatched =
-    rephasingAreaRatio !== null &&
-    Math.abs(rephasingAreaRatio - 0.5) < 0.001
-  const encodingStartTimeMilliseconds =
-    enabledChannels.rf && rfExcitationPulse
-    ? rfExcitationPulse.end * durationMilliseconds
-    : 0
-  const kxCyclesPerMeter = gradientKSpaceCyclesPerMeterAt(
-    enabledChannels.readout ? readoutPulses : [],
-    timeMilliseconds,
-    durationMilliseconds,
-    gradientImperfections,
-    encodingStartTimeMilliseconds,
-  )
-  const kyCyclesPerMeter = gradientKSpaceCyclesPerMeterAt(
-    enabledChannels['phase-encoding'] ? phaseEncodingPulses : [],
-    timeMilliseconds,
-    durationMilliseconds,
-    gradientImperfections,
-    encodingStartTimeMilliseconds,
-  )
-  const kSpaceCoverage = useMemo(
-    () =>
-      kSpaceCoverageForGrid(
-        adcAcquisitionRuns,
-        gridSize,
-        reconstructionVoxelSizeMillimeters,
-      ),
-    [adcAcquisitionRuns, gridSize, reconstructionVoxelSizeMillimeters],
-  )
-  const autoFill = useKSpaceAutoFill({
-    acquisitionRuns: adcAcquisitionRuns,
-    adcPulses,
-    coveragePercentage: kSpaceCoverage.percentage,
-    enabledChannels,
-    encodingStartTimeMilliseconds:
-      (rfExcitationPulse?.end ?? 0) * durationMilliseconds,
-    gradientImperfections,
-    gridSize,
-    onAdcPulsesChange,
-    onChannelEnabledChange,
-    onPause,
-    onPhaseEncodingPulsesChange,
-    onReadoutPulsesChange,
-    onSpeedChange,
-    onStart,
-    phaseEncodingPulses,
-    readoutPulses,
-    speed,
-    status,
-    voxelSizeMillimeters: reconstructionVoxelSizeMillimeters,
-  })
-  const displayedCoveragePercentage =
-    kSpaceCoverage.coveredBinCount === kSpaceCoverage.totalBinCount
-      ? 100
-      : Math.floor(kSpaceCoverage.percentage * 10) / 10
-  const changeReconstructionVoxelSize = (voxelSizeMillimeters: number) => {
-    autoFill.stop()
-    setReconstructionVoxelSize(voxelSizeMillimeters)
-  }
-  const resetSimulationAndReconstruction = () => {
-    autoFill.cancel()
-    setReconstructionVoxelSize(DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS)
-    onSimulationReset()
-  }
+function GradientHeightmap({
+  fieldOfViewMillimeters,
+  xProfile,
+  yProfile,
+}: {
+  fieldOfViewMillimeters: number
+  xProfile: SpatialGradientProfile
+  yProfile: SpatialGradientProfile
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const heightmap = createGradientHeightmap(xProfile, yProfile)
+
+  useEffect(() => {
+    const context = canvasRef.current?.getContext('2d')
+    if (!context) return
+    const imageData = context.createImageData(
+      heightmap.size,
+      heightmap.size,
+    )
+    imageData.data.set(heightmap.rgba)
+    context.putImageData(imageData, 0, 0)
+  }, [heightmap])
 
   return (
-    <>
-      <div className="gradient-playback-controls gradient-playback-controls-top">
-        <div className="gradient-playback-actions">
-          <button
-            className="fid-control-button primary transport"
-            type="button"
-            title={status === 'running' ? 'Pause sequence' : 'Play sequence'}
-            aria-label={
-              status === 'running'
-                ? 'Pause gradient sequence'
-                : status === 'paused'
-                  ? 'Resume gradient sequence'
-                  : status === 'complete'
-                    ? 'Replay gradient sequence'
-                    : 'Play gradient sequence'
-            }
-            onClick={status === 'running' ? onPause : onStart}
-          >
-            <span aria-hidden="true">
-              {status === 'running' ? '❚❚' : '▶'}
-            </span>
-          </button>
-          <DarkSelect
-            className="gradient-playback-speed-select"
-            ariaLabel="Gradient sequence playback speed"
-            value={speed}
-            options={GRADIENT_PLAYBACK_SPEED_OPTIONS}
-            onChange={onSpeedChange}
-          />
-          <button
-            className="fid-control-button"
-            type="button"
-            disabled={
-              status === 'idle' && adcAcquisitionRuns.length === 0
-            }
-            onClick={resetSimulationAndReconstruction}
-          >
-            Reset
-          </button>
+    <figure className="spatial-gradient-heightmap">
+      <figcaption>
+        <div>
+          <strong>Magnetic gradient heightmap</strong>
+          <span>ΔB₀(x,y) = ΔBₓ(x) + ΔBᵧ(y)</span>
         </div>
+        <small>{fieldOfViewMillimeters} × {fieldOfViewMillimeters} mm</small>
+      </figcaption>
+      <div className="spatial-gradient-heightmap-plot">
+        <span className="spatial-gradient-heightmap-y" aria-hidden="true">
+          y ↑
+        </span>
+        <canvas
+          ref={canvasRef}
+          width={heightmap.size}
+          height={heightmap.size}
+          role="img"
+          aria-label={`Grayscale magnetic gradient heightmap from ${formatFieldOffset(
+            heightmap.minimumFieldOffsetMillitesla,
+          )} to ${formatFieldOffset(
+            heightmap.maximumFieldOffsetMillitesla,
+          )} millitesla`}
+        />
+        <span className="spatial-gradient-heightmap-x" aria-hidden="true">
+          x →
+        </span>
+      </div>
+      <footer>
+        <span>
+          {formatFieldOffset(heightmap.minimumFieldOffsetMillitesla)} mT
+        </span>
+        <i aria-hidden="true" />
+        <span>
+          {formatFieldOffset(heightmap.maximumFieldOffsetMillitesla)} mT
+        </span>
+        <strong>Relative field offset</strong>
+      </footer>
+    </figure>
+  )
+}
 
-        <div className="gradient-playback-meta">
-          <span className={`fid-status ${status}`}>{status}</span>
-          <span>
-            G<sub>SS</sub> ⟂ G<sub>PE</sub> ⟂ G<sub>RO</sub>
-          </span>
-          <strong>
-            {timeMilliseconds.toFixed(2)} / {durationMilliseconds} ms
-          </strong>
+function GradientEncodingExperimentPanel({
+  fieldOfViewMillimeters = DEFAULT_FIELD_OF_VIEW_MILLIMETERS,
+}: GradientEncodingExperimentPanelProps) {
+  const defaults = createDefaultSpatialGradientProfiles(
+    fieldOfViewMillimeters,
+  )
+  const [xProfile, setXProfile] = useState<SpatialGradientProfile>(
+    defaults.x,
+  )
+  const [yProfile, setYProfile] = useState<SpatialGradientProfile>(
+    defaults.y,
+  )
+  const maximumFieldOffset = maximumEndpointFieldOffsetMillitesla(
+    fieldOfViewMillimeters,
+  )
+
+  return (
+    <section className="fundamental-gradient-section">
+      <div className="section-heading">
+        <div>
+          <span className="section-index">01</span>
+          <h2>Frequency Encoding</h2>
         </div>
       </div>
 
-      <section className="gradient-slice-selection-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-index">01</span>
-            <h2>Slice Selection</h2>
-          </div>
-        </div>
+      <p className="gradient-input-instructions">
+        Drag either endpoint to define the linear ΔB₀ profile across each
+        spatial axis. The line slope is the applied gradient strength; the
+        grayscale map combines G<sub>x</sub> and G<sub>y</sub> across the
+        sample plane.
+      </p>
 
-        <p className="gradient-input-instructions">
-          The coral B₁ trace is a Hamming-windowed sinc pulse. Its duration,
-          transmit bandwidth, and peak B₁ determine the time-bandwidth
-          product and nominal flip. G<sub>SS</sub> acts during RF; its opposite
-          rewinder defaults to half the selection-lobe area. Gradient full
-          scale is ±
-          {MAXIMUM_GRADIENT_TESLA_PER_METER * 1e3} mT/m. RF Reset recalibrates
-          the current bandwidth to 90° when it fits within the B₁ limit.
-          {gradientImperfections &&
-            ' Dashed yellow shows the applied gradient response.'}
-        </p>
-
-        <div className="gradient-timing-diagram">
-          <EditableGradientGraph
-            channelEnabled={enabledChannels.rf}
-            description="RF excitation pulse"
-            durationMilliseconds={durationMilliseconds}
-            gradientImperfections={false}
-            guideTime={timingGuideTime}
-            label="RF"
-            pulses={rfExcitationPulses}
-            playheadTime={playheadTime}
-            referenceWaveforms={RF_EXCITATION_REFERENCE_WAVEFORMS}
-            rfReferenceTransmitFrequencyBand={
-              defaultTransmitFrequencyBand
-            }
-            rfTransmitFrequencyBand={transmitFrequencyBand}
-            onChange={onRfExcitationPulsesChange}
-            onEnabledChange={(enabled) =>
-              onChannelEnabledChange('rf', enabled)
-            }
-            onGuideTimeChange={setTimingGuideTime}
-            onReset={onRfExcitationReset}
-          />
-          <div className="rf-pulse-meta" aria-label="RF pulse derived properties">
-            <span>
-              T<sub>RF</sub> = {rfDurationMilliseconds.toFixed(2)} ms
-            </span>
-            <span>BW = {rfBandwidthKilohertz.toFixed(3)} kHz</span>
-            <span>TBW = {rfTimeBandwidthProduct.toFixed(2)}</span>
-            <strong>
-              α<sub>nominal</sub> = {rfNominalFlipDegrees.toFixed(1)}° · B
-              <sub>1, peak</sub> = {rfPeakB1Microtesla.toFixed(2)} /{' '}
-              {(MAXIMUM_RF_B1_TESLA * 1e6).toFixed(0)} µT
-            </strong>
-            <strong
-              className={
-                rfNinetyDegreeTargetAvailable
-                  ? 'rf-pulse-target'
-                  : 'rf-pulse-limit-warning'
-              }
-            >
-              90° target: B<sub>1, peak</sub> ={' '}
-              {Number.isFinite(rfPeakB1ForNinetyDegreesMicrotesla)
-                ? rfPeakB1ForNinetyDegreesMicrotesla.toFixed(2)
-                : '—'}{' '}
-              µT
-              {!rfNinetyDegreeTargetAvailable &&
-                ' · exceeds limit; reduce bandwidth or |GSS|'}
-            </strong>
-          </div>
-          <EditableGradientGraph
-            channelEnabled={enabledChannels['slice-selection']}
-            description="Slice selection gradient"
-            durationMilliseconds={durationMilliseconds}
-            gradientImperfections={gradientImperfections}
-            guideTime={timingGuideTime}
-            label="SS"
-            linkedPulses
-            maintainHalfAreaRephasing
-            pulses={sliceSelectionPulses}
-            playheadTime={playheadTime}
-            referenceWaveforms={SLICE_SELECTION_REFERENCE_WAVEFORMS}
-            onChange={onSliceSelectionPulsesChange}
-            onEnabledChange={(enabled) =>
-              onChannelEnabledChange('slice-selection', enabled)
-            }
-            onGuideTimeChange={setTimingGuideTime}
-            onReset={onSliceSelectionReset}
-          />
-          <div
-            className={`slice-rephasing-meta${
-              rephasingAreaMatched ? ' matched' : ' warning'
-            }`}
-            aria-label="Slice rephasing area"
-          >
-            <span>
-              |A<sub>rephase</sub> / A<sub>select</sub>| ={' '}
-              {rephasingAreaRatio?.toFixed(3) ?? '—'}
-            </span>
-            <strong>target 0.500</strong>
-          </div>
-          <SliceSelectionMappingGraph
-            gradientAmplitude={sliceMappingGradientAmplitude}
-            gridSize={gridSize}
-            transmitFrequencyBand={transmitFrequencyBand}
-            onChange={onTransmitFrequencyBandChange}
-            onReset={onTransmitFrequencyBandReset}
-          />
-        </div>
-      </section>
-
-      <section className="gradient-encoding-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-index">02</span>
-            <h2>Phase &amp; Frequency Encoding</h2>
-          </div>
-        </div>
-
-        <p className="gradient-input-instructions">
-          Gray lines mark the default encoding steps on the shared 20 ms
-          timeline. G<sub>PE</sub> occupies the middle interval; readout
-          prephasing leads directly into positive acquisition. The grayscale
-          maps show cos φ and sin φ for the integrated k-space coordinate
-          under the playhead.
-          {gradientImperfections &&
-            ' Dashed yellow shows the applied gradient response.'}
-        </p>
-
-        <div className="gradient-timing-diagram">
-          <EditableGradientGraph
-            channelEnabled={enabledChannels['phase-encoding']}
-            description="Phase encoding gradient"
-            durationMilliseconds={durationMilliseconds}
-            gradientImperfections={gradientImperfections}
-            guideTime={timingGuideTime}
-            label="PE"
-            pulses={phaseEncodingPulses}
-            playheadTime={playheadTime}
-            referenceWaveforms={PHASE_ENCODING_REFERENCE_WAVEFORMS}
-            onChange={onPhaseEncodingPulsesChange}
-            onEnabledChange={(enabled) =>
-              onChannelEnabledChange('phase-encoding', enabled)
-            }
-            onGuideTimeChange={setTimingGuideTime}
-            onReset={onPhaseEncodingReset}
-          />
-          <EditableGradientGraph
-            channelEnabled={enabledChannels.readout}
-            description="Readout gradient"
-            durationMilliseconds={durationMilliseconds}
-            gradientImperfections={gradientImperfections}
-            guideTime={timingGuideTime}
-            label="RO"
-            linkedPulses
-            pulses={readoutPulses}
-            playheadTime={playheadTime}
-            referenceWaveforms={READOUT_REFERENCE_WAVEFORMS}
-            onChange={onReadoutPulsesChange}
-            onEnabledChange={(enabled) =>
-              onChannelEnabledChange('readout', enabled)
-            }
-            onGuideTimeChange={setTimingGuideTime}
-            onReset={onReadoutReset}
-          />
-          <KSpaceEncodingMaps
-            gridSize={gridSize}
-            kxCyclesPerMeter={kxCyclesPerMeter}
-            kyCyclesPerMeter={kyCyclesPerMeter}
-          />
-        </div>
-      </section>
-
-      <section className="gradient-k-space-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-index">03</span>
-            <h2>K-Space Exploration</h2>
-          </div>
-        </div>
-
-        <p className="gradient-input-instructions">
-          ADC is a receiver gate, not an applied field. Its edges set the
-          acquisition window; complex signal samples are recorded every{' '}
-          {ADC_DWELL_TIME_MILLISECONDS.toFixed(2)} ms while the gate is high.
-          The k-space cursor follows the integrated G<sub>RO</sub> and G
-          <sub>PE</sub> moments continuously; only ADC samples leave a trace,
-          with brightness showing relative signal magnitude. Drag any corner
-          of the green Nyquist square to change the reconstruction voxel size
-          and FOV. The retained complex samples are reconstructed once when
-          the drag ends.
-        </p>
-
-        <div className="gradient-timing-diagram">
-          <EditableGradientGraph
-            amplitudeEditable={false}
-            channelEnabled={enabledChannels.adc}
-            description="Signal acquisition window"
-            durationMilliseconds={durationMilliseconds}
-            gradientImperfections={false}
-            guideTime={timingGuideTime}
-            label="ADC"
-            pulses={adcPulses}
-            playheadTime={playheadTime}
-            referenceWaveforms={ADC_REFERENCE_WAVEFORMS}
-            onChange={onAdcPulsesChange}
-            onEnabledChange={(enabled) =>
-              onChannelEnabledChange('adc', enabled)
-            }
-            onGuideTimeChange={setTimingGuideTime}
-            onReset={onAdcReset}
-          />
-          <GradientAcquisitionGraph
-            adcPulses={adcPulses}
-            durationMilliseconds={durationMilliseconds}
-            points={adcSignalPoints}
-          />
-          <KSpaceAcquisitionGraph
-            acquisitionRuns={adcAcquisitionRuns}
-            currentKxCyclesPerMeter={kxCyclesPerMeter}
-            currentKyCyclesPerMeter={kyCyclesPerMeter}
-            durationMilliseconds={durationMilliseconds}
-            encodingStartTimeMilliseconds={encodingStartTimeMilliseconds}
-            gradientImperfections={gradientImperfections}
-            gridSize={gridSize}
-            reconstructionVoxelSizeMillimeters={
-              reconstructionVoxelSizeMillimeters
-            }
-            onReconstructionVoxelSizeChange={changeReconstructionVoxelSize}
-            phaseEncodingPulses={
-              enabledChannels['phase-encoding']
-                ? phaseEncodingPulses
-                : []
-            }
-            readoutPulses={
-              enabledChannels.readout ? readoutPulses : []
-            }
-            status={status}
-          />
-        </div>
-      </section>
-
-      <section className="gradient-inverse-fourier-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-index">04</span>
-            <h2>Inverse Fourier Transform</h2>
-          </div>
-        </div>
-
-        <p className="gradient-input-instructions">
-          Each measured complex k-space phasor contributes its conjugate
-          spatial basis surface. Their running sum forms a partial MRI image;
-          brightness shows the magnitude of the complex reconstruction,
-          normalized to its current peak.
-        </p>
-
-        <InverseFourierReconstruction
-          acquisitionRuns={adcAcquisitionRuns}
-          gridSize={gridSize}
-          voxelSizeMillimeters={reconstructionVoxelSizeMillimeters}
+      <div className="spatial-gradient-stack">
+        <SpatialGradientGraph
+          axis="x"
+          fieldOfViewMillimeters={fieldOfViewMillimeters}
+          maximumFieldOffsetMillitesla={maximumFieldOffset}
+          profile={xProfile}
+          onChange={setXProfile}
+          onReset={() =>
+            setXProfile(
+              createDefaultSpatialGradientProfiles(
+                fieldOfViewMillimeters,
+              ).x,
+            )
+          }
         />
-        <div className="k-space-coverage-controls">
-          <div className="k-space-coverage-progress">
-            <div>
-              <span>K-space sufficiently explored</span>
-              <strong>{displayedCoveragePercentage.toFixed(1)}%</strong>
-            </div>
-            <progress
-              aria-label="K-space exploration progress"
-              max={kSpaceCoverage.totalBinCount}
-              value={kSpaceCoverage.coveredBinCount}
-            />
-            <small>
-              {kSpaceCoverage.coveredBinCount.toLocaleString()} /{' '}
-              {kSpaceCoverage.totalBinCount.toLocaleString()} Cartesian cells
-              {autoFill.active &&
-                ` · acquisition ${Math.min(
-                  autoFill.completedAcquisitionCount + 1,
-                  autoFill.plannedAcquisitionCount,
-                )} of ${autoFill.plannedAcquisitionCount}`}
-            </small>
-          </div>
-          <button
-            className={`k-space-auto-fill${autoFill.active ? ' active' : ''}`}
-            type="button"
-            disabled={
-              !autoFill.active &&
-              (kSpaceCoverage.percentage >= 100 ||
-                status === 'running' ||
-                status === 'paused')
-            }
-            onClick={autoFill.active ? autoFill.stop : autoFill.start}
-          >
-            {autoFill.active ? 'Stop Auto-Fill' : 'Auto-Fill'}
-          </button>
-        </div>
-      </section>
-    </>
+        <SpatialGradientGraph
+          axis="y"
+          fieldOfViewMillimeters={fieldOfViewMillimeters}
+          maximumFieldOffsetMillitesla={maximumFieldOffset}
+          profile={yProfile}
+          onChange={setYProfile}
+          onReset={() =>
+            setYProfile(
+              createDefaultSpatialGradientProfiles(
+                fieldOfViewMillimeters,
+              ).y,
+            )
+          }
+        />
+        <GradientHeightmap
+          fieldOfViewMillimeters={fieldOfViewMillimeters}
+          xProfile={xProfile}
+          yProfile={yProfile}
+        />
+      </div>
+    </section>
   )
 }
 

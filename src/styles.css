@@ -891,6 +891,7 @@ a:focus-visible {
 .fid-experiment-section,
 .t1-relaxation-section,
 .spin-echo-section,
+.fundamental-gradient-section,
 .gradient-slice-selection-section,
 .gradient-encoding-section,
 .gradient-k-space-section,
@@ -912,6 +913,231 @@ a:focus-visible {
   letter-spacing: 0.04em;
   line-height: 1.6;
   text-transform: uppercase;
+}
+
+.spatial-gradient-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.spatial-gradient-input {
+  min-width: 0;
+}
+
+.gradient-input-gx .gradient-input-heading strong {
+  color: var(--cyan);
+}
+
+.gradient-input-gy .gradient-input-heading strong {
+  color: var(--pink);
+}
+
+.spatial-gradient-grid line {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+}
+
+.spatial-gradient-zero-axis {
+  stroke: rgba(244, 245, 241, 0.32);
+  stroke-width: 1;
+}
+
+.spatial-gradient-fill {
+  pointer-events: none;
+}
+
+.spatial-gradient-fill-x {
+  fill: rgba(125, 215, 240, 0.075);
+}
+
+.spatial-gradient-fill-y {
+  fill: rgba(244, 148, 190, 0.07);
+}
+
+.spatial-gradient-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+  pointer-events: none;
+}
+
+.spatial-gradient-line-x {
+  stroke: var(--cyan);
+}
+
+.spatial-gradient-line-y {
+  stroke: var(--pink);
+}
+
+.spatial-gradient-axis-value,
+.spatial-gradient-axis-title {
+  fill: #727a7f;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+}
+
+.spatial-gradient-axis-title {
+  fill: #92989c;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+}
+
+.spatial-gradient-endpoint-grip {
+  pointer-events: none;
+  stroke: #080b0e;
+  stroke-width: 1.2;
+  transition: fill 120ms ease, r 120ms ease, stroke 120ms ease;
+}
+
+.spatial-gradient-endpoint-grip-x {
+  fill: var(--cyan);
+}
+
+.spatial-gradient-endpoint-grip-y {
+  fill: var(--pink);
+}
+
+.spatial-gradient-endpoint-hit {
+  fill: transparent;
+  cursor: ns-resize;
+  outline: none;
+  touch-action: none;
+}
+
+.spatial-gradient-endpoint:hover .spatial-gradient-endpoint-grip,
+.spatial-gradient-endpoint:has(.spatial-gradient-endpoint-hit.active)
+  .spatial-gradient-endpoint-grip,
+.spatial-gradient-endpoint:has(.spatial-gradient-endpoint-hit:focus-visible)
+  .spatial-gradient-endpoint-grip {
+  fill: var(--white);
+  stroke: currentColor;
+  r: 5px;
+}
+
+.spatial-gradient-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 13px 11px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.spatial-gradient-meta span:nth-child(2) {
+  text-align: center;
+}
+
+.spatial-gradient-meta strong {
+  color: var(--white);
+  font-size: 8px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.spatial-gradient-heightmap {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  background: rgba(7, 9, 12, 0.52);
+}
+
+.spatial-gradient-heightmap > figcaption {
+  display: flex;
+  min-height: 48px;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  text-transform: uppercase;
+}
+
+.spatial-gradient-heightmap > figcaption div {
+  display: grid;
+  gap: 3px;
+}
+
+.spatial-gradient-heightmap > figcaption strong {
+  color: var(--white);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.spatial-gradient-heightmap > figcaption span,
+.spatial-gradient-heightmap > figcaption small {
+  color: var(--muted);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  line-height: 1.45;
+}
+
+.spatial-gradient-heightmap-plot {
+  position: relative;
+  padding: 18px 18px 24px 26px;
+}
+
+.spatial-gradient-heightmap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  background: #808080;
+  image-rendering: auto;
+}
+
+.spatial-gradient-heightmap-x,
+.spatial-gradient-heightmap-y {
+  position: absolute;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.spatial-gradient-heightmap-x {
+  right: 18px;
+  bottom: 8px;
+}
+
+.spatial-gradient-heightmap-y {
+  top: 8px;
+  left: 8px;
+}
+
+.spatial-gradient-heightmap > footer {
+  display: grid;
+  min-height: 36px;
+  grid-template-columns: auto minmax(50px, 1fr) auto auto;
+  gap: 7px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.spatial-gradient-heightmap > footer i {
+  height: 3px;
+  background: linear-gradient(90deg, #000, #fff);
+}
+
+.spatial-gradient-heightmap > footer strong {
+  margin-left: 8px;
+  color: var(--white);
+  font-size: 7px;
+  font-weight: 500;
+  text-align: right;
 }
 
 .gradient-timing-diagram {
@@ -2464,6 +2690,7 @@ a:focus-visible {
   .fid-experiment-section,
   .t1-relaxation-section,
   .spin-echo-section,
+  .fundamental-gradient-section,
   .gradient-playback-controls-top,
   .gradient-slice-selection-section,
   .gradient-encoding-section,
@@ -2492,6 +2719,7 @@ a:focus-visible {
   .gradient-input-graph,
   .gradient-input-heading > strong,
   .gradient-handle-stroke,
+  .spatial-gradient-endpoint-grip,
   .slice-mapping-band-edge,
   .slice-mapping-band-grip,
   .k-space-cursor.running .cursor-halo {

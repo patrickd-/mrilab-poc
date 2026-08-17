@@ -67,6 +67,14 @@ vi.mock('./components/SpinEchoExperimentPanel', () => ({
 }))
 
 vi.mock('./components/GradientEncodingExperimentPanel', () => ({
+  default: () => (
+    <div data-testid="fundamental-gradient-experiment">
+      Fundamental gradient experiment view
+    </div>
+  ),
+}))
+
+vi.mock('./components/GradientRecalledEchoExperimentPanel', () => ({
   default: (props: Record<string, any>) => {
     mocks.gradientPanelProps = props
     return (
@@ -203,6 +211,9 @@ describe('App integration', () => {
     expect(
       screen.queryByTestId('gradient-recalled-echo-experiment'),
     ).toBeNull()
+    expect(
+      screen.getByTestId('fundamental-gradient-experiment'),
+    ).toBeTruthy()
     expect(mocks.sceneProps?.gradientEncodingSelected).toBe(false)
     expect(mocks.gradientHook.mock.calls.at(-1)?.[0]).toMatchObject({
       active: false,

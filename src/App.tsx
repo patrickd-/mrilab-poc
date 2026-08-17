@@ -16,9 +16,10 @@ import LabScene, {
 } from './components/LabScene'
 import DarkSelect from './components/DarkSelect'
 import FidExperimentPanel from './components/FidExperimentPanel'
+import GradientEncodingExperimentPanel from './components/GradientEncodingExperimentPanel'
 import GradientRecalledEchoExperimentPanel, {
   type GradientChannelId,
-} from './components/GradientEncodingExperimentPanel'
+} from './components/GradientRecalledEchoExperimentPanel'
 import RealismMenu, {
   type RealismOptionId,
 } from './components/RealismMenu'
@@ -814,6 +815,12 @@ function App() {
                 signalPoints={fidSimulation.signalPoints}
                 timeMilliseconds={fidSimulation.timeMilliseconds}
                 timeStepMilliseconds={Number(simulationTimeStep)}
+              />
+            )}
+
+            {selectedExperiment === 'gradient-encoding' && (
+              <GradientEncodingExperimentPanel
+                fieldOfViewMillimeters={GRID_SIZE}
               />
             )}
 
