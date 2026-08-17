@@ -33,6 +33,7 @@ import {
 } from '../simulation/gradientEncoding'
 import DarkSelect from './DarkSelect'
 import GradientAcquisitionGraph from './GradientAcquisitionGraph'
+import KSpaceAcquisitionGraph from './KSpaceAcquisitionGraph'
 import KSpaceEncodingMaps from './KSpaceEncodingMaps'
 import SliceSelectionMappingGraph from './SliceSelectionMappingGraph'
 
@@ -819,7 +820,8 @@ function GradientEncodingExperimentPanel({
   const rephasingAreaMatched =
     rephasingAreaRatio !== null &&
     Math.abs(rephasingAreaRatio - 0.5) < 0.001
-  const encodingStartTimeMilliseconds = rfExcitationPulse
+  const encodingStartTimeMilliseconds =
+    enabledChannels.rf && rfExcitationPulse
     ? rfExcitationPulse.end * durationMilliseconds
     : 0
   const kxCyclesPerMeter = gradientKSpaceCyclesPerMeterAt(
@@ -1072,6 +1074,9 @@ function GradientEncodingExperimentPanel({
           ADC is a receiver gate, not an applied field. Its edges set the
           acquisition window; complex signal samples are recorded every{' '}
           {ADC_DWELL_TIME_MILLISECONDS.toFixed(2)} ms while the gate is high.
+          The k-space cursor follows the integrated G<sub>RO</sub> and G
+          <sub>PE</sub> moments continuously; only ADC samples leave a trace,
+          with brightness showing relative signal magnitude.
         </p>
 
         <div className="gradient-timing-diagram">
@@ -1097,6 +1102,23 @@ function GradientEncodingExperimentPanel({
             adcPulses={adcPulses}
             durationMilliseconds={durationMilliseconds}
             points={adcSignalPoints}
+          />
+          <KSpaceAcquisitionGraph
+            currentKxCyclesPerMeter={kxCyclesPerMeter}
+            currentKyCyclesPerMeter={kyCyclesPerMeter}
+            durationMilliseconds={durationMilliseconds}
+            encodingStartTimeMilliseconds={encodingStartTimeMilliseconds}
+            gradientImperfections={gradientImperfections}
+            phaseEncodingPulses={
+              enabledChannels['phase-encoding']
+                ? phaseEncodingPulses
+                : []
+            }
+            points={adcSignalPoints}
+            readoutPulses={
+              enabledChannels.readout ? readoutPulses : []
+            }
+            status={status}
           />
         </div>
       </section>

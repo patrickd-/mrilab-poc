@@ -1551,17 +1551,17 @@ a:focus-visible {
 }
 
 .gradient-acquisition-axis-labels {
-  fill: var(--muted);
+  fill: #727a7f;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 8px;
 }
 
 .gradient-acquisition-x-axis-title,
 .gradient-acquisition-y-axis-title {
-  fill: var(--white);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 10px;
-  font-style: italic;
+  fill: #92989c;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .gradient-acquisition-i-path,
@@ -1578,6 +1578,144 @@ a:focus-visible {
 
 .gradient-acquisition-q-path {
   stroke: var(--cyan);
+}
+
+.k-space-acquisition-shell {
+  border: 1px solid var(--line);
+  background: rgba(7, 9, 12, 0.52);
+}
+
+.k-space-acquisition-shell > header {
+  display: flex;
+  min-height: 48px;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  text-transform: uppercase;
+}
+
+.k-space-acquisition-shell > header div {
+  display: grid;
+  gap: 3px;
+}
+
+.k-space-acquisition-shell > header strong {
+  color: var(--white);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.k-space-acquisition-shell > header span,
+.k-space-acquisition-shell > header small {
+  color: var(--muted);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  line-height: 1.45;
+}
+
+.k-space-acquisition-shell > header small {
+  max-width: 52%;
+  text-align: right;
+}
+
+.k-space-acquisition-shell > header sub {
+  font-size: 0.7em;
+}
+
+.k-space-acquisition-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.k-space-acquisition-grid line {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+}
+
+.k-space-acquisition-axis {
+  stroke: rgba(244, 245, 241, 0.3);
+  stroke-width: 1;
+}
+
+.k-space-axis-value,
+.k-space-axis-title {
+  fill: #727a7f;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+}
+
+.k-space-axis-title {
+  fill: #92989c;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.k-space-acquired-trace line {
+  stroke-linecap: round;
+  stroke-width: 2.6;
+}
+
+.k-space-cursor .cursor-halo {
+  fill: rgba(255, 120, 102, 0.13);
+  stroke: rgba(255, 120, 102, 0.55);
+  stroke-width: 1;
+}
+
+.k-space-cursor .cursor-head {
+  fill: var(--coral);
+  stroke: #080b0e;
+  stroke-width: 1;
+}
+
+.k-space-cursor.running .cursor-halo {
+  animation: k-space-cursor-pulse 950ms ease-in-out infinite alternate;
+}
+
+@keyframes k-space-cursor-pulse {
+  to {
+    r: 7px;
+    opacity: 0.5;
+  }
+}
+
+.k-space-acquisition-shell > footer {
+  display: flex;
+  min-height: 36px;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.k-space-acquisition-shell > footer strong {
+  color: var(--white);
+  font-size: 7px;
+  font-weight: 500;
+}
+
+.k-space-signal-key {
+  display: grid;
+  min-width: 180px;
+  grid-template-columns: auto minmax(34px, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.k-space-signal-key i {
+  height: 3px;
+  background: linear-gradient(90deg, #1a1a1a, #fff);
 }
 
 .gradient-handle-hit {
@@ -2109,7 +2247,9 @@ a:focus-visible {
   .gradient-input-heading > strong,
   .gradient-handle-stroke,
   .slice-mapping-band-edge,
-  .slice-mapping-band-grip {
+  .slice-mapping-band-grip,
+  .k-space-cursor.running .cursor-halo {
     transition: none;
+    animation: none;
   }
 }

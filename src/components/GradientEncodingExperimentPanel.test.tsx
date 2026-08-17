@@ -170,6 +170,11 @@ describe('GradientEncodingExperimentPanel', () => {
       }),
     ).not.toBeNull()
     expect(
+      screen.getByRole('img', {
+        name: /K-space trajectory with 0 ADC-acquired complex signal samples/i,
+      }),
+    ).not.toBeNull()
+    expect(
       screen.queryByRole('slider', {
         name: /Signal acquisition window, pulse 1, top handle/,
       }),
