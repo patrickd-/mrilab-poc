@@ -45,9 +45,6 @@ function StatefulGradientEncodingExperimentPanel() {
     <GradientEncodingExperimentPanel
       ensembleStates={TEST_ENSEMBLE_STATES}
       fieldOfViewMillimeters={128}
-      playbackSpeed="10"
-      playbackStatus="idle"
-      playbackTimeMilliseconds={0}
       xEnabled={xEnabled}
       xProfile={xProfile}
       yEnabled={yEnabled}
@@ -56,10 +53,6 @@ function StatefulGradientEncodingExperimentPanel() {
       onXProfileChange={setXProfile}
       onYEnabledChange={setYEnabled}
       onYProfileChange={setYProfile}
-      onPause={vi.fn()}
-      onPlaybackSpeedChange={vi.fn()}
-      onReset={vi.fn()}
-      onStart={vi.fn()}
     />
   )
 }

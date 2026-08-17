@@ -40,6 +40,8 @@ export interface SpatialFourierProjection {
   timeWindowMilliseconds: number
 }
 
+export const DEFAULT_SPATIAL_FOURIER_SAMPLE_COUNT = 512
+
 export function spatialPhaseRadiansAt(
   fieldOffsetTesla: number,
   timeMilliseconds: number,
@@ -87,7 +89,7 @@ export function createSpatialFourierProjection(
   xProfile: SpatialGradientProfile | null,
   yProfile: SpatialGradientProfile | null,
   maximumFieldOffsetTesla: number,
-  sampleCount = 512,
+  sampleCount = DEFAULT_SPATIAL_FOURIER_SAMPLE_COUNT,
 ): SpatialFourierProjection {
   if (maximumFieldOffsetTesla <= 0) {
     throw new RangeError('Maximum field offset must be positive')
@@ -187,9 +189,28 @@ export function createSpatialFourierProjection(
       maximumAngularFrequencyRadiansPerSecond / (2 * Math.PI * 1000),
     signalPoints,
     spectrumPoints,
-    timeWindowMilliseconds:
-      (sampleCount - 1) * timeStepSeconds * 1000,
+    timeWindowMilliseconds: spatialFourierTimeWindowMilliseconds(
+      maximumFieldOffsetTesla,
+      sampleCount,
+    ),
   }
+}
+
+export function spatialFourierTimeWindowMilliseconds(
+  maximumFieldOffsetTesla: number,
+  sampleCount = DEFAULT_SPATIAL_FOURIER_SAMPLE_COUNT,
+) {
+  if (maximumFieldOffsetTesla <= 0) {
+    throw new RangeError('Maximum field offset must be positive')
+  }
+  if (sampleCount < 2 || (sampleCount & (sampleCount - 1)) !== 0) {
+    throw new RangeError('Projection sample count must be a power of two')
+  }
+
+  return (
+    ((sampleCount - 1) * Math.PI * 1000) /
+    (PROTON_GYROMAGNETIC_RATIO * maximumFieldOffsetTesla)
+  )
 }
 
 export const MAXIMUM_SPATIAL_GRADIENT_MILLITESLA_PER_METER = 40
@@ -202,6 +223,17 @@ export function maximumEndpointFieldOffsetMillitesla(
     (MAXIMUM_SPATIAL_GRADIENT_MILLITESLA_PER_METER *
       fieldOfViewMillimeters) /
     2000
+  )
+}
+
+export function spatialProjectionMaximumFieldOffsetTesla(
+  fieldOfViewMillimeters: number,
+) {
+  return (
+    maximumEndpointFieldOffsetMillitesla(fieldOfViewMillimeters) *
+    2 *
+    1e-3 *
+    1.02
   )
 }
 

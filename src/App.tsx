@@ -30,7 +30,6 @@ import SpinEchoExperimentPanel from './components/SpinEchoExperimentPanel'
 import { useFidSimulation } from './hooks/useFidSimulation'
 import { useGradientAcquisition } from './hooks/useGradientAcquisition'
 import { useGradientEncodingPlayback } from './hooks/useGradientEncodingPlayback'
-import { useSpatialGradientPlayback } from './hooks/useSpatialGradientPlayback'
 import {
   createBlockSimulationEnsembles,
   createHydrogenEnsembles,
@@ -58,6 +57,8 @@ import {
 } from './simulation/gradientEncoding'
 import {
   createDefaultSpatialGradientProfiles,
+  spatialFourierTimeWindowMilliseconds,
+  spatialProjectionMaximumFieldOffsetTesla,
   type SpatialGradientProfile,
 } from './simulation/spatialGradient'
 
@@ -71,8 +72,12 @@ const B0_OPTIONS: ReadonlyArray<{ id: B0Tesla; label: string }> = [
 // LabScene owns a long-lived Three.js animation loop. Bump this key whenever
 // the data contract consumed inside that loop changes so Vite hot reload does
 // not leave an already-mounted scene running an incompatible closure.
-const LAB_SCENE_RUNTIME_VERSION = 'recomputed-spatial-gradient-phase-v2'
+const LAB_SCENE_RUNTIME_VERSION = 'spatial-gradient-acquisition-end-v3'
 const EMPTY_GRADIENT_PULSES: ReadonlyArray<GradientPulse> = []
+const SPATIAL_PROJECTION_END_TIME_MILLISECONDS =
+  spatialFourierTimeWindowMilliseconds(
+    spatialProjectionMaximumFieldOffsetTesla(GRID_SIZE),
+  )
 const DEFAULT_GRADIENT_CHANNELS_ENABLED: Readonly<
   Record<GradientChannelId, boolean>
 > = {
@@ -404,7 +409,6 @@ function App() {
             fieldStrengthTesla,
             fieldUniformity,
             {
-              includeAirEnsembles: true,
               tissueHeterogeneity,
             },
           )
@@ -419,33 +423,27 @@ function App() {
     ],
   )
   const spatialProjectionEnsembleStates = useMemo(
-    () => {
-      if (!spatialGradientExperimentSelected) return []
-      if (renderMode !== 'block') return spatialGradientEnsembleStates
-      return createFidEnsembleStates(
-        ensembles,
-        fieldStrengthTesla,
-        fieldUniformity,
-        {
-          includeAirEnsembles: true,
-          tissueHeterogeneity,
-        },
-      )
-    },
+    () =>
+      spatialGradientExperimentSelected
+        ? createFidEnsembleStates(
+            ensembles,
+            fieldStrengthTesla,
+            fieldUniformity,
+            {
+              includeAirEnsembles: true,
+              tissueHeterogeneity,
+            },
+          )
+        : [],
     [
       ensembleRevision,
       ensembles,
       fieldStrengthTesla,
       fieldUniformity,
-      renderMode,
-      spatialGradientEnsembleStates,
       spatialGradientExperimentSelected,
       tissueHeterogeneity,
     ],
   )
-  const spatialGradientPlayback = useSpatialGradientPlayback({
-    active: spatialGradientExperimentSelected,
-  })
   const fidSimulation = useFidSimulation({
     active: simulationExperimentSelected,
     ensembles: simulationEnsembles,
@@ -691,7 +689,7 @@ function App() {
           spatialGradientActive={spatialGradientExperimentSelected}
           spatialGradientEnsembleStates={spatialGradientEnsembleStates}
           spatialGradientTimeMilliseconds={
-            spatialGradientPlayback.timeMilliseconds
+            SPATIAL_PROJECTION_END_TIME_MILLISECONDS
           }
           spatialGradientXEnabled={spatialGradientXEnabled}
           spatialGradientXProfile={spatialGradientXProfile}
@@ -726,7 +724,7 @@ function App() {
               <>
                 <span>
                   {(spatialGradientExperimentSelected
-                    ? simulationEnsembles.length
+                    ? spatialGradientEnsembleStates.length
                     : stackedEnsembleCount
                   ).toLocaleString()} vectors
                 </span>
@@ -906,19 +904,10 @@ function App() {
               <GradientEncodingExperimentPanel
                 ensembleStates={spatialProjectionEnsembleStates}
                 fieldOfViewMillimeters={GRID_SIZE}
-                playbackSpeed={spatialGradientPlayback.speed}
-                playbackStatus={spatialGradientPlayback.status}
-                playbackTimeMilliseconds={
-                  spatialGradientPlayback.timeMilliseconds
-                }
                 xEnabled={spatialGradientXEnabled}
                 xProfile={spatialGradientXProfile}
                 yEnabled={spatialGradientYEnabled}
                 yProfile={spatialGradientYProfile}
-                onPause={spatialGradientPlayback.pause}
-                onPlaybackSpeedChange={spatialGradientPlayback.setSpeed}
-                onReset={spatialGradientPlayback.reset}
-                onStart={spatialGradientPlayback.start}
                 onXEnabledChange={setSpatialGradientXEnabled}
                 onXProfileChange={setSpatialGradientXProfile}
                 onYEnabledChange={setSpatialGradientYEnabled}

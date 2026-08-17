@@ -924,10 +924,6 @@ a:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 
-.spatial-gradient-playback-controls .gradient-playback-actions {
-  grid-template-columns: auto minmax(110px, 1fr) auto;
-}
-
 .spatial-projection-stack {
   display: grid;
   gap: 14px;

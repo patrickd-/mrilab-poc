@@ -13,13 +13,10 @@ import {
   gradientStrengthMilliteslaPerMeter,
   maximumEndpointFieldOffsetMillitesla,
   projectedPositionMillimetersAtFrequency,
+  spatialProjectionMaximumFieldOffsetTesla,
   type SpatialFourierProjection,
   type SpatialGradientProfile,
 } from '../simulation/spatialGradient'
-import type {
-  SpatialGradientPlaybackSpeed,
-  SpatialGradientPlaybackStatus,
-} from '../hooks/useSpatialGradientPlayback'
 import {
   addBackprojection,
   backprojectionGrayscalePixels,
@@ -43,17 +40,10 @@ type GradientEndpoint = 'start' | 'end'
 interface GradientEncodingExperimentPanelProps {
   ensembleStates: ReadonlyArray<FidEnsembleState>
   fieldOfViewMillimeters: number
-  onPause: () => void
-  onPlaybackSpeedChange: (speed: SpatialGradientPlaybackSpeed) => void
-  onReset: () => void
-  onStart: () => void
   onXEnabledChange: (enabled: boolean) => void
   onXProfileChange: (profile: SpatialGradientProfile) => void
   onYEnabledChange: (enabled: boolean) => void
   onYProfileChange: (profile: SpatialGradientProfile) => void
-  playbackSpeed: SpatialGradientPlaybackSpeed
-  playbackStatus: SpatialGradientPlaybackStatus
-  playbackTimeMilliseconds: number
   xEnabled: boolean
   xProfile: SpatialGradientProfile
   yEnabled: boolean
@@ -93,15 +83,6 @@ const PROJECTION_GRAPH = {
   top: 18,
   width: 460,
 }
-const SPATIAL_PLAYBACK_SPEED_OPTIONS: ReadonlyArray<{
-  id: SpatialGradientPlaybackSpeed
-  label: string
-}> = [
-  { id: '5', label: '5 µs/s' },
-  { id: '10', label: '10 µs/s' },
-  { id: '25', label: '25 µs/s' },
-  { id: '50', label: '50 µs/s' },
-]
 const BACKPROJECTION_FILTER_OPTIONS: ReadonlyArray<{
   id: SpatialBackprojectionFilter
   label: string
@@ -901,17 +882,10 @@ function SpatialGradientGraph({
 function GradientEncodingExperimentPanel({
   ensembleStates,
   fieldOfViewMillimeters,
-  onPause,
-  onPlaybackSpeedChange,
-  onReset,
-  onStart,
   onXEnabledChange,
   onXProfileChange,
   onYEnabledChange,
   onYProfileChange,
-  playbackSpeed,
-  playbackStatus,
-  playbackTimeMilliseconds,
   xEnabled,
   xProfile,
   yEnabled,
@@ -950,11 +924,11 @@ function GradientEncodingExperimentPanel({
         ensembleStates,
         xEnabled ? xProfile : null,
         yEnabled ? yProfile : null,
-        maximumFieldOffset * 2 * 1e-3 * 1.02,
+        spatialProjectionMaximumFieldOffsetTesla(fieldOfViewMillimeters),
       ),
     [
       ensembleStates,
-      maximumFieldOffset,
+      fieldOfViewMillimeters,
       xEnabled,
       xProfile,
       yEnabled,
@@ -964,56 +938,6 @@ function GradientEncodingExperimentPanel({
 
   return (
     <>
-      <div className="gradient-playback-controls gradient-playback-controls-top spatial-gradient-playback-controls">
-        <div className="gradient-playback-actions">
-          <button
-            className="fid-control-button primary transport"
-            type="button"
-            title={
-              playbackStatus === 'running'
-                ? 'Pause experiment'
-                : 'Play experiment'
-            }
-            aria-label={
-              playbackStatus === 'running'
-                ? 'Pause spatial gradient experiment'
-                : playbackStatus === 'paused'
-                  ? 'Resume spatial gradient experiment'
-                  : 'Start spatial gradient experiment'
-            }
-            onClick={playbackStatus === 'running' ? onPause : onStart}
-          >
-            <span aria-hidden="true">
-              {playbackStatus === 'running' ? '❚❚' : '▶'}
-            </span>
-          </button>
-          <DarkSelect
-            className="gradient-playback-speed-select"
-            ariaLabel="Spatial gradient experiment playback speed"
-            value={playbackSpeed}
-            options={SPATIAL_PLAYBACK_SPEED_OPTIONS}
-            onChange={onPlaybackSpeedChange}
-          />
-          <button
-            className="fid-control-button"
-            type="button"
-            disabled={
-              playbackStatus === 'idle' && playbackTimeMilliseconds === 0
-            }
-            onClick={onReset}
-          >
-            Reset
-          </button>
-        </div>
-        <div className="gradient-playback-meta">
-          <span className={`fid-status ${playbackStatus}`}>
-            {playbackStatus}
-          </span>
-          <span>Ideal 90° transverse state</span>
-          <strong>t = {playbackTimeMilliseconds.toFixed(4)} ms</strong>
-        </div>
-      </div>
-
       <section className="fundamental-gradient-section">
         <div className="section-heading">
           <div>

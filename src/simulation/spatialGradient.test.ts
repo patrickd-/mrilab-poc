@@ -3,6 +3,7 @@ import { PROTON_GYROMAGNETIC_RATIO } from '../models/HydrogenEnsemble'
 import {
   createSpatialFourierProjection,
   projectedPositionMillimetersAtFrequency,
+  spatialFourierTimeWindowMilliseconds,
   spatialPhaseRadiansAt,
   type SpatialProjectionEnsemble,
 } from './spatialGradient'
@@ -69,6 +70,14 @@ describe('1D spatial Fourier projection', () => {
       expect(point.magnitude).toBeCloseTo(1, 10)
     })
     expect(projection.spectrumPoints[32].magnitude).toBeCloseTo(1, 12)
+    expect(projection.timeWindowMilliseconds).toBeCloseTo(
+      spatialFourierTimeWindowMilliseconds(0.00512, 64),
+      12,
+    )
+    expect(projection.signalPoints.at(-1)?.timeMilliseconds).toBeCloseTo(
+      projection.timeWindowMilliseconds,
+      12,
+    )
   })
 
   it('maps a symmetric gradient to a symmetric frequency projection', () => {
