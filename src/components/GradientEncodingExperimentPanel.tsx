@@ -27,6 +27,7 @@ import {
   spatialProjectionAngleBin,
   SPATIAL_RECONSTRUCTION_ANGLE_BIN_COUNT,
   SPATIAL_RECONSTRUCTION_GRID_SIZE,
+  type SpatialBackprojectionFilter,
 } from '../simulation/spatialReconstruction'
 import DarkSelect from './DarkSelect'
 
@@ -100,6 +101,13 @@ const SPATIAL_PLAYBACK_SPEED_OPTIONS: ReadonlyArray<{
   { id: '10', label: '10 µs/s' },
   { id: '25', label: '25 µs/s' },
   { id: '50', label: '50 µs/s' },
+]
+const BACKPROJECTION_FILTER_OPTIONS: ReadonlyArray<{
+  id: SpatialBackprojectionFilter
+  label: string
+}> = [
+  { id: 'hann-ramp', label: 'Filtered (Hann ramp)' },
+  { id: 'unfiltered', label: 'Unfiltered' },
 ]
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -403,7 +411,13 @@ function SpatialBackprojectionReconstruction({
   yGradientMilliteslaPerMeter: number
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const accumulatorRef = useRef(
+  const filteredAccumulatorRef = useRef(
+    new Float64Array(
+      SPATIAL_RECONSTRUCTION_GRID_SIZE *
+        SPATIAL_RECONSTRUCTION_GRID_SIZE,
+    ),
+  )
+  const unfilteredAccumulatorRef = useRef(
     new Float64Array(
       SPATIAL_RECONSTRUCTION_GRID_SIZE *
         SPATIAL_RECONSTRUCTION_GRID_SIZE,
@@ -417,9 +431,12 @@ function SpatialBackprojectionReconstruction({
   const [acquiredProjectionCount, setAcquiredProjectionCount] =
     useState(0)
   const [imageRevision, setImageRevision] = useState(0)
+  const [filter, setFilter] =
+    useState<SpatialBackprojectionFilter>('hann-ramp')
 
   const clearReconstruction = () => {
-    accumulatorRef.current.fill(0)
+    filteredAccumulatorRef.current.fill(0)
+    unfilteredAccumulatorRef.current.fill(0)
     acquiredAnglesRef.current.fill(0)
     acquiredProjectionCountRef.current = 0
     setAcquiredProjectionCount(0)
@@ -439,17 +456,33 @@ function SpatialBackprojectionReconstruction({
     )
     if (angleBin === null || acquiredAnglesRef.current[angleBin]) return
 
-    const backprojection = backprojectSpatialProjection(
+    const gradient = {
+      centerFieldOffsetMillitesla,
+      xGradientMilliteslaPerMeter,
+      yGradientMilliteslaPerMeter,
+    }
+    const unfilteredBackprojection = backprojectSpatialProjection(
       projection,
-      {
-        centerFieldOffsetMillitesla,
-        xGradientMilliteslaPerMeter,
-        yGradientMilliteslaPerMeter,
-      },
+      gradient,
       fieldOfViewMillimeters,
       SPATIAL_RECONSTRUCTION_GRID_SIZE,
+      'unfiltered',
     )
-    addBackprojection(accumulatorRef.current, backprojection)
+    const filteredBackprojection = backprojectSpatialProjection(
+      projection,
+      gradient,
+      fieldOfViewMillimeters,
+      SPATIAL_RECONSTRUCTION_GRID_SIZE,
+      'hann-ramp',
+    )
+    addBackprojection(
+      unfilteredAccumulatorRef.current,
+      unfilteredBackprojection,
+    )
+    addBackprojection(
+      filteredAccumulatorRef.current,
+      filteredBackprojection,
+    )
     acquiredAnglesRef.current[angleBin] = 1
     acquiredProjectionCountRef.current += 1
     setAcquiredProjectionCount(acquiredProjectionCountRef.current)
@@ -473,10 +506,15 @@ function SpatialBackprojectionReconstruction({
       SPATIAL_RECONSTRUCTION_GRID_SIZE,
     )
     imageData.data.set(
-      backprojectionGrayscalePixels(accumulatorRef.current),
+      backprojectionGrayscalePixels(
+        filter === 'hann-ramp'
+          ? filteredAccumulatorRef.current
+          : unfilteredAccumulatorRef.current,
+        acquiredProjectionCount,
+      ),
     )
     context.putImageData(imageData, 0, 0)
-  }, [imageRevision])
+  }, [acquiredProjectionCount, filter, imageRevision])
 
   const coveragePercentage =
     (acquiredProjectionCount /
@@ -487,18 +525,34 @@ function SpatialBackprojectionReconstruction({
     <div className="spatial-reconstruction-shell">
       <header>
         <div>
-          <strong>Accumulated unfiltered backprojection</strong>
-          <span>Proton-weighted projection density</span>
+          <strong>
+            Accumulated {filter === 'hann-ramp' ? 'filtered' : 'unfiltered'}{' '}
+            backprojection
+          </strong>
+          <span>
+            {filter === 'hann-ramp'
+              ? 'Hann-windowed ramp · linear grayscale'
+              : 'Raw projection smears · linear grayscale'}
+          </span>
         </div>
-        <button
-          className="gradient-input-reset"
-          type="button"
-          aria-label="Reset backprojection reconstruction"
-          disabled={acquiredProjectionCount === 0}
-          onClick={clearReconstruction}
-        >
-          Reset
-        </button>
+        <div className="spatial-reconstruction-actions">
+          <DarkSelect
+            className="spatial-reconstruction-filter-select"
+            ariaLabel="Backprojection filter"
+            value={filter}
+            options={BACKPROJECTION_FILTER_OPTIONS}
+            onChange={setFilter}
+          />
+          <button
+            className="gradient-input-reset"
+            type="button"
+            aria-label="Reset backprojection reconstruction"
+            disabled={acquiredProjectionCount === 0}
+            onClick={clearReconstruction}
+          >
+            Reset
+          </button>
+        </div>
       </header>
       <canvas
         ref={canvasRef}
@@ -1037,7 +1091,8 @@ function GradientEncodingExperimentPanel({
         <p className="gradient-input-instructions">
           Each newly explored gradient angle spreads its F(ω) projection
           back across the slice, perpendicular to G. The accumulated smears
-          form an unfiltered two-dimensional projection reconstruction.
+          can be viewed raw or after a Hann-windowed ramp filter suppresses
+          the low-frequency backprojection haze.
         </p>
 
         <SpatialBackprojectionReconstruction

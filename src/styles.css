@@ -1048,7 +1048,6 @@ a:focus-visible {
 }
 
 .spatial-reconstruction-shell {
-  overflow: hidden;
   border: 1px solid var(--line);
   background: #080b0e;
 }
@@ -1083,6 +1082,26 @@ a:focus-visible {
 .spatial-reconstruction-shell > header span {
   color: var(--muted);
   font-size: 7px;
+}
+
+.spatial-reconstruction-actions {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.spatial-reconstruction-filter-select {
+  width: 156px;
+}
+
+.spatial-reconstruction-filter-select .dark-select-trigger {
+  height: 32px;
+}
+
+.spatial-reconstruction-filter-select .dark-select-options {
+  right: 0;
+  left: auto;
+  min-width: 180px;
 }
 
 .spatial-reconstruction-shell canvas {

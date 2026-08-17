@@ -1,8 +1,10 @@
 import { PROTON_GYROMAGNETIC_RATIO } from '../models/HydrogenEnsemble'
+import { complexFourierTransformInPlace } from './complexFft'
 import type { SpatialFourierProjection } from './spatialGradient'
 
 export const SPATIAL_RECONSTRUCTION_ANGLE_BIN_COUNT = 180
 export const SPATIAL_RECONSTRUCTION_GRID_SIZE = 128
+export type SpatialBackprojectionFilter = 'hann-ramp' | 'unfiltered'
 
 export interface SpatialProjectionGradient {
   centerFieldOffsetMillitesla: number
@@ -33,10 +35,11 @@ export function spatialProjectionAngleBin(
 
 function projectionDensityAtFrequency(
   projection: SpatialFourierProjection,
+  densities: ArrayLike<number>,
   frequencyKilohertz: number,
 ) {
   const points = projection.spectrumPoints
-  if (points.length < 2) return points[0]?.density ?? 0
+  if (points.length < 2) return densities[0] ?? 0
   const minimumFrequency = points[0].frequencyKilohertz
   const maximumFrequency = points[points.length - 1].frequencyKilohertz
   if (
@@ -54,9 +57,48 @@ function projectionDensityAtFrequency(
   const upperIndex = Math.min(points.length - 1, lowerIndex + 1)
   const upperWeight = continuousIndex - lowerIndex
   return (
-    points[lowerIndex].density * (1 - upperWeight) +
-    points[upperIndex].density * upperWeight
+    densities[lowerIndex] * (1 - upperWeight) +
+    densities[upperIndex] * upperWeight
   )
+}
+
+function nextPowerOfTwo(value: number) {
+  let power = 1
+  while (power < value) power *= 2
+  return power
+}
+
+export function projectionDensitiesForBackprojection(
+  projection: SpatialFourierProjection,
+  filter: SpatialBackprojectionFilter,
+) {
+  const source = Float64Array.from(
+    projection.spectrumPoints,
+    (point) => point.density,
+  )
+  if (filter === 'unfiltered' || source.length < 2) return source
+
+  const paddedLength = nextPowerOfTwo(source.length * 2)
+  const paddingOffset = Math.floor((paddedLength - source.length) / 2)
+  const real = new Float64Array(paddedLength)
+  const imaginary = new Float64Array(paddedLength)
+  real.set(source, paddingOffset)
+  complexFourierTransformInPlace(real, imaginary, false)
+
+  for (let index = 0; index < paddedLength; index += 1) {
+    const signedFrequencyIndex =
+      index <= paddedLength / 2 ? index : index - paddedLength
+    const normalizedFrequency =
+      Math.abs(signedFrequencyIndex) / (paddedLength / 2)
+    const ramp = normalizedFrequency
+    const hannWindow = 0.5 * (1 + Math.cos(Math.PI * normalizedFrequency))
+    const multiplier = ramp * hannWindow
+    real[index] *= multiplier
+    imaginary[index] *= multiplier
+  }
+
+  complexFourierTransformInPlace(real, imaginary, true)
+  return real.slice(paddingOffset, paddingOffset + source.length)
 }
 
 export function backprojectSpatialProjection(
@@ -64,6 +106,7 @@ export function backprojectSpatialProjection(
   gradient: SpatialProjectionGradient,
   fieldOfViewMillimeters: number,
   gridSize = SPATIAL_RECONSTRUCTION_GRID_SIZE,
+  filter: SpatialBackprojectionFilter = 'unfiltered',
 ) {
   const backprojection = new Float64Array(gridSize * gridSize)
   const gradientMagnitudeMilliteslaPerMeter = Math.hypot(
@@ -87,6 +130,17 @@ export function backprojectSpatialProjection(
       gradient.centerFieldOffsetMillitesla *
       1e-3) /
     1000
+  const projectionDensities = projectionDensitiesForBackprojection(
+    projection,
+    filter,
+  )
+  // F(omega) is sampled per frequency bin, while backprojection samples per
+  // spatial position. The first gradient factor is the frequency-to-position
+  // Jacobian; ramp filtering contributes a second spatial-frequency factor.
+  const spatialDensityScale =
+    filter === 'hann-ramp'
+      ? gradientMagnitudeMilliteslaPerMeter ** 2
+      : gradientMagnitudeMilliteslaPerMeter
 
   for (let row = 0; row < gridSize; row += 1) {
     const yMillimeters =
@@ -103,7 +157,11 @@ export function backprojectSpatialProjection(
           projectedPositionMillimeters *
           1e-9
       backprojection[row * gridSize + column] =
-        projectionDensityAtFrequency(projection, frequencyKilohertz)
+        projectionDensityAtFrequency(
+          projection,
+          projectionDensities,
+          frequencyKilohertz,
+        ) * spatialDensityScale
     }
   }
 
@@ -124,16 +182,21 @@ export function addBackprojection(
 
 export function backprojectionGrayscalePixels(
   accumulator: ArrayLike<number>,
+  projectionCount = 1,
 ) {
+  const safeProjectionCount = Math.max(1, projectionCount)
   let maximum = 0
   for (let index = 0; index < accumulator.length; index += 1) {
-    maximum = Math.max(maximum, accumulator[index])
+    maximum = Math.max(maximum, accumulator[index] / safeProjectionCount)
   }
 
   const pixels = new Uint8ClampedArray(accumulator.length * 4)
   for (let index = 0; index < accumulator.length; index += 1) {
-    const normalized = maximum > 0 ? accumulator[index] / maximum : 0
-    const grayscale = Math.round(Math.sqrt(Math.max(0, normalized)) * 255)
+    const averagedValue = accumulator[index] / safeProjectionCount
+    const normalized = maximum > 0 ? averagedValue / maximum : 0
+    const grayscale = Math.round(
+      Math.min(1, Math.max(0, normalized)) * 255,
+    )
     const pixelOffset = index * 4
     pixels[pixelOffset] = grayscale
     pixels[pixelOffset + 1] = grayscale

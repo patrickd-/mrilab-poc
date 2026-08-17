@@ -127,6 +127,28 @@ describe('GradientEncodingExperimentPanel', () => {
       }),
     ).not.toBeNull()
     expect(screen.getByText('1 / 180 angular projections')).not.toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Backprojection filter' })
+        .textContent,
+    ).toContain('Filtered (Hann ramp)')
+  })
+
+  it('switches between the retained filtered and unfiltered reconstructions', () => {
+    render(<StatefulGradientEncodingExperimentPanel />)
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Backprojection filter' }),
+    )
+    fireEvent.click(screen.getByRole('option', { name: 'Unfiltered' }))
+
+    expect(
+      screen.getByRole('button', { name: 'Backprojection filter' })
+        .textContent,
+    ).toContain('Unfiltered')
+    expect(
+      screen.getByText('Raw projection smears · linear grayscale'),
+    ).not.toBeNull()
+    expect(screen.getByText('1 / 180 angular projections')).not.toBeNull()
   })
 
   it('accumulates distinct gradient angles and can reset the backprojection', () => {
