@@ -57,7 +57,7 @@ describe('fundamental spatial gradient model', () => {
     ).toBeCloseTo(1.28, 10)
   })
 
-  it('maps the lowest and highest combined field offsets to black and white', () => {
+  it('maps field offsets onto one fixed physical grayscale scale', () => {
     const profiles = createDefaultSpatialGradientProfiles(128)
     const heightmap = createGradientHeightmap(
       profiles.x,
@@ -67,13 +67,49 @@ describe('fundamental spatial gradient model', () => {
 
     expect(heightmap.minimumFieldOffsetMillitesla).toBeCloseTo(-1.28, 10)
     expect(heightmap.maximumFieldOffsetMillitesla).toBeCloseTo(1.28, 10)
-    expect(Array.from(heightmap.rgba.slice(0, 4))).toEqual([0, 0, 0, 255])
-    expect(Array.from(heightmap.rgba.slice(8, 12))).toEqual([
-      255,
-      255,
-      255,
+    expect(heightmap.displayMinimumFieldOffsetMillitesla).toBeCloseTo(
+      -5.12,
+      10,
+    )
+    expect(heightmap.displayMaximumFieldOffsetMillitesla).toBeCloseTo(
+      5.12,
+      10,
+    )
+    expect(Array.from(heightmap.rgba.slice(0, 4))).toEqual([
+      96,
+      96,
+      96,
       255,
     ])
+    expect(Array.from(heightmap.rgba.slice(8, 12))).toEqual([
+      159,
+      159,
+      159,
+      255,
+    ])
+  })
+
+  it('changes gradually while summing both gradient axes per pixel', () => {
+    const flat = {
+      endFieldOffsetMillitesla: 0,
+      startFieldOffsetMillitesla: 0,
+    }
+    const gentleRise = {
+      endFieldOffsetMillitesla: 0.08,
+      startFieldOffsetMillitesla: 0,
+    }
+    const xOnly = createGradientHeightmap(gentleRise, flat, 2, 5.12)
+    const xAndY = createGradientHeightmap(
+      gentleRise,
+      gentleRise,
+      2,
+      5.12,
+    )
+
+    expect(xOnly.rgba[0]).toBe(128)
+    expect(xOnly.rgba[4]).toBe(129)
+    expect(xAndY.rgba[4]).toBe(131)
+    expect(xAndY.rgba[8]).toBe(128)
   })
 })
 
@@ -97,12 +133,12 @@ describe('GradientEncodingExperimentPanel', () => {
       ).not.toBeNull()
       expect(
         screen.getByRole('img', {
-          name: /grayscale magnetic gradient heightmap from −1\.28 to \+1\.28 millitesla/i,
+          name: /grayscale magnetic gradient heightmap with actual field offsets from −1\.28 to \+1\.28 millitesla on a fixed −5\.12 to \+5\.12 millitesla scale/i,
         }),
       ).not.toBeNull()
       expect(images).toHaveLength(1)
-      expect(images[0].data[0]).toBe(0)
-      expect(images[0].data.at(-4)).toBe(255)
+      expect(images[0].data[0]).toBe(96)
+      expect(images[0].data.at(-4)).toBe(159)
     } finally {
       getContext.mockRestore()
     }

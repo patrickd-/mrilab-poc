@@ -120,8 +120,16 @@ export function createGradientHeightmap(
   xProfile: SpatialGradientProfile,
   yProfile: SpatialGradientProfile,
   size = PREVIEW_SIZE,
+  displayMagnitudeMillitesla =
+    maximumEndpointFieldOffsetMillitesla(
+      DEFAULT_FIELD_OF_VIEW_MILLIMETERS,
+    ) * 2,
 ) {
   const safeSize = Math.max(1, Math.floor(size))
+  const safeDisplayMagnitudeMillitesla = Math.max(
+    Number.EPSILON,
+    Math.abs(displayMagnitudeMillitesla),
+  )
   const fieldOffsets = new Float64Array(safeSize ** 2)
   let minimumFieldOffsetMillitesla = Number.POSITIVE_INFINITY
   let maximumFieldOffsetMillitesla = Number.NEGATIVE_INFINITY
@@ -153,18 +161,16 @@ export function createGradientHeightmap(
   }
 
   const rgba = new Uint8ClampedArray(safeSize ** 2 * 4)
-  const fieldRangeMillitesla =
-    maximumFieldOffsetMillitesla - minimumFieldOffsetMillitesla
 
   fieldOffsets.forEach((fieldOffset, index) => {
-    const grayscale =
-      fieldRangeMillitesla <= Number.EPSILON
-        ? 128
-        : Math.round(
-            ((fieldOffset - minimumFieldOffsetMillitesla) /
-              fieldRangeMillitesla) *
-              255,
-          )
+    const grayscale = Math.round(
+      clamp(
+        (fieldOffset + safeDisplayMagnitudeMillitesla) /
+          (2 * safeDisplayMagnitudeMillitesla),
+        0,
+        1,
+      ) * 255,
+    )
     const pixelOffset = index * 4
     rgba[pixelOffset] = grayscale
     rgba[pixelOffset + 1] = grayscale
@@ -173,6 +179,9 @@ export function createGradientHeightmap(
   })
 
   return {
+    displayMaximumFieldOffsetMillitesla: safeDisplayMagnitudeMillitesla,
+    displayMinimumFieldOffsetMillitesla:
+      -safeDisplayMagnitudeMillitesla,
     maximumFieldOffsetMillitesla,
     minimumFieldOffsetMillitesla,
     rgba,
@@ -494,16 +503,23 @@ function SpatialGradientGraph({
 }
 
 function GradientHeightmap({
+  displayMagnitudeMillitesla,
   fieldOfViewMillimeters,
   xProfile,
   yProfile,
 }: {
+  displayMagnitudeMillitesla: number
   fieldOfViewMillimeters: number
   xProfile: SpatialGradientProfile
   yProfile: SpatialGradientProfile
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const heightmap = createGradientHeightmap(xProfile, yProfile)
+  const heightmap = createGradientHeightmap(
+    xProfile,
+    yProfile,
+    PREVIEW_SIZE,
+    displayMagnitudeMillitesla,
+  )
 
   useEffect(() => {
     const context = canvasRef.current?.getContext('2d')
@@ -523,7 +539,13 @@ function GradientHeightmap({
           <strong>Magnetic gradient heightmap</strong>
           <span>ΔB₀(x,y) = ΔBₓ(x) + ΔBᵧ(y)</span>
         </div>
-        <small>{fieldOfViewMillimeters} × {fieldOfViewMillimeters} mm</small>
+        <small>
+          Actual {formatFieldOffset(
+            heightmap.minimumFieldOffsetMillitesla,
+          )}…{formatFieldOffset(
+            heightmap.maximumFieldOffsetMillitesla,
+          )} mT · {fieldOfViewMillimeters} × {fieldOfViewMillimeters} mm
+        </small>
       </figcaption>
       <div className="spatial-gradient-heightmap-plot">
         <span className="spatial-gradient-heightmap-y" aria-hidden="true">
@@ -534,11 +556,15 @@ function GradientHeightmap({
           width={heightmap.size}
           height={heightmap.size}
           role="img"
-          aria-label={`Grayscale magnetic gradient heightmap from ${formatFieldOffset(
+          aria-label={`Grayscale magnetic gradient heightmap with actual field offsets from ${formatFieldOffset(
             heightmap.minimumFieldOffsetMillitesla,
           )} to ${formatFieldOffset(
             heightmap.maximumFieldOffsetMillitesla,
-          )} millitesla`}
+          )} millitesla on a fixed ${formatFieldOffset(
+            heightmap.displayMinimumFieldOffsetMillitesla,
+          )} to ${formatFieldOffset(
+            heightmap.displayMaximumFieldOffsetMillitesla,
+          )} millitesla scale`}
         />
         <span className="spatial-gradient-heightmap-x" aria-hidden="true">
           x →
@@ -546,13 +572,17 @@ function GradientHeightmap({
       </div>
       <footer>
         <span>
-          {formatFieldOffset(heightmap.minimumFieldOffsetMillitesla)} mT
+          {formatFieldOffset(
+            heightmap.displayMinimumFieldOffsetMillitesla,
+          )} mT
         </span>
         <i aria-hidden="true" />
         <span>
-          {formatFieldOffset(heightmap.maximumFieldOffsetMillitesla)} mT
+          {formatFieldOffset(
+            heightmap.displayMaximumFieldOffsetMillitesla,
+          )} mT
         </span>
-        <strong>Relative field offset</strong>
+        <strong>Fixed field scale</strong>
       </footer>
     </figure>
   )
@@ -620,6 +650,7 @@ function GradientEncodingExperimentPanel({
           }
         />
         <GradientHeightmap
+          displayMagnitudeMillitesla={maximumFieldOffset * 2}
           fieldOfViewMillimeters={fieldOfViewMillimeters}
           xProfile={xProfile}
           yProfile={yProfile}
