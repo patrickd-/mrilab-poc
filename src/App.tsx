@@ -5,6 +5,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react'
 import LabScene, {
   type EnsembleSelection,
@@ -73,6 +76,9 @@ const B0_OPTIONS: ReadonlyArray<{ id: B0Tesla; label: string }> = [
 // the data contract consumed inside that loop changes so Vite hot reload does
 // not leave an already-mounted scene running an incompatible closure.
 const LAB_SCENE_RUNTIME_VERSION = 'spatial-gradient-acquisition-end-v3'
+const CONTROL_PANEL_MINIMUM_WIDTH = 418
+const VIEWPORT_MINIMUM_WIDTH = 320
+const CONTROL_PANEL_KEYBOARD_STEP = 48
 const EMPTY_GRADIENT_PULSES: ReadonlyArray<GradientPulse> = []
 const SPATIAL_PROJECTION_END_TIME_MILLISECONDS =
   spatialFourierTimeWindowMilliseconds(
@@ -273,7 +279,16 @@ function formatRelaxationTime(value: number) {
 function App() {
   const ensembles = useMemo(() => createHydrogenEnsembles(GRID_SIZE), [])
   const sceneRef = useRef<LabSceneHandle>(null)
+  const controlPanelRef = useRef<HTMLElement>(null)
+  const controlPanelResizeRef = useRef<{
+    pointerId: number
+    startWidth: number
+    startX: number
+  } | null>(null)
   const experimentMenuRef = useRef<HTMLElement>(null)
+  const [controlPanelWidth, setControlPanelWidth] = useState<number | null>(
+    null,
+  )
   const [selected, setSelected] = useState<EnsembleSelection | null>(null)
   const [ensembleRevision, setEnsembleRevision] = useState(0)
   const [b0Tesla, setB0Tesla] = useState<B0Tesla>('1.5')
@@ -622,8 +637,105 @@ function App() {
     setEnsembleRevision((revision) => revision + 1)
   }
 
+  const clampControlPanelWidth = useCallback((width: number) => {
+    const maximumWidth = Math.max(
+      CONTROL_PANEL_MINIMUM_WIDTH,
+      window.innerWidth - VIEWPORT_MINIMUM_WIDTH,
+    )
+    return Math.min(maximumWidth, Math.max(CONTROL_PANEL_MINIMUM_WIDTH, width))
+  }, [])
+
+  const beginControlPanelResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (event.button !== 0 || window.innerWidth <= 840) return
+
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    controlPanelResizeRef.current = {
+      pointerId: event.pointerId,
+      startWidth:
+        controlPanelRef.current?.getBoundingClientRect().width ??
+        CONTROL_PANEL_MINIMUM_WIDTH,
+      startX: event.clientX,
+    }
+    document.body.classList.add('resizing-control-panel')
+  }
+
+  const continueControlPanelResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    const resize = controlPanelResizeRef.current
+    if (!resize || resize.pointerId !== event.pointerId) return
+
+    setControlPanelWidth(
+      clampControlPanelWidth(resize.startWidth + resize.startX - event.clientX),
+    )
+  }
+
+  const finishControlPanelResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (controlPanelResizeRef.current?.pointerId !== event.pointerId) return
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    controlPanelResizeRef.current = null
+    document.body.classList.remove('resizing-control-panel')
+  }
+
+  const resizeControlPanelWithKeyboard = (
+    event: ReactKeyboardEvent<HTMLDivElement>,
+  ) => {
+    const currentWidth =
+      controlPanelWidth ??
+      controlPanelRef.current?.getBoundingClientRect().width ??
+      CONTROL_PANEL_MINIMUM_WIDTH
+    let nextWidth: number | null = null
+
+    if (event.key === 'ArrowLeft') {
+      nextWidth = currentWidth + CONTROL_PANEL_KEYBOARD_STEP
+    } else if (event.key === 'ArrowRight') {
+      nextWidth = currentWidth - CONTROL_PANEL_KEYBOARD_STEP
+    } else if (event.key === 'Home') {
+      nextWidth = CONTROL_PANEL_MINIMUM_WIDTH
+    } else if (event.key === 'End') {
+      nextWidth = window.innerWidth - VIEWPORT_MINIMUM_WIDTH
+    }
+
+    if (nextWidth === null) return
+    event.preventDefault()
+    setControlPanelWidth(clampControlPanelWidth(nextWidth))
+  }
+
+  useEffect(() => {
+    const keepControlPanelWithinViewport = () => {
+      setControlPanelWidth((currentWidth) =>
+        currentWidth === null
+          ? null
+          : clampControlPanelWidth(currentWidth),
+      )
+    }
+
+    window.addEventListener('resize', keepControlPanelWithinViewport)
+    return () => {
+      window.removeEventListener('resize', keepControlPanelWithinViewport)
+      document.body.classList.remove('resizing-control-panel')
+    }
+  }, [clampControlPanelWidth])
+
   return (
-    <main className="lab-shell">
+    <main
+      className="lab-shell"
+      style={
+        controlPanelWidth === null
+          ? undefined
+          : ({
+              '--control-panel-width': `${controlPanelWidth}px`,
+            } as CSSProperties)
+      }
+    >
       <header className="global-toolbar">
         <div className="slice-preset-control">
           <SlicePresetMenu onApply={applySlicePreset} />
@@ -792,7 +904,36 @@ function App() {
         </div>
       </section>
 
-      <aside className="control-panel">
+      <aside className="control-panel" ref={controlPanelRef}>
+        <div
+          className="control-panel-resizer"
+          role="separator"
+          tabIndex={0}
+          aria-label="Resize control panel"
+          aria-orientation="vertical"
+          aria-valuemin={CONTROL_PANEL_MINIMUM_WIDTH}
+          aria-valuemax={
+            typeof window === 'undefined'
+              ? CONTROL_PANEL_MINIMUM_WIDTH
+              : Math.max(
+                  CONTROL_PANEL_MINIMUM_WIDTH,
+                  window.innerWidth - VIEWPORT_MINIMUM_WIDTH,
+                )
+          }
+          aria-valuenow={controlPanelWidth ?? undefined}
+          aria-valuetext={
+            controlPanelWidth === null
+              ? 'Default width'
+              : `${Math.round(controlPanelWidth)} pixels`
+          }
+          title="Drag to resize · Double-click to restore"
+          onDoubleClick={() => setControlPanelWidth(null)}
+          onKeyDown={resizeControlPanelWithKeyboard}
+          onPointerCancel={finishControlPanelResize}
+          onPointerDown={beginControlPanelResize}
+          onPointerMove={continueControlPanelResize}
+          onPointerUp={finishControlPanelResize}
+        />
         <header className="experiment-menu" ref={experimentMenuRef}>
           <button
             className="experiment-trigger"
@@ -839,7 +980,10 @@ function App() {
         </header>
 
         <div className="panel-content">
-          <div className="active-experiment-view" hidden={selected !== null}>
+          <div
+            className="active-experiment-view panel-section-grid"
+            hidden={selected !== null}
+          >
             {simulationExperimentSelected && (
               <SimulationControls
                 activeEnsembleCount={fidSimulation.ensembleStates.length}
@@ -986,7 +1130,7 @@ function App() {
             selectedEnsemble &&
             magneticProperties &&
             sampleProperties && (
-            <>
+            <div className="ensemble-details-view panel-section-grid">
               <section className="selection-section" aria-live="polite">
                 <div className="section-heading">
                   <div>
@@ -1299,7 +1443,7 @@ function App() {
                   </div>
                 </dl>
               </section>
-            </>
+            </div>
           )}
         </div>
       </aside>

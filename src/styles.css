@@ -46,8 +46,9 @@ a:focus-visible {
 }
 
 .lab-shell {
+  --control-panel-width: clamp(418px, 38.5vw, 572px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(418px, 38.5vw, 572px);
+  grid-template-columns: minmax(0, 1fr) var(--control-panel-width);
   grid-template-rows: 54px minmax(0, 1fr);
   width: 100%;
   height: 100%;
@@ -514,11 +515,51 @@ a:focus-visible {
 }
 
 .control-panel {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
   background: var(--panel);
+}
+
+.control-panel-resizer {
+  position: absolute;
+  z-index: 45;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  width: 12px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.control-panel-resizer::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 2px;
+  content: '';
+  background: rgba(125, 215, 240, 0.14);
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+
+.control-panel-resizer:hover::after,
+.control-panel-resizer:focus-visible::after,
+.resizing-control-panel .control-panel-resizer::after {
+  background: var(--cyan);
+  box-shadow: 0 0 12px rgba(125, 215, 240, 0.55);
+}
+
+.control-panel-resizer:focus-visible {
+  outline: none;
+}
+
+.resizing-control-panel,
+.resizing-control-panel * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .experiment-menu {
@@ -605,6 +646,32 @@ a:focus-visible {
   overflow-y: auto;
   scrollbar-color: rgba(244, 245, 241, 0.18) transparent;
   scrollbar-width: thin;
+}
+
+.panel-section-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, 480px), 572px)
+  );
+  align-content: start;
+  align-items: start;
+  justify-content: start;
+}
+
+.panel-section-grid[hidden] {
+  display: none;
+}
+
+.panel-section-grid > section {
+  width: 100%;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+}
+
+.panel-section-grid > .fid-simulation-controls,
+.panel-section-grid > .gradient-playback-controls-top {
+  grid-column: 1 / -1;
 }
 
 .selection-section,
@@ -2742,6 +2809,10 @@ a:focus-visible {
 
   .control-panel {
     min-height: 760px;
+  }
+
+  .control-panel-resizer {
+    display: none;
   }
 
   .panel-content {

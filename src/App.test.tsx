@@ -171,6 +171,29 @@ describe('App integration', () => {
     expect(screen.getByTestId('lab-scene').dataset.fieldStrength).toBe('1.5')
   })
 
+  it('resizes and restores the responsive control panel', () => {
+    const { container } = render(<App />)
+    const shell = container.querySelector<HTMLElement>('.lab-shell')
+    const resizer = screen.getByRole('separator', {
+      name: 'Resize control panel',
+    })
+
+    expect(shell?.style.getPropertyValue('--control-panel-width')).toBe('')
+
+    fireEvent.keyDown(resizer, { key: 'Home' })
+    expect(shell?.style.getPropertyValue('--control-panel-width')).toBe(
+      '418px',
+    )
+
+    fireEvent.keyDown(resizer, { key: 'ArrowLeft' })
+    expect(shell?.style.getPropertyValue('--control-panel-width')).toBe(
+      '466px',
+    )
+
+    fireEvent.doubleClick(resizer)
+    expect(shell?.style.getPropertyValue('--control-panel-width')).toBe('')
+  })
+
   it('keeps an active experiment underneath dismissible ensemble details', async () => {
     const user = userEvent.setup()
     render(<App />)
