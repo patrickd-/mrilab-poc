@@ -96,6 +96,13 @@ The slice-preset menu also includes a three-circle phantom that places equal
 CSF disks at the quarter, center, and three-quarter points of the slice's
 top-left-to-bottom-right diagonal.
 
+The Shepp–Logan MRI Phantom preset follows the 2D MRI ellipse geometry from
+[Gach, Tanase, and Boada](https://doi.org/10.1109/ICSEng.2008.15). Bone, CSF,
+gray-matter, and white-matter regions use the lab's corresponding simulated
+sample types. The lab does not yet model scalp or tumor tissue, so the scalp
+shell is omitted and the small high-spin-density inclusions use CSF as the
+closest available proton-density proxy.
+
 Block View expands the logical domain to 128 × 128 × 128 voxels. A removed
 64³ corner exposes one 64 × 64 quadrant of the source slice at the block's
 mid-plane. Two rotated copies of that quadrant form the other cut faces. Block

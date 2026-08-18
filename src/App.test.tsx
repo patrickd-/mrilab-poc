@@ -541,6 +541,32 @@ describe('App integration', () => {
     expect(ensembles[45 * 128 + 45].samplePreset).toBe('white-matter')
   })
 
+  it('applies the tissue-mapped Shepp-Logan MRI phantom', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Apply slice preset' }))
+    await user.click(
+      screen.getByRole('option', { name: 'Shepp–Logan MRI Phantom' }),
+    )
+
+    const ensembles = mocks.sceneProps?.ensembleModels as Array<{
+      samplePreset: SamplePresetId
+    }>
+    expect(new Set(ensembles.map((ensemble) => ensemble.samplePreset))).toEqual(
+      new Set([
+        'air',
+        'cortical-bone',
+        'cerebrospinal-fluid',
+        'gray-matter',
+        'white-matter',
+      ]),
+    )
+    expect(ensembles[6 * 128 + 64].samplePreset).toBe('cortical-bone')
+    expect(ensembles[64 * 128 + 64].samplePreset).toBe('gray-matter')
+    expect(ensembles[41 * 128 + 64].samplePreset).toBe('white-matter')
+  })
+
   it('routes camera and viewport controls while clearing a stale selection', async () => {
     const user = userEvent.setup()
     render(<App />)

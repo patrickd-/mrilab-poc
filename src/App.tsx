@@ -44,6 +44,7 @@ import {
   type SupportedFieldStrengthTesla,
 } from './models/HydrogenEnsemble'
 import { simplifiedBrainSampleAt } from './presets/simplifiedBrain'
+import { sheppLoganSampleAt } from './presets/sheppLogan'
 import { createFidEnsembleStates } from './simulation/fid'
 import {
   calibrateRfPulseForFlipAngle,
@@ -161,6 +162,7 @@ type TissueSamplePresetId = Exclude<SamplePresetId, 'air'>
 type SlicePresetAction =
   | 'reset'
   | 'phantom-3-circles'
+  | 'shepp-logan'
   | 'simplified-brain'
   | TissueSamplePresetId
 
@@ -170,6 +172,7 @@ const SLICE_PRESET_OPTIONS: ReadonlyArray<{
 }> = [
   { id: 'reset', label: 'Reset' },
   { id: 'phantom-3-circles', label: 'Phantom (3 circles)' },
+  { id: 'shepp-logan', label: 'Shepp–Logan MRI Phantom' },
   { id: 'simplified-brain', label: 'Simplified Brain' },
   { id: 'cortical-bone', label: 'Add Cortical bone' },
   {
@@ -643,6 +646,14 @@ function App() {
     if (action === 'reset') {
       ensembles.forEach((ensemble) => {
         ensemble.samplePreset = 'air'
+      })
+    } else if (action === 'shepp-logan') {
+      ensembles.forEach((ensemble) => {
+        ensemble.samplePreset = sheppLoganSampleAt(
+          ensemble.column,
+          ensemble.row,
+          ensemble.gridSize,
+        )
       })
     } else if (action === 'simplified-brain') {
       ensembles.forEach((ensemble) => {
