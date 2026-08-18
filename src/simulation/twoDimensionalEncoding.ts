@@ -33,19 +33,23 @@ function averagedAppliedProfile(
   phaseEnabled: boolean,
   frequencyEnabled: boolean,
 ): SpatialGradientProfile {
+  const enabledStageCount =
+    Number(phaseEnabled) + Number(frequencyEnabled)
+  const divisor = Math.max(1, enabledStageCount)
+
   return {
     startFieldOffsetMillitesla:
       ((phaseEnabled ? phaseProfile.startFieldOffsetMillitesla : 0) +
         (frequencyEnabled
           ? frequencyProfile.startFieldOffsetMillitesla
           : 0)) /
-      2,
+      divisor,
     endFieldOffsetMillitesla:
       ((phaseEnabled ? phaseProfile.endFieldOffsetMillitesla : 0) +
         (frequencyEnabled
           ? frequencyProfile.endFieldOffsetMillitesla
           : 0)) /
-      2,
+      divisor,
   }
 }
 
@@ -55,9 +59,9 @@ export function effectiveTwoDimensionalGradientVector(
   phaseEnabled = true,
   frequencyEnabled = true,
 ): TwoDimensionalGradientVector {
-  // Both stages have the same duration. Applying their average for twice that
-  // duration preserves the accumulated gradient phase while also letting B0
-  // inhomogeneity accrue throughout the complete two-stage interval.
+  // Enabled stages have the same duration. Applying their average for their
+  // combined duration preserves accumulated gradient phase while also letting
+  // B0 inhomogeneity accrue for exactly as long as the enabled sequence.
   return {
     x: averagedAppliedProfile(
       phase.x,
@@ -72,6 +76,16 @@ export function effectiveTwoDimensionalGradientVector(
       frequencyEnabled,
     ),
   }
+}
+
+export function twoDimensionalEncodingDurationMilliseconds(
+  phaseEnabled: boolean,
+  frequencyEnabled: boolean,
+) {
+  return (
+    (Number(phaseEnabled) + Number(frequencyEnabled)) *
+    TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS
+  )
 }
 
 function zeroProfile(): SpatialGradientProfile {

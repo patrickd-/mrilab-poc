@@ -408,11 +408,20 @@ describe('App integration', () => {
         startFieldOffsetMillitesla: 0,
       },
       spatialGradientPhaseYProfile: {
-        endFieldOffsetMillitesla: 0.64,
-        startFieldOffsetMillitesla: -0.64,
+        endFieldOffsetMillitesla: 1.28,
+        startFieldOffsetMillitesla: -1.28,
       },
-      spatialGradientXEnabled: false,
-      spatialGradientYEnabled: false,
+      spatialGradientTimeMilliseconds: 0.1,
+      spatialGradientXEnabled: true,
+      spatialGradientXProfile: {
+        endFieldOffsetMillitesla: 0,
+        startFieldOffsetMillitesla: 0,
+      },
+      spatialGradientYEnabled: true,
+      spatialGradientYProfile: {
+        endFieldOffsetMillitesla: 1.28,
+        startFieldOffsetMillitesla: -1.28,
+      },
     })
   })
 

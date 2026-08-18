@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createDefaultTwoDimensionalEncodingGradients,
   effectiveTwoDimensionalGradientVector,
+  twoDimensionalEncodingDurationMilliseconds,
   twoDimensionalEncodingState,
 } from './twoDimensionalEncoding'
 
@@ -72,8 +73,12 @@ describe('two-dimensional gradient encoding', () => {
       false,
       true,
     )
-    expect(frequencyOnly.x).toEqual(effective.x)
+    expect(frequencyOnly.x.startFieldOffsetMillitesla).toBeCloseTo(-1.28, 12)
+    expect(frequencyOnly.x.endFieldOffsetMillitesla).toBeCloseTo(1.28, 12)
     expect(frequencyOnly.y.startFieldOffsetMillitesla).toBe(0)
     expect(frequencyOnly.y.endFieldOffsetMillitesla).toBe(0)
+    expect(twoDimensionalEncodingDurationMilliseconds(true, true)).toBe(0.2)
+    expect(twoDimensionalEncodingDurationMilliseconds(true, false)).toBe(0.1)
+    expect(twoDimensionalEncodingDurationMilliseconds(false, false)).toBe(0)
   })
 })

@@ -68,7 +68,7 @@ import {
 import {
   createDefaultTwoDimensionalEncodingGradients,
   effectiveTwoDimensionalGradientVector,
-  TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS,
+  twoDimensionalEncodingDurationMilliseconds,
   type TwoDimensionalGradientVector,
 } from './simulation/twoDimensionalEncoding'
 
@@ -438,6 +438,11 @@ function App() {
       twoDimensionalPhaseProfiles,
     ],
   )
+  const currentTwoDimensionalGradient = twoDimensionalFrequencyEnabled
+    ? twoDimensionalFrequencyProfiles
+    : twoDimensionalPhaseProfiles
+  const currentTwoDimensionalGradientEnabled =
+    twoDimensionalFrequencyEnabled || twoDimensionalPhaseEnabled
   const gradientEnsembleStates = useMemo(
     () =>
       gradientRecalledEchoExperimentSelected
@@ -867,27 +872,30 @@ function App() {
           }
           spatialGradientTimeMilliseconds={
             twoDimensionalGradientExperimentSelected
-              ? TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS * 2
+              ? twoDimensionalEncodingDurationMilliseconds(
+                  twoDimensionalPhaseEnabled,
+                  twoDimensionalFrequencyEnabled,
+                )
               : SPATIAL_PROJECTION_END_TIME_MILLISECONDS
           }
           spatialGradientXEnabled={
             twoDimensionalGradientExperimentSelected
-              ? twoDimensionalFrequencyEnabled
+              ? currentTwoDimensionalGradientEnabled
               : spatialGradientXEnabled
           }
           spatialGradientXProfile={
             twoDimensionalGradientExperimentSelected
-              ? twoDimensionalFrequencyProfiles.x
+              ? currentTwoDimensionalGradient.x
               : spatialGradientXProfile
           }
           spatialGradientYEnabled={
             twoDimensionalGradientExperimentSelected
-              ? twoDimensionalFrequencyEnabled
+              ? currentTwoDimensionalGradientEnabled
               : spatialGradientYEnabled
           }
           spatialGradientYProfile={
             twoDimensionalGradientExperimentSelected
-              ? twoDimensionalFrequencyProfiles.y
+              ? currentTwoDimensionalGradient.y
               : spatialGradientYProfile
           }
           referenceFrame={referenceFrame}
