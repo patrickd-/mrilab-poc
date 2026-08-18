@@ -23,6 +23,17 @@ Run the deterministic simulation tests with:
 npm test
 ```
 
+## GitHub Pages
+
+Pushes to `main` run the GitHub Pages workflow in
+`.github/workflows/pages.yml`. It installs the locked dependencies, runs the
+test suite, builds the Vite app with the repository's Pages base path, and
+deploys the generated `dist` artifact.
+
+Before the first deployment, open the repository's **Settings → Pages** and
+set **Build and deployment → Source** to **GitHub Actions**. The workflow also
+supports a manual run from the repository's Actions tab.
+
 Calibrate the editable gradients against the same k-space integrator used by
 the simulation with:
 
