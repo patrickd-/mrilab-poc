@@ -2111,6 +2111,12 @@ a:focus-visible {
   align-items: flex-end;
 }
 
+.k-space-acquisition-shell > header .k-space-acquisition-meta small {
+  max-width: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .k-space-acquisition-meta .gradient-input-reset {
   width: auto;
 }
