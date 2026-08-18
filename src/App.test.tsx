@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   gradientPanelProps: null as Record<string, any> | null,
   resetCamera: vi.fn(),
   sceneProps: null as Record<string, unknown> | null,
+  twoDimensionalGradientPanelProps: null as Record<string, any> | null,
 }))
 
 vi.mock('./components/LabScene', async () => {
@@ -112,6 +113,17 @@ vi.mock('./components/GradientRecalledEchoExperimentPanel', () => ({
   },
 }))
 
+vi.mock('./components/TwoDimensionalGradientEncodingExperimentPanel', () => ({
+  default: (props: Record<string, any>) => {
+    mocks.twoDimensionalGradientPanelProps = props
+    return (
+      <div data-testid="two-dimensional-gradient-experiment">
+        Two-dimensional gradient experiment view
+      </div>
+    )
+  },
+}))
+
 import App from './App'
 
 function experimentViewIsHidden() {
@@ -135,6 +147,7 @@ describe('App integration', () => {
     mocks.fundamentalGradientPanelProps = null
     mocks.gradientPanelProps = null
     mocks.sceneProps = null
+    mocks.twoDimensionalGradientPanelProps = null
     mocks.fidHook.mockReset().mockReturnValue({
       applyPulse: vi.fn(),
       ensembleStates: [],
@@ -328,6 +341,12 @@ describe('App integration', () => {
     expect(
       screen.queryByTestId('gradient-recalled-echo-experiment'),
     ).toBeNull()
+    expect(
+      screen.getByTestId('two-dimensional-gradient-experiment'),
+    ).toBeTruthy()
+    expect(mocks.twoDimensionalGradientPanelProps).toMatchObject({
+      gridSize: 128,
+    })
     expect(mocks.sceneProps).toMatchObject({
       gradientEncodingSelected: false,
       spatialGradientActive: false,

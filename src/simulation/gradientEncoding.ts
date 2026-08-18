@@ -582,15 +582,17 @@ export function spatialEncodingBasisAt(
   gridSize: number,
   kxCyclesPerMeter: number,
   kyCyclesPerMeter: number,
+  phaseOffsetRadians = 0,
 ) {
   const gridCenter = (gridSize - 1) / 2
   const positionXMeters = (column - gridCenter) * 1e-3
   const positionYMeters = (gridCenter - row) * 1e-3
   const phaseRadians =
+    phaseOffsetRadians +
     2 *
-    Math.PI *
-    (kxCyclesPerMeter * positionXMeters +
-      kyCyclesPerMeter * positionYMeters)
+      Math.PI *
+      (kxCyclesPerMeter * positionXMeters +
+        kyCyclesPerMeter * positionYMeters)
 
   return {
     phaseRadians,

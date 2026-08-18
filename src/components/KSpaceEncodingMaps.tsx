@@ -5,6 +5,7 @@ interface KSpaceEncodingMapsProps {
   gridSize: number
   kxCyclesPerMeter: number
   kyCyclesPerMeter: number
+  phaseOffsetRadians?: number
 }
 
 type EncodingComponent = 'imaginary' | 'real'
@@ -18,6 +19,7 @@ function EncodingMap({
   gridSize,
   kxCyclesPerMeter,
   kyCyclesPerMeter,
+  phaseOffsetRadians = 0,
 }: KSpaceEncodingMapsProps & { component: EncodingComponent }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -42,6 +44,7 @@ function EncodingMap({
           gridSize,
           kxCyclesPerMeter,
           kyCyclesPerMeter,
+          phaseOffsetRadians,
         )
         const value = component === 'real' ? basis.real : basis.imaginary
         const grayscale = Math.round(((value + 1) / 2) * 255)
@@ -53,7 +56,13 @@ function EncodingMap({
       }
     }
     context.putImageData(image, 0, 0)
-  }, [component, gridSize, kxCyclesPerMeter, kyCyclesPerMeter])
+  }, [
+    component,
+    gridSize,
+    kxCyclesPerMeter,
+    kyCyclesPerMeter,
+    phaseOffsetRadians,
+  ])
 
   const label = componentLabel(component)
   return (

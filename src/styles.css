@@ -987,6 +987,83 @@ a:focus-visible {
   gap: 14px;
 }
 
+.two-dimensional-gradient-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.dual-spatial-gradient-phase .gradient-input-heading > strong {
+  color: var(--yellow);
+}
+
+.dual-spatial-gradient-frequency .gradient-input-heading > strong {
+  color: var(--green);
+}
+
+.dual-spatial-gradient-legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dual-spatial-gradient-legend span,
+.dual-spatial-gradient-meta span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.dual-spatial-gradient-legend span::before {
+  width: 9px;
+  height: 2px;
+  content: '';
+  background: currentColor;
+}
+
+.dual-spatial-gradient-legend .x-axis,
+.dual-spatial-gradient-meta .x-axis {
+  color: var(--cyan);
+}
+
+.dual-spatial-gradient-legend .y-axis,
+.dual-spatial-gradient-meta .y-axis {
+  color: var(--pink);
+}
+
+.two-dimensional-encoding-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: rgba(125, 215, 240, 0.025);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.two-dimensional-encoding-order i {
+  color: var(--cyan);
+  font-style: normal;
+}
+
+.two-dimensional-encoding-order strong {
+  color: var(--white);
+  font-size: inherit;
+  font-weight: 500;
+}
+
 .fundamental-gradient-section {
   border-bottom: 1px solid var(--line);
 }

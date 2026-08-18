@@ -30,6 +30,7 @@ import SimulationControls, {
   type SimulationTimeStep,
 } from './components/SimulationControls'
 import SpinEchoExperimentPanel from './components/SpinEchoExperimentPanel'
+import TwoDimensionalGradientEncodingExperimentPanel from './components/TwoDimensionalGradientEncodingExperimentPanel'
 import { useFidSimulation } from './hooks/useFidSimulation'
 import { useGradientAcquisition } from './hooks/useGradientAcquisition'
 import { useGradientEncodingPlayback } from './hooks/useGradientEncodingPlayback'
@@ -1058,6 +1059,12 @@ function App() {
                 onXProfileChange={setSpatialGradientXProfile}
                 onYEnabledChange={setSpatialGradientYEnabled}
                 onYProfileChange={setSpatialGradientYProfile}
+              />
+            )}
+
+            {selectedExperiment === 'gradient-encoding-2d' && (
+              <TwoDimensionalGradientEncodingExperimentPanel
+                gridSize={GRID_SIZE}
               />
             )}
 
