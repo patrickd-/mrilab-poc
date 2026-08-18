@@ -18,6 +18,7 @@ import {
 } from '../simulation/spatialGradient'
 import {
   createDefaultTwoDimensionalEncodingGradients,
+  spatialGradientProfileForKSpaceCoordinate,
   TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS,
   twoDimensionalEncodingDurationMilliseconds,
   twoDimensionalEncodingState,
@@ -90,6 +91,29 @@ function updateEndpoint(
         ...profile,
         endFieldOffsetMillitesla: fieldOffsetMillitesla,
       }
+}
+
+function gradientVectorForKSpaceCoordinate(
+  kxCyclesPerMeter: number,
+  kyCyclesPerMeter: number,
+  currentProfiles: TwoDimensionalGradientVector,
+  fieldOfViewMillimeters: number,
+  maximumFieldOffsetMillitesla: number,
+): TwoDimensionalGradientVector {
+  return {
+    x: spatialGradientProfileForKSpaceCoordinate(
+      kxCyclesPerMeter,
+      currentProfiles.x,
+      fieldOfViewMillimeters,
+      maximumFieldOffsetMillitesla,
+    ),
+    y: spatialGradientProfileForKSpaceCoordinate(
+      kyCyclesPerMeter,
+      currentProfiles.y,
+      fieldOfViewMillimeters,
+      maximumFieldOffsetMillitesla,
+    ),
+  }
 }
 
 function DualSpatialGradientGraph({
@@ -652,6 +676,62 @@ function TwoDimensionalGradientEncodingExperimentPanel({
     setFrequencyAdcEnabled(enabled)
   }
 
+  const changeKSpaceCursor = (
+    kxCyclesPerMeter: number,
+    kyCyclesPerMeter: number,
+  ) => {
+    const maximumFieldOffsetMillitesla =
+      maximumEndpointFieldOffsetMillitesla(gridSize)
+
+    if (frequencyEnabled) {
+      changeFrequencyProfiles(
+        gradientVectorForKSpaceCoordinate(
+          kxCyclesPerMeter - encodingState.phaseKxCyclesPerMeter,
+          kyCyclesPerMeter - encodingState.phaseKyCyclesPerMeter,
+          frequencyProfiles,
+          gridSize,
+          maximumFieldOffsetMillitesla,
+        ),
+      )
+      return
+    }
+
+    if (phaseEnabled) {
+      changePhaseProfiles(
+        gradientVectorForKSpaceCoordinate(
+          kxCyclesPerMeter,
+          kyCyclesPerMeter,
+          phaseProfiles,
+          gridSize,
+          maximumFieldOffsetMillitesla,
+        ),
+      )
+      return
+    }
+
+    const nextFrequencyProfiles = gradientVectorForKSpaceCoordinate(
+      kxCyclesPerMeter,
+      kyCyclesPerMeter,
+      frequencyProfiles,
+      gridSize,
+      maximumFieldOffsetMillitesla,
+    )
+    acquireGradientUpdate(
+      'frequency',
+      twoDimensionalEncodingState(
+        phaseProfiles,
+        nextFrequencyProfiles,
+        gridSize,
+        false,
+        true,
+      ),
+      TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS,
+      frequencyAdcEnabled,
+    )
+    onFrequencyProfilesChange(nextFrequencyProfiles)
+    onFrequencyEnabledChange(true)
+  }
+
   return (
     <>
       <section className="fundamental-gradient-section two-dimensional-gradient-section">
@@ -733,9 +813,10 @@ function TwoDimensionalGradientEncodingExperimentPanel({
 
         <p className="gradient-input-instructions">
           The cursor follows the accumulated gradient configuration
-          continuously. Editing a stage with ADC enabled records its complex
-          signal and adds a magnitude-weighted trace; editing with ADC off
-          moves the cursor without acquiring.
+          continuously and can be dragged to solve backward for the active
+          gradient endpoints. Editing either way with ADC enabled records its
+          complex signal and adds a magnitude-weighted trace; with ADC off,
+          only the cursor and gradients move.
         </p>
 
         <div className="two-dimensional-k-space-stack">
@@ -747,6 +828,7 @@ function TwoDimensionalGradientEncodingExperimentPanel({
             encodingStartTimeMilliseconds={0}
             gradientImperfections={false}
             gridSize={gridSize}
+            onCursorKSpaceChange={changeKSpaceCursor}
             reconstructionVoxelSizeMillimeters={
               reconstructionVoxelSizeMillimeters
             }

@@ -2197,7 +2197,29 @@ a:focus-visible {
 
 .k-space-cursor .cursor-head {
   fill: var(--coral);
+  pointer-events: none;
   stroke: #080b0e;
+  stroke-width: 1;
+}
+
+.k-space-cursor .cursor-halo {
+  pointer-events: none;
+}
+
+.k-space-cursor .cursor-hit {
+  fill: transparent;
+  cursor: grab;
+  outline: none;
+  touch-action: none;
+}
+
+.k-space-cursor .cursor-hit:active {
+  cursor: grabbing;
+}
+
+.k-space-cursor .cursor-hit:focus-visible {
+  fill: rgba(255, 120, 102, 0.12);
+  stroke: var(--coral);
   stroke-width: 1;
 }
 

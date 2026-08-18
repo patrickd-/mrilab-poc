@@ -195,4 +195,53 @@ describe('TwoDimensionalGradientEncodingExperimentPanel', () => {
     ).not.toBeNull()
     expect(putImageData.mock.calls.length).toBeGreaterThan(3)
   })
+
+  it('drives the gradient editors and acquisition by dragging the k-space cursor', () => {
+    const { container } = render(<StatefulPanel />)
+    const graph = container.querySelector<SVGSVGElement>(
+      '.k-space-acquisition-graph',
+    )!
+    vi.spyOn(graph, 'getBoundingClientRect').mockReturnValue({
+      bottom: 378,
+      height: 378,
+      left: 0,
+      right: 460,
+      top: 0,
+      width: 460,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    const frequencyXEnd = screen.getByRole('slider', {
+      name: 'Frequency encoding G x gradient 8 millimeter endpoint',
+    })
+    const initialEndpoint = Number(
+      frequencyXEnd.getAttribute('aria-valuenow'),
+    )
+    const cursor = screen.getByRole('button', {
+      name: /drag k-space cursor/i,
+    })
+    Object.defineProperty(cursor, 'setPointerCapture', {
+      value: vi.fn(),
+    })
+
+    fireEvent.pointerDown(cursor, { pointerId: 11 })
+    fireEvent.pointerMove(graph, {
+      clientX: 225,
+      clientY: 168,
+      pointerId: 11,
+    })
+
+    expect(
+      Number(frequencyXEnd.getAttribute('aria-valuenow')),
+    ).not.toBe(initialEndpoint)
+    expect(
+      screen.getByRole('img', {
+        name: /K-space trajectory with 2 ADC-acquired complex signal samples; cursor at kx 0\.00 and ky 0\.00/i,
+      }),
+    ).not.toBeNull()
+    expect(
+      container.querySelectorAll('.k-space-acquired-trace line'),
+    ).toHaveLength(1)
+  })
 })

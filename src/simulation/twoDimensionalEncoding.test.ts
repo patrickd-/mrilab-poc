@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createHydrogenEnsembles } from '../models/HydrogenEnsemble'
 import { createFidEnsembleStates } from './fid'
+import { maximumEndpointFieldOffsetMillitesla } from './spatialGradient'
 import {
   createDefaultTwoDimensionalEncodingGradients,
   effectiveTwoDimensionalGradientVector,
+  spatialGradientProfileForKSpaceCoordinate,
   twoDimensionalEncodingDurationMilliseconds,
   twoDimensionalEncodingState,
   twoDimensionalSignalPointAt,
@@ -141,5 +143,40 @@ describe('two-dimensional gradient encoding', () => {
     expect(shifted.kyCyclesPerMeter).toBe(encoded.kyCyclesPerMeter)
     expect(shifted.timeMilliseconds).toBe(0.02)
     expect(Number.isFinite(shifted.normalizedMagnitude)).toBe(true)
+  })
+
+  it('solves gradient endpoints backward from a requested k-space coordinate', () => {
+    const gridSize = 128
+    const defaults = createDefaultTwoDimensionalEncodingGradients(gridSize)
+    const currentProfile = {
+      startFieldOffsetMillitesla:
+        defaults.frequency.x.startFieldOffsetMillitesla + 0.2,
+      endFieldOffsetMillitesla:
+        defaults.frequency.x.endFieldOffsetMillitesla + 0.2,
+    }
+    const requestedKxCyclesPerMeter = 123
+    const profile = spatialGradientProfileForKSpaceCoordinate(
+      requestedKxCyclesPerMeter,
+      currentProfile,
+      gridSize,
+      maximumEndpointFieldOffsetMillitesla(gridSize),
+    )
+    const state = twoDimensionalEncodingState(
+      defaults.phase,
+      { ...defaults.frequency, x: profile },
+      gridSize,
+      false,
+      true,
+    )
+
+    expect(state.kxCyclesPerMeter).toBeCloseTo(
+      requestedKxCyclesPerMeter,
+      10,
+    )
+    expect(
+      (profile.startFieldOffsetMillitesla +
+        profile.endFieldOffsetMillitesla) /
+        2,
+    ).toBeCloseTo(0.2, 12)
   })
 })

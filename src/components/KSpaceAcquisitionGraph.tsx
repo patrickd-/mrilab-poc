@@ -24,6 +24,10 @@ interface KSpaceAcquisitionGraphProps {
   encodingStartTimeMilliseconds: number
   gradientImperfections: boolean
   gridSize: number
+  onCursorKSpaceChange?: (
+    kxCyclesPerMeter: number,
+    kyCyclesPerMeter: number,
+  ) => void
   onReconstructionVoxelSizeChange: (voxelSizeMillimeters: number) => void
   phaseEncodingPulses: ReadonlyArray<GradientPulse>
   readoutPulses: ReadonlyArray<GradientPulse>
@@ -44,6 +48,10 @@ const MINIMUM_NYQUIST_CYCLES_PER_METER = 50
 const KEYBOARD_NYQUIST_STEP_CYCLES_PER_METER = 50
 
 interface SupportDragState {
+  pointerId: number
+}
+
+interface CursorDragState {
   pointerId: number
 }
 
@@ -87,6 +95,7 @@ function KSpaceAcquisitionGraph({
   encodingStartTimeMilliseconds,
   gradientImperfections,
   gridSize,
+  onCursorKSpaceChange,
   onReconstructionVoxelSizeChange,
   phaseEncodingPulses,
   readoutPulses,
@@ -95,6 +104,7 @@ function KSpaceAcquisitionGraph({
 }: KSpaceAcquisitionGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const supportDragRef = useRef<SupportDragState | null>(null)
+  const cursorDragRef = useRef<CursorDragState | null>(null)
   const draftVoxelSizeRef = useRef<number | null>(null)
   const [draftVoxelSizeMillimeters, setDraftVoxelSizeMillimeters] =
     useState<number | null>(null)
@@ -232,6 +242,35 @@ function KSpaceAcquisitionGraph({
     )
   }
 
+  const kSpaceAtPointer = (clientX: number, clientY: number) => {
+    const bounds = svgRef.current?.getBoundingClientRect()
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return {
+        kxCyclesPerMeter: currentKxCyclesPerMeter,
+        kyCyclesPerMeter: currentKyCyclesPerMeter,
+      }
+    }
+    const svgX = ((clientX - bounds.left) / bounds.width) * GRAPH.width
+    const svgY = ((clientY - bounds.top) / bounds.height) * GRAPH.height
+
+    return {
+      kxCyclesPerMeter: Math.min(
+        extent,
+        Math.max(
+          -extent,
+          ((svgX - GRAPH.left) / GRAPH.size) * 2 * extent - extent,
+        ),
+      ),
+      kyCyclesPerMeter: Math.min(
+        extent,
+        Math.max(
+          -extent,
+          extent - ((svgY - GRAPH.top) / GRAPH.size) * 2 * extent,
+        ),
+      ),
+    }
+  }
+
   const updateDraftSupport = (nyquist: number) => {
     const nextVoxelSize = voxelSizeForNyquist(nyquist)
     draftVoxelSizeRef.current = nextVoxelSize
@@ -247,9 +286,37 @@ function KSpaceAcquisitionGraph({
     updateDraftSupport(nyquistAtPointer(event.clientX, event.clientY))
   }
 
+  const beginCursorDrag = (
+    event: ReactPointerEvent<SVGCircleElement>,
+  ) => {
+    if (!onCursorKSpaceChange) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    cursorDragRef.current = { pointerId: event.pointerId }
+  }
+
   const continueSupportDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (supportDragRef.current?.pointerId !== event.pointerId) return
     updateDraftSupport(nyquistAtPointer(event.clientX, event.clientY))
+  }
+
+  const continueCursorDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (
+      !onCursorKSpaceChange ||
+      cursorDragRef.current?.pointerId !== event.pointerId
+    ) {
+      return
+    }
+    const coordinate = kSpaceAtPointer(event.clientX, event.clientY)
+    onCursorKSpaceChange(
+      coordinate.kxCyclesPerMeter,
+      coordinate.kyCyclesPerMeter,
+    )
+  }
+
+  const continueDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    continueSupportDrag(event)
+    continueCursorDrag(event)
   }
 
   const endSupportDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -263,11 +330,31 @@ function KSpaceAcquisitionGraph({
     }
   }
 
+  const endCursorDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (cursorDragRef.current?.pointerId !== event.pointerId) return
+    cursorDragRef.current = null
+  }
+
+  const endDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    endSupportDrag(event)
+    endCursorDrag(event)
+  }
+
   const cancelSupportDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (supportDragRef.current?.pointerId !== event.pointerId) return
     supportDragRef.current = null
     draftVoxelSizeRef.current = null
     setDraftVoxelSizeMillimeters(null)
+  }
+
+  const cancelCursorDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (cursorDragRef.current?.pointerId !== event.pointerId) return
+    cursorDragRef.current = null
+  }
+
+  const cancelDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    cancelSupportDrag(event)
+    cancelCursorDrag(event)
   }
 
   const handleSupportKeyDown = (
@@ -290,6 +377,32 @@ function KSpaceAcquisitionGraph({
       voxelSizeForNyquist(
         Math.max(MINIMUM_NYQUIST_CYCLES_PER_METER, requestedNyquist),
       ),
+    )
+  }
+
+  const handleCursorKeyDown = (
+    event: ReactKeyboardEvent<SVGCircleElement>,
+  ) => {
+    if (!onCursorKSpaceChange) return
+    const step = Math.max(1, extent / 100)
+    let nextKx = currentKxCyclesPerMeter
+    let nextKy = currentKyCyclesPerMeter
+
+    if (event.key === 'ArrowRight') nextKx += step
+    else if (event.key === 'ArrowLeft') nextKx -= step
+    else if (event.key === 'ArrowUp') nextKy += step
+    else if (event.key === 'ArrowDown') nextKy -= step
+    else if (event.key === 'Home') {
+      nextKx = 0
+      nextKy = 0
+    } else {
+      return
+    }
+
+    event.preventDefault()
+    onCursorKSpaceChange(
+      Math.min(extent, Math.max(-extent, nextKx)),
+      Math.min(extent, Math.max(-extent, nextKy)),
     )
   }
 
@@ -325,9 +438,9 @@ function KSpaceAcquisitionGraph({
         viewBox={`0 0 ${GRAPH.width} ${GRAPH.height}`}
         role="img"
         aria-label={`K-space trajectory with ${points.length} ADC-acquired complex signal samples; cursor at kx ${formatKSpaceAxisValue(currentKxCyclesPerMeter)} and ky ${formatKSpaceAxisValue(currentKyCyclesPerMeter)} cycles per millimeter`}
-        onPointerMove={continueSupportDrag}
-        onPointerUp={endSupportDrag}
-        onPointerCancel={cancelSupportDrag}
+        onPointerMove={continueDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={cancelDrag}
       >
         <g className="k-space-acquisition-grid" aria-hidden="true">
           {[-1, -0.5, 0, 0.5, 1].map((fraction) => (
@@ -475,10 +588,24 @@ function KSpaceAcquisitionGraph({
         <g
           className={`k-space-cursor ${status}`}
           transform={`translate(${cursorX} ${cursorY})`}
-          aria-hidden="true"
+          aria-hidden={onCursorKSpaceChange ? undefined : true}
         >
           <circle className="cursor-halo" r="5.5" />
           <circle className="cursor-head" r="2.8" />
+          {onCursorKSpaceChange && (
+            <circle
+              className="cursor-hit"
+              r="11"
+              role="button"
+              tabIndex={0}
+              aria-label="Drag k-space cursor to change the encoding gradients"
+              aria-valuetext={`kx ${formatKSpaceAxisValue(currentKxCyclesPerMeter)} and ky ${formatKSpaceAxisValue(currentKyCyclesPerMeter)} cycles per millimeter`}
+              onPointerDown={beginCursorDrag}
+              onKeyDown={handleCursorKeyDown}
+            >
+              <title>Drag to change the active encoding gradient</title>
+            </circle>
+          )}
         </g>
 
         {[-1, 0, 1].map((fraction) => (

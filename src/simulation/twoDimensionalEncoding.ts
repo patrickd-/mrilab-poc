@@ -202,6 +202,50 @@ function kSpaceCyclesPerMeterForProfile(
   )
 }
 
+export function spatialGradientProfileForKSpaceCoordinate(
+  kSpaceCyclesPerMeter: number,
+  currentProfile: SpatialGradientProfile,
+  fieldOfViewMillimeters: number,
+  maximumEndpointFieldOffsetMillitesla: number,
+  durationMilliseconds =
+    TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS,
+): SpatialGradientProfile {
+  if (fieldOfViewMillimeters <= 0 || durationMilliseconds <= 0) {
+    return { ...currentProfile }
+  }
+
+  const gyromagneticRatioHertzPerTesla =
+    PROTON_GYROMAGNETIC_RATIO / (2 * Math.PI)
+  const gradientTeslaPerMeter =
+    kSpaceCyclesPerMeter /
+    (gyromagneticRatioHertzPerTesla * (durationMilliseconds / 1000))
+  const requestedEndpointDifferenceMillitesla =
+    gradientTeslaPerMeter * fieldOfViewMillimeters
+  const centerFieldOffsetMillitesla =
+    (currentProfile.startFieldOffsetMillitesla +
+      currentProfile.endFieldOffsetMillitesla) /
+    2
+  const maximumHalfDifference = Math.max(
+    0,
+    maximumEndpointFieldOffsetMillitesla -
+      Math.abs(centerFieldOffsetMillitesla),
+  )
+  const halfDifference = Math.min(
+    maximumHalfDifference,
+    Math.max(
+      -maximumHalfDifference,
+      requestedEndpointDifferenceMillitesla / 2,
+    ),
+  )
+
+  return {
+    startFieldOffsetMillitesla:
+      centerFieldOffsetMillitesla - halfDifference,
+    endFieldOffsetMillitesla:
+      centerFieldOffsetMillitesla + halfDifference,
+  }
+}
+
 function centerFieldOffsetTesla(vector: TwoDimensionalGradientVector) {
   return (
     (vector.x.startFieldOffsetMillitesla +

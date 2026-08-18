@@ -99,6 +99,55 @@ describe('KSpaceAcquisitionGraph', () => {
     expect(container.querySelector('.k-space-cursor.running')).not.toBeNull()
   })
 
+  it('reports k-space coordinates while its interactive cursor is dragged', () => {
+    const onCursorKSpaceChange = vi.fn()
+    const { container } = renderGraph({
+      onCursorKSpaceChange,
+      phaseEncodingPulses: [],
+      readoutPulses: [],
+    })
+    const graph = container.querySelector<SVGSVGElement>(
+      '.k-space-acquisition-graph',
+    )!
+    vi.spyOn(graph, 'getBoundingClientRect').mockReturnValue({
+      bottom: 378,
+      height: 378,
+      left: 0,
+      right: 460,
+      top: 0,
+      width: 460,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    const cursor = screen.getByRole('button', {
+      name: /drag k-space cursor/i,
+    })
+    Object.defineProperty(cursor, 'setPointerCapture', {
+      value: vi.fn(),
+    })
+
+    fireEvent.pointerDown(cursor, { pointerId: 9 })
+    fireEvent.pointerMove(graph, {
+      clientX: 255,
+      clientY: 138,
+      pointerId: 9,
+    })
+
+    expect(onCursorKSpaceChange).toHaveBeenLastCalledWith(100, 100)
+
+    fireEvent.pointerUp(graph, { pointerId: 9 })
+    fireEvent.pointerMove(graph, {
+      clientX: 285,
+      clientY: 108,
+      pointerId: 9,
+    })
+    expect(onCursorKSpaceChange).toHaveBeenCalledTimes(1)
+
+    fireEvent.keyDown(cursor, { key: 'ArrowRight' })
+    expect(onCursorKSpaceChange).toHaveBeenLastCalledWith(5, 0)
+  })
+
   it('draws only contiguous ADC samples and brightens stronger signal segments', () => {
     const points = [
       signalPoint(10, -1000, 500, 0.01),
