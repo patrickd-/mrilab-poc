@@ -236,11 +236,15 @@ describe('App integration', () => {
       }),
     ).toBeTruthy()
     await user.click(
-      screen.getByRole('option', { name: 'Gradient Encoding Experiment' }),
+      screen.getByRole('option', {
+        name: '1D Gradient Encoding Experiment',
+      }),
     )
 
     expect(
-      screen.getByRole('button', { name: 'Gradient Encoding Experiment' }),
+      screen.getByRole('button', {
+        name: '1D Gradient Encoding Experiment',
+      }),
     ).toBeTruthy()
     expect(
       screen.queryByTestId('gradient-recalled-echo-experiment'),
@@ -286,6 +290,48 @@ describe('App integration', () => {
       screen.getByRole('button', { name: 'Disable fundamental Gx' }),
     )
     expect(mocks.sceneProps?.spatialGradientXEnabled).toBe(false)
+  })
+
+  it('lists a separate 2D gradient encoding workspace after the 1D experiment', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(
+      screen.getByRole('button', { name: /Select Experiment/i }),
+    )
+    const experimentLabels = screen
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+
+    expect(experimentLabels).toEqual([
+      'Ping Experiment',
+      'Spin Echo Experiment',
+      '1D Gradient Encoding Experiment',
+      '2D Gradient Encoding Experiment',
+      'Gradient Recalled Echo Experiment',
+    ])
+
+    await user.click(
+      screen.getByRole('option', {
+        name: '2D Gradient Encoding Experiment',
+      }),
+    )
+
+    expect(
+      screen.getByRole('button', {
+        name: '2D Gradient Encoding Experiment',
+      }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByTestId('fundamental-gradient-experiment'),
+    ).toBeNull()
+    expect(
+      screen.queryByTestId('gradient-recalled-echo-experiment'),
+    ).toBeNull()
+    expect(mocks.sceneProps).toMatchObject({
+      gradientEncodingSelected: false,
+      spatialGradientActive: false,
+    })
   })
 
   it('bypasses disabled gradient channels without discarding their waveforms', async () => {

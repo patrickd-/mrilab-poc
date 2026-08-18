@@ -102,6 +102,7 @@ const B0_TESLA_VALUES: Readonly<
 }
 type ExperimentId =
   | 'gradient-encoding'
+  | 'gradient-encoding-2d'
   | 'gradient-recalled-echo'
   | 'ping'
   | 'spin-echo'
@@ -109,7 +110,8 @@ type ExperimentId =
 const EXPERIMENTS: ReadonlyArray<{ id: ExperimentId; label: string }> = [
   { id: 'ping', label: 'Ping Experiment' },
   { id: 'spin-echo', label: 'Spin Echo Experiment' },
-  { id: 'gradient-encoding', label: 'Gradient Encoding Experiment' },
+  { id: 'gradient-encoding', label: '1D Gradient Encoding Experiment' },
+  { id: 'gradient-encoding-2d', label: '2D Gradient Encoding Experiment' },
   {
     id: 'gradient-recalled-echo',
     label: 'Gradient Recalled Echo Experiment',
