@@ -244,4 +244,65 @@ describe('TwoDimensionalGradientEncodingExperimentPanel', () => {
       container.querySelectorAll('.k-space-acquired-trace line'),
     ).toHaveLength(1)
   })
+
+  it('resets the k-space trace and magnitude reconstruction independently', () => {
+    render(<StatefulPanel />)
+    const frequencyXEnd = screen.getByRole('slider', {
+      name: 'Frequency encoding G x gradient 8 millimeter endpoint',
+    })
+    const resetTrace = screen.getByRole('button', {
+      name: 'Reset K-space acquisition',
+    }) as HTMLButtonElement
+    const resetImage = screen.getByRole('button', {
+      name: 'Reset magnitude reconstruction',
+    }) as HTMLButtonElement
+
+    expect(resetTrace.disabled).toBe(true)
+    expect(resetImage.disabled).toBe(true)
+
+    fireEvent.keyDown(frequencyXEnd, { key: 'ArrowUp' })
+    expect(resetTrace.disabled).toBe(false)
+    expect(resetImage.disabled).toBe(false)
+
+    fireEvent.click(resetImage)
+    expect(
+      screen.getByRole('img', {
+        name: /K-space trajectory with 2 ADC-acquired complex signal samples/i,
+      }),
+    ).not.toBeNull()
+    expect(
+      screen.getByRole('img', {
+        name: /Partial magnitude MR image from 0 acquisitions and 0 complex k-space samples/i,
+      }),
+    ).not.toBeNull()
+    expect(resetImage.disabled).toBe(true)
+    expect(resetTrace.disabled).toBe(false)
+
+    fireEvent.keyDown(frequencyXEnd, { key: 'ArrowUp' })
+    expect(
+      screen.getByRole('img', {
+        name: /K-space trajectory with 3 ADC-acquired complex signal samples/i,
+      }),
+    ).not.toBeNull()
+    expect(
+      screen.getByRole('img', {
+        name: /Partial magnitude MR image from 1 acquisition and 1 complex k-space sample/i,
+      }),
+    ).not.toBeNull()
+
+    fireEvent.click(resetTrace)
+    expect(
+      screen.getByRole('img', {
+        name: /K-space trajectory with 0 ADC-acquired complex signal samples/i,
+      }),
+    ).not.toBeNull()
+    expect(screen.getByText('0 complex samples')).not.toBeNull()
+    expect(
+      screen.getByRole('img', {
+        name: /Partial magnitude MR image from 1 acquisition and 1 complex k-space sample/i,
+      }),
+    ).not.toBeNull()
+    expect(resetTrace.disabled).toBe(true)
+    expect(resetImage.disabled).toBe(false)
+  })
 })

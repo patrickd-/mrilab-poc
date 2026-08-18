@@ -1755,6 +1755,14 @@ a:focus-visible {
   background: rgba(125, 215, 240, 0.055);
 }
 
+.gradient-input-reset:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  background: transparent;
+  cursor: default;
+  opacity: 0.35;
+}
+
 .gradient-input-ro .gradient-input-heading strong {
   color: var(--pink);
 }

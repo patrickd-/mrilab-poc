@@ -53,6 +53,12 @@ interface EndpointDragState {
   pointerId: number
 }
 
+interface AcquisitionCheckpoint {
+  activePointCount: number
+  activeRunId: number | null
+  nextRunId: number
+}
+
 const GRAPH = {
   bottom: 34,
   height: 190,
@@ -66,6 +72,36 @@ const DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS = 1
 const MANUAL_ADC_WINDOW: ReadonlyArray<GradientPulse> = [
   { start: 0, end: 1, amplitude: 1 },
 ]
+
+function acquisitionRunsAfterCheckpoint(
+  runs: ReadonlyArray<GradientAcquisitionRun>,
+  checkpoint: AcquisitionCheckpoint | null,
+  includeAnchorPoint: boolean,
+): ReadonlyArray<GradientAcquisitionRun> {
+  if (!checkpoint) return runs
+
+  return runs.flatMap((run) => {
+    if (run.id === checkpoint.activeRunId) {
+      if (run.points.length <= checkpoint.activePointCount) return []
+      const startIndex = includeAnchorPoint
+        ? Math.max(0, checkpoint.activePointCount - 1)
+        : checkpoint.activePointCount
+      const visiblePoints = run.points.slice(startIndex)
+      const timeOriginMilliseconds = visiblePoints[0].timeMilliseconds
+      return [
+        {
+          ...run,
+          points: visiblePoints.map((point) => ({
+            ...point,
+            timeMilliseconds:
+              point.timeMilliseconds - timeOriginMilliseconds,
+          })),
+        },
+      ]
+    }
+    return run.id >= checkpoint.nextRunId ? [run] : []
+  })
+}
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
@@ -500,6 +536,10 @@ function TwoDimensionalGradientEncodingExperimentPanel({
   const [acquisitionRuns, setAcquisitionRuns] = useState<
     GradientAcquisitionRun[]
   >([])
+  const [kSpaceCheckpoint, setKSpaceCheckpoint] =
+    useState<AcquisitionCheckpoint | null>(null)
+  const [reconstructionCheckpoint, setReconstructionCheckpoint] =
+    useState<AcquisitionCheckpoint | null>(null)
   const [reconstructionVoxelSizeMillimeters, setReconstructionVoxelSize] =
     useState(DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS)
   const activeAcquisitionStageRef = useRef<EncodingStage | null>(null)
@@ -526,7 +566,25 @@ function TwoDimensionalGradientEncodingExperimentPanel({
       phaseEnabled,
       frequencyEnabled,
     )
-  const latestSignalPoints = acquisitionRuns.at(-1)?.points ?? []
+  const kSpaceAcquisitionRuns = useMemo(
+    () =>
+      acquisitionRunsAfterCheckpoint(
+        acquisitionRuns,
+        kSpaceCheckpoint,
+        true,
+      ),
+    [acquisitionRuns, kSpaceCheckpoint],
+  )
+  const reconstructionAcquisitionRuns = useMemo(
+    () =>
+      acquisitionRunsAfterCheckpoint(
+        acquisitionRuns,
+        reconstructionCheckpoint,
+        false,
+      ),
+    [acquisitionRuns, reconstructionCheckpoint],
+  )
+  const latestSignalPoints = kSpaceAcquisitionRuns.at(-1)?.points ?? []
   const signalGraphDurationMilliseconds = Math.max(
     ADC_DWELL_TIME_MILLISECONDS,
     latestSignalPoints.at(-1)?.timeMilliseconds ?? 0,
@@ -676,6 +734,30 @@ function TwoDimensionalGradientEncodingExperimentPanel({
     setFrequencyAdcEnabled(enabled)
   }
 
+  const currentAcquisitionCheckpoint = (): AcquisitionCheckpoint => {
+    const activeRunId =
+      activeAcquisitionStageRef.current === null
+        ? null
+        : nextAcquisitionRunIdRef.current - 1
+    return {
+      activePointCount:
+        activeRunId === null
+          ? 0
+          : (acquisitionRuns.find((run) => run.id === activeRunId)?.points
+              .length ?? 0),
+      activeRunId,
+      nextRunId: nextAcquisitionRunIdRef.current,
+    }
+  }
+
+  const resetKSpaceAcquisition = () => {
+    setKSpaceCheckpoint(currentAcquisitionCheckpoint())
+  }
+
+  const resetReconstruction = () => {
+    setReconstructionCheckpoint(currentAcquisitionCheckpoint())
+  }
+
   const changeKSpaceCursor = (
     kxCyclesPerMeter: number,
     kyCyclesPerMeter: number,
@@ -809,6 +891,15 @@ function TwoDimensionalGradientEncodingExperimentPanel({
             <span className="section-index">02</span>
             <h2>K-Space</h2>
           </div>
+          <button
+            className="gradient-input-reset"
+            type="button"
+            aria-label="Reset K-space acquisition"
+            disabled={kSpaceAcquisitionRuns.length === 0}
+            onClick={resetKSpaceAcquisition}
+          >
+            Reset trace
+          </button>
         </div>
 
         <p className="gradient-input-instructions">
@@ -821,7 +912,7 @@ function TwoDimensionalGradientEncodingExperimentPanel({
 
         <div className="two-dimensional-k-space-stack">
           <KSpaceAcquisitionGraph
-            acquisitionRuns={acquisitionRuns}
+            acquisitionRuns={kSpaceAcquisitionRuns}
             currentKxCyclesPerMeter={encodingState.kxCyclesPerMeter}
             currentKyCyclesPerMeter={encodingState.kyCyclesPerMeter}
             durationMilliseconds={1}
@@ -837,7 +928,9 @@ function TwoDimensionalGradientEncodingExperimentPanel({
             }
             phaseEncodingPulses={[]}
             readoutPulses={[]}
-            status={acquisitionRuns.length === 0 ? 'idle' : 'paused'}
+            status={
+              kSpaceAcquisitionRuns.length === 0 ? 'idle' : 'paused'
+            }
           />
           <GradientAcquisitionGraph
             adcPulses={MANUAL_ADC_WINDOW}
@@ -855,6 +948,15 @@ function TwoDimensionalGradientEncodingExperimentPanel({
             <span className="section-index">03</span>
             <h2>2D Reconstruction via Inverse Fourier Transform</h2>
           </div>
+          <button
+            className="gradient-input-reset"
+            type="button"
+            aria-label="Reset magnitude reconstruction"
+            disabled={reconstructionAcquisitionRuns.length === 0}
+            onClick={resetReconstruction}
+          >
+            Reset image
+          </button>
         </div>
 
         <p className="gradient-input-instructions">
@@ -865,7 +967,7 @@ function TwoDimensionalGradientEncodingExperimentPanel({
         </p>
 
         <InverseFourierReconstruction
-          acquisitionRuns={acquisitionRuns}
+          acquisitionRuns={reconstructionAcquisitionRuns}
           gridSize={gridSize}
           voxelSizeMillimeters={reconstructionVoxelSizeMillimeters}
         />
