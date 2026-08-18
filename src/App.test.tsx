@@ -499,7 +499,7 @@ describe('App integration', () => {
 
     await user.click(screen.getByRole('button', { name: 'Apply slice preset' }))
     await user.click(
-      screen.getByRole('option', { name: 'Phantom (3 circles)' }),
+      screen.getByRole('option', { name: '3 CSF Circle Phantom' }),
     )
 
     const ensembles = mocks.sceneProps?.ensembleModels as Array<{

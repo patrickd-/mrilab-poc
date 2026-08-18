@@ -92,7 +92,7 @@ The grid is rendered as a single `THREE.InstancedMesh` of translucent sphere
 geometry, so all 16,384 ensembles remain practical to navigate while retaining
 true 3D volumes for future internal geometry. The scene lifecycle is isolated
 in `LabScene`, while the worker owns simulation timing and signal sampling.
-The slice-preset menu also includes a three-circle phantom that places equal
+The slice-preset menu also includes a 3 CSF Circle Phantom that places equal
 CSF disks at the quarter, center, and three-quarter points of the slice's
 top-left-to-bottom-right diagonal.
 

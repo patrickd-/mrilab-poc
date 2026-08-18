@@ -171,7 +171,7 @@ const SLICE_PRESET_OPTIONS: ReadonlyArray<{
   label: string
 }> = [
   { id: 'reset', label: 'Reset' },
-  { id: 'phantom-3-circles', label: 'Phantom (3 circles)' },
+  { id: 'phantom-3-circles', label: '3 CSF Circle Phantom' },
   { id: 'shepp-logan', label: 'Shepp–Logan MRI Phantom' },
   { id: 'simplified-brain', label: 'Simplified Brain' },
   { id: 'cortical-bone', label: 'Add Cortical bone' },
