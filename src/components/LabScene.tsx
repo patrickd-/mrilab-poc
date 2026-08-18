@@ -155,6 +155,10 @@ interface LabSceneProps {
   gradientSliceSelectionPulses: ReadonlyArray<GradientPulse>
   spatialGradientActive: boolean
   spatialGradientEnsembleStates: ReadonlyArray<FidEnsembleState>
+  spatialGradientPhaseXEnabled: boolean
+  spatialGradientPhaseXProfile: SpatialGradientProfile
+  spatialGradientPhaseYEnabled: boolean
+  spatialGradientPhaseYProfile: SpatialGradientProfile
   spatialGradientTimeMilliseconds: number
   spatialGradientXEnabled: boolean
   spatialGradientXProfile: SpatialGradientProfile
@@ -208,6 +212,10 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       gradientSliceSelectionPulses,
       spatialGradientActive,
       spatialGradientEnsembleStates,
+      spatialGradientPhaseXEnabled,
+      spatialGradientPhaseXProfile,
+      spatialGradientPhaseYEnabled,
+      spatialGradientPhaseYProfile,
       spatialGradientTimeMilliseconds,
       spatialGradientXEnabled,
       spatialGradientXProfile,
@@ -287,6 +295,10 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       active: spatialGradientActive,
       states: spatialGradientEnsembleStates,
       timeMilliseconds: spatialGradientTimeMilliseconds,
+      phaseXEnabled: spatialGradientPhaseXEnabled,
+      phaseXProfile: spatialGradientPhaseXProfile,
+      phaseYEnabled: spatialGradientPhaseYEnabled,
+      phaseYProfile: spatialGradientPhaseYProfile,
       xEnabled: spatialGradientXEnabled,
       xProfile: spatialGradientXProfile,
       yEnabled: spatialGradientYEnabled,
@@ -347,6 +359,16 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
       const fieldChanged =
         previous.xEnabled !== spatialGradientXEnabled ||
         previous.yEnabled !== spatialGradientYEnabled ||
+        previous.phaseXEnabled !== spatialGradientPhaseXEnabled ||
+        previous.phaseYEnabled !== spatialGradientPhaseYEnabled ||
+        previous.phaseXProfile.startFieldOffsetMillitesla !==
+          spatialGradientPhaseXProfile.startFieldOffsetMillitesla ||
+        previous.phaseXProfile.endFieldOffsetMillitesla !==
+          spatialGradientPhaseXProfile.endFieldOffsetMillitesla ||
+        previous.phaseYProfile.startFieldOffsetMillitesla !==
+          spatialGradientPhaseYProfile.startFieldOffsetMillitesla ||
+        previous.phaseYProfile.endFieldOffsetMillitesla !==
+          spatialGradientPhaseYProfile.endFieldOffsetMillitesla ||
         previous.xProfile.startFieldOffsetMillitesla !==
           spatialGradientXProfile.startFieldOffsetMillitesla ||
         previous.xProfile.endFieldOffsetMillitesla !==
@@ -365,6 +387,10 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
         active: spatialGradientActive,
         states: spatialGradientEnsembleStates,
         timeMilliseconds: spatialGradientTimeMilliseconds,
+        phaseXEnabled: spatialGradientPhaseXEnabled,
+        phaseXProfile: spatialGradientPhaseXProfile,
+        phaseYEnabled: spatialGradientPhaseYEnabled,
+        phaseYProfile: spatialGradientPhaseYProfile,
         xEnabled: spatialGradientXEnabled,
         xProfile: spatialGradientXProfile,
         yEnabled: spatialGradientYEnabled,
@@ -383,6 +409,10 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
     }, [
       spatialGradientActive,
       spatialGradientEnsembleStates,
+      spatialGradientPhaseXEnabled,
+      spatialGradientPhaseXProfile,
+      spatialGradientPhaseYEnabled,
+      spatialGradientPhaseYProfile,
       spatialGradientTimeMilliseconds,
       spatialGradientXEnabled,
       spatialGradientXProfile,
@@ -1279,8 +1309,12 @@ const LabScene = forwardRef<LabSceneHandle, LabSceneProps>(
             GRID_SIZE,
             0,
             0,
-            spatialGradient.xEnabled ? spatialGradient.xProfile : null,
-            spatialGradient.yEnabled ? spatialGradient.yProfile : null,
+            spatialGradient.phaseXEnabled
+              ? spatialGradient.phaseXProfile
+              : null,
+            spatialGradient.phaseYEnabled
+              ? spatialGradient.phaseYProfile
+              : null,
           )
           spatialGradientFieldOffsetsTesla.set(
             magneticField.fieldOffsetsTesla,

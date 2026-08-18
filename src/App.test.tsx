@@ -119,6 +119,12 @@ vi.mock('./components/TwoDimensionalGradientEncodingExperimentPanel', () => ({
     return (
       <div data-testid="two-dimensional-gradient-experiment">
         Two-dimensional gradient experiment view
+        <button
+          type="button"
+          onClick={() => props.onFrequencyEnabledChange(false)}
+        >
+          Disable 2D frequency gradient
+        </button>
       </div>
     )
   },
@@ -345,11 +351,68 @@ describe('App integration', () => {
       screen.getByTestId('two-dimensional-gradient-experiment'),
     ).toBeTruthy()
     expect(mocks.twoDimensionalGradientPanelProps).toMatchObject({
+      frequencyEnabled: true,
       gridSize: 128,
+      phaseEnabled: true,
     })
     expect(mocks.sceneProps).toMatchObject({
       gradientEncodingSelected: false,
-      spatialGradientActive: false,
+      spatialGradientActive: true,
+      spatialGradientPhaseXEnabled: true,
+      spatialGradientPhaseXProfile: {
+        endFieldOffsetMillitesla: 0.64,
+        startFieldOffsetMillitesla: -0.64,
+      },
+      spatialGradientPhaseYEnabled: true,
+      spatialGradientPhaseYProfile: {
+        endFieldOffsetMillitesla: 0.64,
+        startFieldOffsetMillitesla: -0.64,
+      },
+      spatialGradientTimeMilliseconds: 0.2,
+      spatialGradientXEnabled: true,
+      spatialGradientXProfile: {
+        endFieldOffsetMillitesla: 1.28,
+        startFieldOffsetMillitesla: -1.28,
+      },
+      spatialGradientYEnabled: true,
+      spatialGradientYProfile: {
+        endFieldOffsetMillitesla: 0,
+        startFieldOffsetMillitesla: 0,
+      },
+    })
+    expect(mocks.sceneProps?.spatialGradientEnsembleStates).toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: 'Apply slice preset' }))
+    await user.click(
+      screen.getByRole('option', {
+        name: 'Add Cerebrospinal fluid (CSF)',
+      }),
+    )
+
+    expect(
+      (mocks.sceneProps?.spatialGradientEnsembleStates as unknown[]).length,
+    ).toBeGreaterThan(0)
+    expect(
+      (mocks.sceneProps?.spatialGradientEnsembleStates as unknown[]).length,
+    ).toBeLessThan(128 * 128)
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Disable 2D frequency gradient',
+      }),
+    )
+    expect(mocks.sceneProps).toMatchObject({
+      spatialGradientActive: true,
+      spatialGradientPhaseXProfile: {
+        endFieldOffsetMillitesla: 0,
+        startFieldOffsetMillitesla: 0,
+      },
+      spatialGradientPhaseYProfile: {
+        endFieldOffsetMillitesla: 0.64,
+        startFieldOffsetMillitesla: -0.64,
+      },
+      spatialGradientXEnabled: false,
+      spatialGradientYEnabled: false,
     })
   })
 

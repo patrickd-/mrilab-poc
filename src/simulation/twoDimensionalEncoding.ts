@@ -27,6 +27,53 @@ export interface TwoDimensionalEncodingState {
   phaseOffsetRadians: number
 }
 
+function averagedAppliedProfile(
+  phaseProfile: SpatialGradientProfile,
+  frequencyProfile: SpatialGradientProfile,
+  phaseEnabled: boolean,
+  frequencyEnabled: boolean,
+): SpatialGradientProfile {
+  return {
+    startFieldOffsetMillitesla:
+      ((phaseEnabled ? phaseProfile.startFieldOffsetMillitesla : 0) +
+        (frequencyEnabled
+          ? frequencyProfile.startFieldOffsetMillitesla
+          : 0)) /
+      2,
+    endFieldOffsetMillitesla:
+      ((phaseEnabled ? phaseProfile.endFieldOffsetMillitesla : 0) +
+        (frequencyEnabled
+          ? frequencyProfile.endFieldOffsetMillitesla
+          : 0)) /
+      2,
+  }
+}
+
+export function effectiveTwoDimensionalGradientVector(
+  phase: TwoDimensionalGradientVector,
+  frequency: TwoDimensionalGradientVector,
+  phaseEnabled = true,
+  frequencyEnabled = true,
+): TwoDimensionalGradientVector {
+  // Both stages have the same duration. Applying their average for twice that
+  // duration preserves the accumulated gradient phase while also letting B0
+  // inhomogeneity accrue throughout the complete two-stage interval.
+  return {
+    x: averagedAppliedProfile(
+      phase.x,
+      frequency.x,
+      phaseEnabled,
+      frequencyEnabled,
+    ),
+    y: averagedAppliedProfile(
+      phase.y,
+      frequency.y,
+      phaseEnabled,
+      frequencyEnabled,
+    ),
+  }
+}
+
 function zeroProfile(): SpatialGradientProfile {
   return {
     endFieldOffsetMillitesla: 0,

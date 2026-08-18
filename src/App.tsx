@@ -65,6 +65,12 @@ import {
   spatialProjectionMaximumFieldOffsetTesla,
   type SpatialGradientProfile,
 } from './simulation/spatialGradient'
+import {
+  createDefaultTwoDimensionalEncodingGradients,
+  effectiveTwoDimensionalGradientVector,
+  TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS,
+  type TwoDimensionalGradientVector,
+} from './simulation/twoDimensionalEncoding'
 
 type B0Tesla = '1.5' | '3' | '7'
 
@@ -76,7 +82,7 @@ const B0_OPTIONS: ReadonlyArray<{ id: B0Tesla; label: string }> = [
 // LabScene owns a long-lived Three.js animation loop. Bump this key whenever
 // the data contract consumed inside that loop changes so Vite hot reload does
 // not leave an already-mounted scene running an incompatible closure.
-const LAB_SCENE_RUNTIME_VERSION = 'spatial-gradient-acquisition-end-v3'
+const LAB_SCENE_RUNTIME_VERSION = 'two-dimensional-gradient-arrows-v4'
 const CONTROL_PANEL_MINIMUM_WIDTH = 418
 const VIEWPORT_MINIMUM_WIDTH = 320
 const CONTROL_PANEL_KEYBOARD_STEP = 48
@@ -342,6 +348,22 @@ function App() {
     useState(true)
   const [spatialGradientYEnabled, setSpatialGradientYEnabled] =
     useState(true)
+  const defaultTwoDimensionalGradients = useMemo(
+    () => createDefaultTwoDimensionalEncodingGradients(GRID_SIZE),
+    [],
+  )
+  const [twoDimensionalPhaseProfiles, setTwoDimensionalPhaseProfiles] =
+    useState<TwoDimensionalGradientVector>(
+      defaultTwoDimensionalGradients.phase,
+    )
+  const [twoDimensionalFrequencyProfiles, setTwoDimensionalFrequencyProfiles] =
+    useState<TwoDimensionalGradientVector>(
+      defaultTwoDimensionalGradients.frequency,
+    )
+  const [twoDimensionalPhaseEnabled, setTwoDimensionalPhaseEnabled] =
+    useState(true)
+  const [twoDimensionalFrequencyEnabled, setTwoDimensionalFrequencyEnabled] =
+    useState(true)
   const [
     gradientAcquisitionResetRevision,
     setGradientAcquisitionResetRevision,
@@ -396,6 +418,26 @@ function App() {
     selectedExperiment === 'gradient-recalled-echo'
   const spatialGradientExperimentSelected =
     selectedExperiment === 'gradient-encoding'
+  const twoDimensionalGradientExperimentSelected =
+    selectedExperiment === 'gradient-encoding-2d'
+  const spatialMagnetizationExperimentSelected =
+    spatialGradientExperimentSelected ||
+    twoDimensionalGradientExperimentSelected
+  const effectiveTwoDimensionalGradient = useMemo(
+    () =>
+      effectiveTwoDimensionalGradientVector(
+        twoDimensionalPhaseProfiles,
+        twoDimensionalFrequencyProfiles,
+        twoDimensionalPhaseEnabled,
+        twoDimensionalFrequencyEnabled,
+      ),
+    [
+      twoDimensionalFrequencyEnabled,
+      twoDimensionalFrequencyProfiles,
+      twoDimensionalPhaseEnabled,
+      twoDimensionalPhaseProfiles,
+    ],
+  )
   const gradientEnsembleStates = useMemo(
     () =>
       gradientRecalledEchoExperimentSelected
@@ -421,7 +463,7 @@ function App() {
   )
   const spatialGradientEnsembleStates = useMemo(
     () =>
-      spatialGradientExperimentSelected
+      spatialMagnetizationExperimentSelected
         ? createFidEnsembleStates(
             simulationEnsembles,
             fieldStrengthTesla,
@@ -436,7 +478,7 @@ function App() {
       simulationEnsembles,
       fieldStrengthTesla,
       fieldUniformity,
-      spatialGradientExperimentSelected,
+      spatialMagnetizationExperimentSelected,
       tissueHeterogeneity,
     ],
   )
@@ -801,15 +843,53 @@ function App() {
           gradientRfExcitationPulses={appliedRfExcitationPulses}
           gradientTransmitFrequencyBand={transmitFrequencyBand}
           gradientSliceSelectionPulses={appliedSliceSelectionPulses}
-          spatialGradientActive={spatialGradientExperimentSelected}
+          spatialGradientActive={spatialMagnetizationExperimentSelected}
           spatialGradientEnsembleStates={spatialGradientEnsembleStates}
-          spatialGradientTimeMilliseconds={
-            SPATIAL_PROJECTION_END_TIME_MILLISECONDS
+          spatialGradientPhaseXEnabled={
+            twoDimensionalGradientExperimentSelected
+              ? true
+              : spatialGradientXEnabled
           }
-          spatialGradientXEnabled={spatialGradientXEnabled}
-          spatialGradientXProfile={spatialGradientXProfile}
-          spatialGradientYEnabled={spatialGradientYEnabled}
-          spatialGradientYProfile={spatialGradientYProfile}
+          spatialGradientPhaseXProfile={
+            twoDimensionalGradientExperimentSelected
+              ? effectiveTwoDimensionalGradient.x
+              : spatialGradientXProfile
+          }
+          spatialGradientPhaseYEnabled={
+            twoDimensionalGradientExperimentSelected
+              ? true
+              : spatialGradientYEnabled
+          }
+          spatialGradientPhaseYProfile={
+            twoDimensionalGradientExperimentSelected
+              ? effectiveTwoDimensionalGradient.y
+              : spatialGradientYProfile
+          }
+          spatialGradientTimeMilliseconds={
+            twoDimensionalGradientExperimentSelected
+              ? TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS * 2
+              : SPATIAL_PROJECTION_END_TIME_MILLISECONDS
+          }
+          spatialGradientXEnabled={
+            twoDimensionalGradientExperimentSelected
+              ? twoDimensionalFrequencyEnabled
+              : spatialGradientXEnabled
+          }
+          spatialGradientXProfile={
+            twoDimensionalGradientExperimentSelected
+              ? twoDimensionalFrequencyProfiles.x
+              : spatialGradientXProfile
+          }
+          spatialGradientYEnabled={
+            twoDimensionalGradientExperimentSelected
+              ? twoDimensionalFrequencyEnabled
+              : spatialGradientYEnabled
+          }
+          spatialGradientYProfile={
+            twoDimensionalGradientExperimentSelected
+              ? twoDimensionalFrequencyProfiles.y
+              : spatialGradientYProfile
+          }
           referenceFrame={referenceFrame}
           renderMode={renderMode}
           sliceGraphMode={sliceGraphMode}
@@ -838,7 +918,7 @@ function App() {
             {renderMode === 'stacked' ? (
               <>
                 <span>
-                  {(spatialGradientExperimentSelected
+                  {(spatialMagnetizationExperimentSelected
                     ? spatialGradientEnsembleStates.length
                     : stackedEnsembleCount
                   ).toLocaleString()} vectors
@@ -1064,7 +1144,19 @@ function App() {
 
             {selectedExperiment === 'gradient-encoding-2d' && (
               <TwoDimensionalGradientEncodingExperimentPanel
+                frequencyEnabled={twoDimensionalFrequencyEnabled}
+                frequencyProfiles={twoDimensionalFrequencyProfiles}
                 gridSize={GRID_SIZE}
+                phaseEnabled={twoDimensionalPhaseEnabled}
+                phaseProfiles={twoDimensionalPhaseProfiles}
+                onFrequencyEnabledChange={
+                  setTwoDimensionalFrequencyEnabled
+                }
+                onFrequencyProfilesChange={
+                  setTwoDimensionalFrequencyProfiles
+                }
+                onPhaseEnabledChange={setTwoDimensionalPhaseEnabled}
+                onPhaseProfilesChange={setTwoDimensionalPhaseProfiles}
               />
             )}
 

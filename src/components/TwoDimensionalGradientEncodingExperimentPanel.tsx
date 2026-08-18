@@ -415,20 +415,30 @@ function DualSpatialGradientGraph({
 }
 
 function TwoDimensionalGradientEncodingExperimentPanel({
+  frequencyEnabled,
+  frequencyProfiles,
   gridSize,
+  onFrequencyEnabledChange,
+  onFrequencyProfilesChange,
+  onPhaseEnabledChange,
+  onPhaseProfilesChange,
+  phaseEnabled,
+  phaseProfiles,
 }: {
+  frequencyEnabled: boolean
+  frequencyProfiles: TwoDimensionalGradientVector
   gridSize: number
+  onFrequencyEnabledChange: (enabled: boolean) => void
+  onFrequencyProfilesChange: (profiles: TwoDimensionalGradientVector) => void
+  onPhaseEnabledChange: (enabled: boolean) => void
+  onPhaseProfilesChange: (profiles: TwoDimensionalGradientVector) => void
+  phaseEnabled: boolean
+  phaseProfiles: TwoDimensionalGradientVector
 }) {
   const defaults = useMemo(
     () => createDefaultTwoDimensionalEncodingGradients(gridSize),
     [gridSize],
   )
-  const [phaseProfiles, setPhaseProfiles] =
-    useState<TwoDimensionalGradientVector>(defaults.phase)
-  const [frequencyProfiles, setFrequencyProfiles] =
-    useState<TwoDimensionalGradientVector>(defaults.frequency)
-  const [phaseEnabled, setPhaseEnabled] = useState(true)
-  const [frequencyEnabled, setFrequencyEnabled] = useState(true)
   const encodingState = useMemo(
     () =>
       twoDimensionalEncodingState(
@@ -472,9 +482,9 @@ function TwoDimensionalGradientEncodingExperimentPanel({
           }
           profiles={phaseProfiles}
           stage="phase"
-          onChange={setPhaseProfiles}
-          onEnabledChange={setPhaseEnabled}
-          onReset={() => setPhaseProfiles(defaults.phase)}
+          onChange={onPhaseProfilesChange}
+          onEnabledChange={onPhaseEnabledChange}
+          onReset={() => onPhaseProfilesChange(defaults.phase)}
         />
         <DualSpatialGradientGraph
           enabled={frequencyEnabled}
@@ -484,9 +494,9 @@ function TwoDimensionalGradientEncodingExperimentPanel({
           }
           profiles={frequencyProfiles}
           stage="frequency"
-          onChange={setFrequencyProfiles}
-          onEnabledChange={setFrequencyEnabled}
-          onReset={() => setFrequencyProfiles(defaults.frequency)}
+          onChange={onFrequencyProfilesChange}
+          onEnabledChange={onFrequencyEnabledChange}
+          onReset={() => onFrequencyProfilesChange(defaults.frequency)}
         />
 
         <div className="two-dimensional-encoding-order" aria-label="Encoding order">

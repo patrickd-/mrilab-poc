@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createDefaultTwoDimensionalEncodingGradients,
+  type TwoDimensionalGradientVector,
+} from '../simulation/twoDimensionalEncoding'
 import TwoDimensionalGradientEncodingExperimentPanel from './TwoDimensionalGradientEncodingExperimentPanel'
 
 const putImageData = vi.fn()
@@ -23,9 +28,33 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+function StatefulPanel() {
+  const defaults = createDefaultTwoDimensionalEncodingGradients(8)
+  const [phaseProfiles, setPhaseProfiles] =
+    useState<TwoDimensionalGradientVector>(defaults.phase)
+  const [frequencyProfiles, setFrequencyProfiles] =
+    useState<TwoDimensionalGradientVector>(defaults.frequency)
+  const [phaseEnabled, setPhaseEnabled] = useState(true)
+  const [frequencyEnabled, setFrequencyEnabled] = useState(true)
+
+  return (
+    <TwoDimensionalGradientEncodingExperimentPanel
+      frequencyEnabled={frequencyEnabled}
+      frequencyProfiles={frequencyProfiles}
+      gridSize={8}
+      phaseEnabled={phaseEnabled}
+      phaseProfiles={phaseProfiles}
+      onFrequencyEnabledChange={setFrequencyEnabled}
+      onFrequencyProfilesChange={setFrequencyProfiles}
+      onPhaseEnabledChange={setPhaseEnabled}
+      onPhaseProfilesChange={setPhaseProfiles}
+    />
+  )
+}
+
 describe('TwoDimensionalGradientEncodingExperimentPanel', () => {
   it('renders sequential phase and frequency vector editors with complex maps', () => {
-    render(<TwoDimensionalGradientEncodingExperimentPanel gridSize={8} />)
+    render(<StatefulPanel />)
 
     expect(screen.getByText('Phase & Frequency Encoding')).not.toBeNull()
     expect(
@@ -54,7 +83,7 @@ describe('TwoDimensionalGradientEncodingExperimentPanel', () => {
   })
 
   it('updates the accumulated basis immediately when a gradient changes', () => {
-    render(<TwoDimensionalGradientEncodingExperimentPanel gridSize={8} />)
+    render(<StatefulPanel />)
     const phaseXStart = screen.getByRole('slider', {
       name: 'Phase encoding G x gradient 0 millimeter endpoint',
     })
