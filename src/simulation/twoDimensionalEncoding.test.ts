@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { createHydrogenEnsembles } from '../models/HydrogenEnsemble'
+import { createFidEnsembleStates } from './fid'
 import {
   createDefaultTwoDimensionalEncodingGradients,
   effectiveTwoDimensionalGradientVector,
   twoDimensionalEncodingDurationMilliseconds,
   twoDimensionalEncodingState,
+  twoDimensionalSignalPointAt,
 } from './twoDimensionalEncoding'
 
 describe('two-dimensional gradient encoding', () => {
@@ -80,5 +83,63 @@ describe('two-dimensional gradient encoding', () => {
     expect(twoDimensionalEncodingDurationMilliseconds(true, true)).toBe(0.2)
     expect(twoDimensionalEncodingDurationMilliseconds(true, false)).toBe(0.1)
     expect(twoDimensionalEncodingDurationMilliseconds(false, false)).toBe(0)
+  })
+
+  it('samples the tissue-weighted complex signal at the configured k-space coordinate', () => {
+    const ensembles = createHydrogenEnsembles(2)
+    ensembles.forEach((ensemble) => {
+      ensemble.samplePreset = 'cerebrospinal-fluid'
+    })
+    const states = createFidEnsembleStates(ensembles, 1.5, 'uniform')
+    const defaults = createDefaultTwoDimensionalEncodingGradients(2)
+    const originEncoding = twoDimensionalEncodingState(
+      defaults.phase,
+      defaults.frequency,
+      2,
+      false,
+      false,
+    )
+    const origin = twoDimensionalSignalPointAt(
+      states,
+      originEncoding,
+      0,
+      0,
+    )
+
+    expect(origin.normalizedInPhaseSignal).toBeCloseTo(1, 12)
+    expect(origin.normalizedQuadratureSignal).toBeCloseTo(0, 12)
+    expect(origin.normalizedMagnitude).toBeCloseTo(1, 12)
+
+    const halfCycleAcrossSampleColumns = twoDimensionalSignalPointAt(
+      states,
+      {
+        ...originEncoding,
+        kxCyclesPerMeter: 500,
+      },
+      0,
+      0.02,
+    )
+    expect(halfCycleAcrossSampleColumns.normalizedInPhaseSignal).toBeCloseTo(
+      0,
+      12,
+    )
+    expect(
+      halfCycleAcrossSampleColumns.normalizedQuadratureSignal,
+    ).toBeCloseTo(0, 12)
+    expect(halfCycleAcrossSampleColumns.normalizedMagnitude).toBeCloseTo(
+      0,
+      12,
+    )
+
+    const encoded = twoDimensionalEncodingState(
+      defaults.phase,
+      defaults.frequency,
+      2,
+    )
+    const shifted = twoDimensionalSignalPointAt(states, encoded, 0.2, 0.02)
+    expect(shifted.kxCyclesPerMeter).toBe(encoded.kxCyclesPerMeter)
+    expect(shifted.kyCyclesPerMeter).toBe(encoded.kyCyclesPerMeter)
+    expect(shifted.timeMilliseconds).toBe(0.02)
+    expect(Number.isFinite(shifted.normalizedMagnitude)).toBe(true)
   })
 })

@@ -7,7 +7,9 @@ import type {
 interface GradientAcquisitionGraphProps {
   adcPulses: ReadonlyArray<GradientPulse>
   durationMilliseconds: number
+  emptyLabel?: string
   points: ReadonlyArray<GradientSignalPoint>
+  xAxisLabel?: string
 }
 
 const GRAPH = {
@@ -53,7 +55,9 @@ function formatSignalAxisValue(value: number) {
 function GradientAcquisitionGraph({
   adcPulses,
   durationMilliseconds,
+  emptyLabel = 'Awaiting ADC window',
   points,
+  xAxisLabel = 'Sequence time (ms)',
 }: GradientAcquisitionGraphProps) {
   const plotWidth = GRAPH.width - GRAPH.left - GRAPH.right
   const plotHeight = GRAPH.height - GRAPH.top - GRAPH.bottom
@@ -118,7 +122,7 @@ function GradientAcquisitionGraph({
         <strong>
           {latestPoint
             ? `I ${latestPoint.normalizedInPhaseSignal.toFixed(4)} · Q ${latestPoint.normalizedQuadratureSignal.toFixed(4)}`
-            : 'Awaiting ADC window'}
+            : emptyLabel}
         </strong>
       </header>
       <svg
@@ -197,7 +201,7 @@ function GradientAcquisitionGraph({
             y={GRAPH.height - 3}
             textAnchor="middle"
           >
-            Sequence time (ms)
+            {xAxisLabel}
           </text>
           <text
             className="gradient-acquisition-y-axis-title"

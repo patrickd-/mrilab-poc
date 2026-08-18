@@ -1152,6 +1152,7 @@ function App() {
 
             {selectedExperiment === 'gradient-encoding-2d' && (
               <TwoDimensionalGradientEncodingExperimentPanel
+                ensembleStates={spatialGradientEnsembleStates}
                 frequencyEnabled={twoDimensionalFrequencyEnabled}
                 frequencyProfiles={twoDimensionalFrequencyProfiles}
                 gridSize={GRID_SIZE}

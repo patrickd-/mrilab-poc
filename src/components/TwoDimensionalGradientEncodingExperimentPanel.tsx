@@ -5,6 +5,12 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import type { GradientAcquisitionRun } from '../hooks/useGradientAcquisition'
+import type { FidEnsembleState } from '../simulation/fid'
+import {
+  ADC_DWELL_TIME_MILLISECONDS,
+  type GradientPulse,
+} from '../simulation/gradientEncoding'
 import {
   gradientStrengthMilliteslaPerMeter,
   maximumEndpointFieldOffsetMillitesla,
@@ -13,9 +19,14 @@ import {
 import {
   createDefaultTwoDimensionalEncodingGradients,
   TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS,
+  twoDimensionalEncodingDurationMilliseconds,
   twoDimensionalEncodingState,
+  twoDimensionalSignalPointAt,
   type TwoDimensionalGradientVector,
 } from '../simulation/twoDimensionalEncoding'
+import GradientAcquisitionGraph from './GradientAcquisitionGraph'
+import InverseFourierReconstruction from './InverseFourierReconstruction'
+import KSpaceAcquisitionGraph from './KSpaceAcquisitionGraph'
 import KSpaceEncodingMaps from './KSpaceEncodingMaps'
 
 type GradientAxis = 'x' | 'y'
@@ -23,9 +34,11 @@ type GradientEndpoint = 'start' | 'end'
 type EncodingStage = 'frequency' | 'phase'
 
 interface DualSpatialGradientGraphProps {
+  adcEnabled: boolean
   enabled: boolean
   fieldOfViewMillimeters: number
   maximumFieldOffsetMillitesla: number
+  onAdcEnabledChange: (enabled: boolean) => void
   onChange: (profiles: TwoDimensionalGradientVector) => void
   onEnabledChange: (enabled: boolean) => void
   onReset: () => void
@@ -48,6 +61,10 @@ const GRAPH = {
   width: 460,
 }
 const KEYBOARD_FIELD_STEP_MILLITESLA = 0.08
+const DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS = 1
+const MANUAL_ADC_WINDOW: ReadonlyArray<GradientPulse> = [
+  { start: 0, end: 1, amplitude: 1 },
+]
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
@@ -76,9 +93,11 @@ function updateEndpoint(
 }
 
 function DualSpatialGradientGraph({
+  adcEnabled,
   enabled,
   fieldOfViewMillimeters,
   maximumFieldOffsetMillitesla,
+  onAdcEnabledChange,
   onChange,
   onEnabledChange,
   onReset,
@@ -188,6 +207,17 @@ function DualSpatialGradientGraph({
         </strong>
         <span>{stageName} gradient</span>
         <div className="gradient-input-actions">
+          <label className="gradient-channel-toggle">
+            <input
+              type="checkbox"
+              checked={adcEnabled}
+              aria-label={`Enable ${stageName.toLowerCase()} ADC`}
+              onChange={(event) =>
+                onAdcEnabledChange(event.currentTarget.checked)
+              }
+            />
+            <span>ADC</span>
+          </label>
           <label className="gradient-channel-toggle">
             <input
               type="checkbox"
@@ -415,6 +445,7 @@ function DualSpatialGradientGraph({
 }
 
 function TwoDimensionalGradientEncodingExperimentPanel({
+  ensembleStates,
   frequencyEnabled,
   frequencyProfiles,
   gridSize,
@@ -425,6 +456,7 @@ function TwoDimensionalGradientEncodingExperimentPanel({
   phaseEnabled,
   phaseProfiles,
 }: {
+  ensembleStates: ReadonlyArray<FidEnsembleState>
   frequencyEnabled: boolean
   frequencyProfiles: TwoDimensionalGradientVector
   gridSize: number
@@ -439,6 +471,15 @@ function TwoDimensionalGradientEncodingExperimentPanel({
     () => createDefaultTwoDimensionalEncodingGradients(gridSize),
     [gridSize],
   )
+  const [phaseAdcEnabled, setPhaseAdcEnabled] = useState(false)
+  const [frequencyAdcEnabled, setFrequencyAdcEnabled] = useState(true)
+  const [acquisitionRuns, setAcquisitionRuns] = useState<
+    GradientAcquisitionRun[]
+  >([])
+  const [reconstructionVoxelSizeMillimeters, setReconstructionVoxelSize] =
+    useState(DEFAULT_RECONSTRUCTION_VOXEL_SIZE_MILLIMETERS)
+  const activeAcquisitionStageRef = useRef<EncodingStage | null>(null)
+  const nextAcquisitionRunIdRef = useRef(0)
   const encodingState = useMemo(
     () =>
       twoDimensionalEncodingState(
@@ -456,69 +497,298 @@ function TwoDimensionalGradientEncodingExperimentPanel({
       phaseProfiles,
     ],
   )
+  const encodingDurationMilliseconds =
+    twoDimensionalEncodingDurationMilliseconds(
+      phaseEnabled,
+      frequencyEnabled,
+    )
+  const latestSignalPoints = acquisitionRuns.at(-1)?.points ?? []
+  const signalGraphDurationMilliseconds = Math.max(
+    ADC_DWELL_TIME_MILLISECONDS,
+    latestSignalPoints.at(-1)?.timeMilliseconds ?? 0,
+  )
+
+  const acquireGradientUpdate = (
+    stage: EncodingStage,
+    nextEncodingState: ReturnType<typeof twoDimensionalEncodingState>,
+    nextEncodingDurationMilliseconds: number,
+    adcEnabled: boolean,
+  ) => {
+    if (!adcEnabled) {
+      activeAcquisitionStageRef.current = null
+      return
+    }
+
+    const previousSignal = twoDimensionalSignalPointAt(
+      ensembleStates,
+      encodingState,
+      encodingDurationMilliseconds,
+      0,
+    )
+    const nextSignal = twoDimensionalSignalPointAt(
+      ensembleStates,
+      nextEncodingState,
+      nextEncodingDurationMilliseconds,
+      0,
+    )
+    const activeRunId =
+      activeAcquisitionStageRef.current === stage
+        ? nextAcquisitionRunIdRef.current - 1
+        : null
+
+    if (activeRunId === null) {
+      const runId = nextAcquisitionRunIdRef.current
+      nextAcquisitionRunIdRef.current += 1
+      activeAcquisitionStageRef.current = stage
+      setAcquisitionRuns((currentRuns) => [
+        ...currentRuns,
+        {
+          id: runId,
+          points: [
+            previousSignal,
+            {
+              ...nextSignal,
+              timeMilliseconds: ADC_DWELL_TIME_MILLISECONDS,
+            },
+          ],
+        },
+      ])
+      return
+    }
+
+    setAcquisitionRuns((currentRuns) =>
+      currentRuns.map((run) =>
+        run.id === activeRunId
+          ? {
+              ...run,
+              points: [
+                ...run.points,
+                {
+                  ...nextSignal,
+                  timeMilliseconds:
+                    run.points.length * ADC_DWELL_TIME_MILLISECONDS,
+                },
+              ],
+            }
+          : run,
+      ),
+    )
+  }
+
+  const changePhaseProfiles = (profiles: TwoDimensionalGradientVector) => {
+    acquireGradientUpdate(
+      'phase',
+      twoDimensionalEncodingState(
+        profiles,
+        frequencyProfiles,
+        gridSize,
+        phaseEnabled,
+        frequencyEnabled,
+      ),
+      encodingDurationMilliseconds,
+      phaseAdcEnabled,
+    )
+    onPhaseProfilesChange(profiles)
+  }
+
+  const changeFrequencyProfiles = (profiles: TwoDimensionalGradientVector) => {
+    acquireGradientUpdate(
+      'frequency',
+      twoDimensionalEncodingState(
+        phaseProfiles,
+        profiles,
+        gridSize,
+        phaseEnabled,
+        frequencyEnabled,
+      ),
+      encodingDurationMilliseconds,
+      frequencyAdcEnabled,
+    )
+    onFrequencyProfilesChange(profiles)
+  }
+
+  const changePhaseEnabled = (enabled: boolean) => {
+    acquireGradientUpdate(
+      'phase',
+      twoDimensionalEncodingState(
+        phaseProfiles,
+        frequencyProfiles,
+        gridSize,
+        enabled,
+        frequencyEnabled,
+      ),
+      twoDimensionalEncodingDurationMilliseconds(
+        enabled,
+        frequencyEnabled,
+      ),
+      phaseAdcEnabled,
+    )
+    onPhaseEnabledChange(enabled)
+  }
+
+  const changeFrequencyEnabled = (enabled: boolean) => {
+    acquireGradientUpdate(
+      'frequency',
+      twoDimensionalEncodingState(
+        phaseProfiles,
+        frequencyProfiles,
+        gridSize,
+        phaseEnabled,
+        enabled,
+      ),
+      twoDimensionalEncodingDurationMilliseconds(phaseEnabled, enabled),
+      frequencyAdcEnabled,
+    )
+    onFrequencyEnabledChange(enabled)
+  }
+
+  const changePhaseAdcEnabled = (enabled: boolean) => {
+    activeAcquisitionStageRef.current = null
+    setPhaseAdcEnabled(enabled)
+  }
+
+  const changeFrequencyAdcEnabled = (enabled: boolean) => {
+    activeAcquisitionStageRef.current = null
+    setFrequencyAdcEnabled(enabled)
+  }
 
   return (
-    <section className="fundamental-gradient-section two-dimensional-gradient-section">
-      <div className="section-heading">
-        <div>
-          <span className="section-index">01</span>
-          <h2>Phase &amp; Frequency Encoding</h2>
-        </div>
-      </div>
-
-      <p className="gradient-input-instructions">
-        Each editor defines a two-dimensional gradient vector: cyan G
-        <sub>x</sub> across x and pink G<sub>y</sub> across y. The phase
-        gradient accumulates first; the frequency gradient then adds to that
-        phase during the fixed preview interval.
-      </p>
-
-      <div className="two-dimensional-gradient-stack">
-        <DualSpatialGradientGraph
-          enabled={phaseEnabled}
-          fieldOfViewMillimeters={gridSize}
-          maximumFieldOffsetMillitesla={
-            maximumEndpointFieldOffsetMillitesla(gridSize)
-          }
-          profiles={phaseProfiles}
-          stage="phase"
-          onChange={onPhaseProfilesChange}
-          onEnabledChange={onPhaseEnabledChange}
-          onReset={() => onPhaseProfilesChange(defaults.phase)}
-        />
-        <DualSpatialGradientGraph
-          enabled={frequencyEnabled}
-          fieldOfViewMillimeters={gridSize}
-          maximumFieldOffsetMillitesla={
-            maximumEndpointFieldOffsetMillitesla(gridSize)
-          }
-          profiles={frequencyProfiles}
-          stage="frequency"
-          onChange={onFrequencyProfilesChange}
-          onEnabledChange={onFrequencyEnabledChange}
-          onReset={() => onFrequencyProfilesChange(defaults.frequency)}
-        />
-
-        <div className="two-dimensional-encoding-order" aria-label="Encoding order">
-          <span>
-            G<sub>PE</sub> · phase stored
-          </span>
-          <i aria-hidden="true">→</i>
-          <span>
-            G<sub>FE</sub> · frequency applied
-          </span>
-          <i aria-hidden="true">→</i>
-          <strong>complex spatial basis</strong>
+    <>
+      <section className="fundamental-gradient-section two-dimensional-gradient-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">01</span>
+            <h2>Phase &amp; Frequency Encoding</h2>
+          </div>
         </div>
 
-        <KSpaceEncodingMaps
+        <p className="gradient-input-instructions">
+          Each editor defines a two-dimensional gradient vector: cyan G
+          <sub>x</sub> across x and pink G<sub>y</sub> across y. The phase
+          gradient accumulates first; the frequency gradient then adds to that
+          phase during the fixed preview interval.
+        </p>
+
+        <div className="two-dimensional-gradient-stack">
+          <DualSpatialGradientGraph
+            adcEnabled={phaseAdcEnabled}
+            enabled={phaseEnabled}
+            fieldOfViewMillimeters={gridSize}
+            maximumFieldOffsetMillitesla={
+              maximumEndpointFieldOffsetMillitesla(gridSize)
+            }
+            profiles={phaseProfiles}
+            stage="phase"
+            onAdcEnabledChange={changePhaseAdcEnabled}
+            onChange={changePhaseProfiles}
+            onEnabledChange={changePhaseEnabled}
+            onReset={() => changePhaseProfiles(defaults.phase)}
+          />
+          <DualSpatialGradientGraph
+            adcEnabled={frequencyAdcEnabled}
+            enabled={frequencyEnabled}
+            fieldOfViewMillimeters={gridSize}
+            maximumFieldOffsetMillitesla={
+              maximumEndpointFieldOffsetMillitesla(gridSize)
+            }
+            profiles={frequencyProfiles}
+            stage="frequency"
+            onAdcEnabledChange={changeFrequencyAdcEnabled}
+            onChange={changeFrequencyProfiles}
+            onEnabledChange={changeFrequencyEnabled}
+            onReset={() => changeFrequencyProfiles(defaults.frequency)}
+          />
+
+          <div
+            className="two-dimensional-encoding-order"
+            aria-label="Encoding order"
+          >
+            <span>
+              G<sub>PE</sub> · phase stored
+            </span>
+            <i aria-hidden="true">→</i>
+            <span>
+              G<sub>FE</sub> · frequency applied
+            </span>
+            <i aria-hidden="true">→</i>
+            <strong>complex spatial basis</strong>
+          </div>
+
+          <KSpaceEncodingMaps
+            gridSize={gridSize}
+            kxCyclesPerMeter={encodingState.kxCyclesPerMeter}
+            kyCyclesPerMeter={encodingState.kyCyclesPerMeter}
+            phaseOffsetRadians={encodingState.phaseOffsetRadians}
+          />
+        </div>
+      </section>
+
+      <section className="gradient-k-space-section two-dimensional-k-space-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">02</span>
+            <h2>K-Space</h2>
+          </div>
+        </div>
+
+        <p className="gradient-input-instructions">
+          The cursor follows the accumulated gradient configuration
+          continuously. Editing a stage with ADC enabled records its complex
+          signal and adds a magnitude-weighted trace; editing with ADC off
+          moves the cursor without acquiring.
+        </p>
+
+        <div className="two-dimensional-k-space-stack">
+          <KSpaceAcquisitionGraph
+            acquisitionRuns={acquisitionRuns}
+            currentKxCyclesPerMeter={encodingState.kxCyclesPerMeter}
+            currentKyCyclesPerMeter={encodingState.kyCyclesPerMeter}
+            durationMilliseconds={1}
+            encodingStartTimeMilliseconds={0}
+            gradientImperfections={false}
+            gridSize={gridSize}
+            reconstructionVoxelSizeMillimeters={
+              reconstructionVoxelSizeMillimeters
+            }
+            onReconstructionVoxelSizeChange={
+              setReconstructionVoxelSize
+            }
+            phaseEncodingPulses={[]}
+            readoutPulses={[]}
+            status={acquisitionRuns.length === 0 ? 'idle' : 'paused'}
+          />
+          <GradientAcquisitionGraph
+            adcPulses={MANUAL_ADC_WINDOW}
+            durationMilliseconds={signalGraphDurationMilliseconds}
+            emptyLabel="Awaiting an ADC-enabled gradient update"
+            points={latestSignalPoints}
+            xAxisLabel="ADC sample progression (ms)"
+          />
+        </div>
+      </section>
+
+      <section className="gradient-inverse-fourier-section two-dimensional-inverse-fourier-section">
+        <div className="section-heading">
+          <div>
+            <span className="section-index">03</span>
+            <h2>2D Reconstruction via Inverse Fourier Transform</h2>
+          </div>
+        </div>
+
+        <p className="gradient-input-instructions">
+          Each retained ADC sample contributes its conjugate spatial basis to
+          the reconstruction. Resize the green square in k-space to change
+          the reconstruction FOV; the retained samples are transformed again
+          when resizing finishes.
+        </p>
+
+        <InverseFourierReconstruction
+          acquisitionRuns={acquisitionRuns}
           gridSize={gridSize}
-          kxCyclesPerMeter={encodingState.kxCyclesPerMeter}
-          kyCyclesPerMeter={encodingState.kyCyclesPerMeter}
-          phaseOffsetRadians={encodingState.phaseOffsetRadians}
+          voxelSizeMillimeters={reconstructionVoxelSizeMillimeters}
         />
-      </div>
-    </section>
+      </section>
+    </>
   )
 }
 

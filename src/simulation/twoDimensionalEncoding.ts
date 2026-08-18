@@ -1,4 +1,6 @@
 import { PROTON_GYROMAGNETIC_RATIO } from '../models/HydrogenEnsemble'
+import type { FidEnsembleState } from './fid'
+import type { GradientSignalPoint } from './gradientEncoding'
 import {
   createDefaultSpatialGradientProfiles,
   gradientStrengthMilliteslaPerMeter,
@@ -86,6 +88,70 @@ export function twoDimensionalEncodingDurationMilliseconds(
     (Number(phaseEnabled) + Number(frequencyEnabled)) *
     TWO_DIMENSIONAL_ENCODING_STAGE_DURATION_MILLISECONDS
   )
+}
+
+export function twoDimensionalSignalPointAt(
+  states: ReadonlyArray<FidEnsembleState>,
+  encoding: TwoDimensionalEncodingState,
+  encodingDurationMilliseconds: number,
+  sampleTimeMilliseconds: number,
+): GradientSignalPoint {
+  let referenceSignal = 0
+  let inPhaseSignal = 0
+  let quadratureSignal = 0
+
+  states.forEach((state) => {
+    const gridCenter = (state.gridSize - 1) / 2
+    const ensembleXMillimeters = state.column - gridCenter
+    const ensembleYMillimeters = gridCenter - state.row
+    const transverseDecay =
+      state.transverseRelaxationTimeMilliseconds === 0
+        ? 0
+        : Math.exp(
+            -encodingDurationMilliseconds /
+              state.transverseRelaxationTimeMilliseconds,
+          )
+
+    state.spinPackets.forEach((spinPacket) => {
+      const positionXMeters =
+        (ensembleXMillimeters + spinPacket.offsetXMillimeters) * 1e-3
+      const positionYMeters =
+        (ensembleYMillimeters + spinPacket.offsetYMillimeters) * 1e-3
+      const phaseRadians =
+        encoding.phaseOffsetRadians +
+        2 *
+          Math.PI *
+          (encoding.kxCyclesPerMeter * positionXMeters +
+            encoding.kyCyclesPerMeter * positionYMeters) +
+        spinPacket.angularFrequencyOffsetRadiansPerMillisecond *
+          encodingDurationMilliseconds
+      const signalWeight =
+        state.equilibriumMagnetization * spinPacket.weight
+
+      referenceSignal += signalWeight
+      inPhaseSignal +=
+        signalWeight * transverseDecay * Math.cos(phaseRadians)
+      quadratureSignal +=
+        signalWeight * transverseDecay * Math.sin(phaseRadians)
+    })
+  })
+
+  const normalizedInPhaseSignal =
+    referenceSignal === 0 ? 0 : inPhaseSignal / referenceSignal
+  const normalizedQuadratureSignal =
+    referenceSignal === 0 ? 0 : quadratureSignal / referenceSignal
+
+  return {
+    kxCyclesPerMeter: encoding.kxCyclesPerMeter,
+    kyCyclesPerMeter: encoding.kyCyclesPerMeter,
+    normalizedInPhaseSignal,
+    normalizedMagnitude: Math.hypot(
+      normalizedInPhaseSignal,
+      normalizedQuadratureSignal,
+    ),
+    normalizedQuadratureSignal,
+    timeMilliseconds: sampleTimeMilliseconds,
+  }
 }
 
 function zeroProfile(): SpatialGradientProfile {

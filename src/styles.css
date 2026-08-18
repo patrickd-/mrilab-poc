@@ -992,6 +992,11 @@ a:focus-visible {
   gap: 14px;
 }
 
+.two-dimensional-k-space-stack {
+  display: grid;
+  gap: 14px;
+}
+
 .dual-spatial-gradient-phase .gradient-input-heading > strong {
   color: var(--yellow);
 }
