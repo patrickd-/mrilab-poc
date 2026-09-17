@@ -88,12 +88,14 @@ function ProtonSphere({
   showCone,
   fieldArrowOpacity = 0,
   animateConeChange = false,
+  showNetMagnet = false,
   className = '',
 }: {
   orientation?: 'up' | 'down'
   showCone: boolean
   fieldArrowOpacity?: number
   animateConeChange?: boolean
+  showNetMagnet?: boolean
   className?: string
 }) {
   return (
@@ -106,6 +108,7 @@ function ProtonSphere({
         fieldArrowOpacity={fieldArrowOpacity}
         orientation={orientation}
         showCone={showCone}
+        showNetMagnet={showNetMagnet}
       />
     </div>
   )
@@ -241,9 +244,10 @@ function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
             <ProtonSphere
               animateConeChange={direction === 'forward'}
               className="proton-sphere--spin"
-              fieldArrowOpacity={arrowOpacity}
+              fieldArrowOpacity={finalExcessState ? 0 : arrowOpacity}
               orientation="up"
               showCone={!finalExcessState}
+              showNetMagnet={finalExcessState}
             />
             {finalExcessState ? <div className="spin-state__caption">Excess protons</div> : null}
           </div>

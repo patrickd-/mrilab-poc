@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 
 /**
@@ -11,16 +11,18 @@ export function ProtonSphereGraphic({
   showCone,
   fieldArrowOpacity,
   animateConeChange,
+  showNetMagnet,
 }: {
   orientation?: 'up' | 'down'
   showCone: boolean
   fieldArrowOpacity: number
   animateConeChange: boolean
+  showNetMagnet: boolean
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
-  const [webGlReady, setWebGlReady] = useState(false)
   const coneMaterialRef = useRef<THREE.MeshPhongMaterial | null>(null)
   const arrowMaterialRef = useRef<THREE.MeshPhongMaterial | null>(null)
+  const netMagnetRef = useRef<THREE.Group | null>(null)
   const renderRef = useRef<(() => void) | null>(null)
   const coneAnimationRef = useRef(0)
 
@@ -124,6 +126,72 @@ export function ProtonSphereGraphic({
     scene.add(arrowShaft, arrowHead)
     arrowMaterialRef.current = arrowMaterial
 
+    const magnetHalfGeometry = new THREE.BoxGeometry(0.42, 0.74, 0.3)
+    const northMaterial = new THREE.MeshPhongMaterial({
+      color: '#ba4442',
+      emissive: '#421313',
+      specular: '#ffd4d1',
+      shininess: 68,
+      depthTest: false,
+      toneMapped: false,
+    })
+    const southMaterial = new THREE.MeshPhongMaterial({
+      color: '#3c6caf',
+      emissive: '#101d44',
+      specular: '#cfddff',
+      shininess: 68,
+      depthTest: false,
+      toneMapped: false,
+    })
+    const netMagnet = new THREE.Group()
+    netMagnet.rotation.y = -0.18
+    netMagnet.visible = showNetMagnet
+
+    const northHalf = new THREE.Mesh(magnetHalfGeometry, northMaterial)
+    northHalf.position.y = 0.37
+    northHalf.renderOrder = 3
+    const southHalf = new THREE.Mesh(magnetHalfGeometry, southMaterial)
+    southHalf.position.y = -0.37
+    southHalf.renderOrder = 3
+    netMagnet.add(northHalf, southHalf)
+
+    const labelPlaneGeometry = new THREE.PlaneGeometry(0.3, 0.3)
+    const labelTextures: THREE.CanvasTexture[] = []
+    const labelMaterials: THREE.MeshBasicMaterial[] = []
+    const makePoleLabel = (label: 'N' | 'S', y: number) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 128
+      canvas.height = 128
+      const context = canvas.getContext('2d')
+      if (!context) return
+      context.clearRect(0, 0, canvas.width, canvas.height)
+      context.fillStyle = '#ffffff'
+      context.font = '700 82px Manrope, sans-serif'
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText(label, canvas.width / 2, canvas.height / 2 + 3)
+
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      const labelMaterial = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      })
+      const labelMesh = new THREE.Mesh(labelPlaneGeometry, labelMaterial)
+      labelMesh.position.set(0, y, 0.155)
+      labelMesh.renderOrder = 4
+      netMagnet.add(labelMesh)
+      labelTextures.push(texture)
+      labelMaterials.push(labelMaterial)
+    }
+    makePoleLabel('N', 0.37)
+    makePoleLabel('S', -0.37)
+    scene.add(netMagnet)
+    netMagnetRef.current = netMagnet
+
     const render = () => {
       const size = Math.max(1, host.clientWidth)
       renderer.setSize(size, size, false)
@@ -131,7 +199,6 @@ export function ProtonSphereGraphic({
     }
     renderRef.current = render
     render()
-    setWebGlReady(true)
 
     const resizeObserver = new ResizeObserver(render)
     resizeObserver.observe(host)
@@ -142,6 +209,7 @@ export function ProtonSphereGraphic({
       renderRef.current = null
       coneMaterialRef.current = null
       arrowMaterialRef.current = null
+      netMagnetRef.current = null
       geometry.dispose()
       depthMaterial.dispose()
       coneGeometry?.dispose()
@@ -150,10 +218,24 @@ export function ProtonSphereGraphic({
       arrowShaftGeometry.dispose()
       arrowHeadGeometry.dispose()
       arrowMaterial.dispose()
+      magnetHalfGeometry.dispose()
+      northMaterial.dispose()
+      southMaterial.dispose()
+      labelPlaneGeometry.dispose()
+      labelTextures.forEach((texture) => texture.dispose())
+      labelMaterials.forEach((labelMaterial) => labelMaterial.dispose())
       renderer.dispose()
       renderer.domElement.remove()
     }
   }, [orientation])
+
+  useEffect(() => {
+    const netMagnet = netMagnetRef.current
+    const render = renderRef.current
+    if (!netMagnet || !render) return
+    netMagnet.visible = showNetMagnet
+    render()
+  }, [showNetMagnet])
 
   useEffect(() => {
     const arrowMaterial = arrowMaterialRef.current
@@ -197,22 +279,12 @@ export function ProtonSphereGraphic({
   return (
     <div
       aria-hidden="true"
-      className={`proton-sphere__surface${webGlReady ? ' proton-sphere__surface--webgl' : ''}`}
+      className="proton-sphere__surface"
       data-cone-orientation={orientation}
       data-cone-visible={orientation ? showCone : undefined}
       data-field-arrow-opacity={fieldArrowOpacity}
+      data-net-magnet-visible={showNetMagnet}
       ref={hostRef}
-    >
-      <span className="proton-sphere__fallback" />
-      {orientation ? (
-        <span
-          className={`proton-cone__fallback proton-cone__fallback--${orientation}`}
-          style={{
-            opacity: showCone ? 1 : 0,
-            transitionDuration: animateConeChange ? undefined : '0ms',
-          }}
-        />
-      ) : null}
-    </div>
+    />
   )
 }

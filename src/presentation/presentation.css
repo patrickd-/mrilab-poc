@@ -255,50 +255,6 @@ input {
   pointer-events: none;
 }
 
-.proton-sphere__fallback {
-  position: absolute;
-  inset: 16%;
-  border: 1px solid rgb(139 241 248 / 58%);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 34% 27%, rgb(240 254 255 / 58%) 0 3%, transparent 6%),
-    radial-gradient(circle at 36% 32%, rgb(173 241 249 / 40%), rgb(85 196 232 / 44%) 46%, rgb(17 72 94 / 55%) 76%, rgb(4 18 27 / 68%) 100%);
-  box-shadow:
-    inset -14px -20px 34px rgb(0 12 21 / 45%),
-    inset 8px 9px 24px rgb(188 247 251 / 14%);
-  opacity: 1;
-  transition: opacity 120ms linear;
-}
-
-.proton-sphere__surface--webgl .proton-sphere__fallback {
-  opacity: 0;
-}
-
-.proton-cone__fallback {
-  position: absolute;
-  z-index: -1;
-  left: 50%;
-  width: 54%;
-  height: 38%;
-  background: radial-gradient(ellipse at 50% 10%, #ffd2c8, #ff7866 42%, #6d1c15 100%);
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
-  transform: translateX(-50%);
-  transition: opacity 420ms ease;
-}
-
-.proton-cone__fallback--up {
-  top: -2%;
-}
-
-.proton-cone__fallback--down {
-  bottom: -2%;
-  transform: translateX(-50%) rotate(180deg);
-}
-
-.proton-sphere__surface--webgl .proton-cone__fallback {
-  opacity: 0 !important;
-}
-
 .proton-sphere--representative {
   z-index: 10;
   top: 50%;

@@ -130,6 +130,16 @@ describe('MRI Intuition presentation', () => {
         ?.getAttribute('data-cone-visible'),
     ).toBe('false')
     expect(
+      container
+        .querySelector('[data-cone-orientation="up"]')
+        ?.getAttribute('data-field-arrow-opacity'),
+    ).toBe('0')
+    expect(
+      container
+        .querySelector('[data-cone-orientation="up"]')
+        ?.getAttribute('data-net-magnet-visible'),
+    ).toBe('true')
+    expect(
       (screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement)
         .disabled,
     ).toBe(true)
