@@ -1,32 +1,60 @@
+import {
+  PHYSICAL_CONSTANTS,
+  PROTON_GYROMAGNETIC_RATIO,
+} from '../models/HydrogenEnsemble'
+
 export const TOTAL_PROTONS = 2e21
 export const HALF_PROTONS = TOTAL_PROTONS / 2
 export const BODY_TEMPERATURE_KELVIN = 310
 
-const REFERENCE_FIELD_TESLA = 3
-const REFERENCE_EXCESS_PROTONS = 1.48e16
-const REFERENCE_POPULATION_SHIFT =
-  REFERENCE_EXCESS_PROTONS / TOTAL_PROTONS
-const REFERENCE_BOLTZMANN_ARGUMENT = Math.atanh(
-  REFERENCE_POPULATION_SHIFT,
-)
-
 /**
- * Small-field Boltzmann population shift, calibrated to the lecture's rounded
- * CSF example: about 1.48e16 excess protons at 3 T and body temperature.
- * Keeping tanh here preserves the thermal-equilibrium response outside that
- * reference point while matching the deliberately approximate teaching count.
+ * Thermal-equilibrium spin polarization for a spin-1/2 proton ensemble:
+ * P = tanh(hbar * gamma * B0 / (2 * kB * T)).
+ *
+ * P is the full population difference divided by the total population, not
+ * the shift of either individual population away from N / 2.
+ * https://pmc.ncbi.nlm.nih.gov/articles/PMC5965996/
  */
-export function excessProtonsAt(
+export function protonPolarizationAt(
   fieldStrengthTesla: number,
   temperatureKelvin = BODY_TEMPERATURE_KELVIN,
 ) {
   const nonNegativeField = Math.max(0, fieldStrengthTesla)
   const thermalArgument =
-    REFERENCE_BOLTZMANN_ARGUMENT *
-    (nonNegativeField / REFERENCE_FIELD_TESLA) *
-    (BODY_TEMPERATURE_KELVIN / temperatureKelvin)
+    (PHYSICAL_CONSTANTS.diracConstant *
+      PROTON_GYROMAGNETIC_RATIO *
+      nonNegativeField) /
+    (2 * PHYSICAL_CONSTANTS.boltzmannConstant * temperatureKelvin)
 
-  return Math.round(TOTAL_PROTONS * Math.tanh(thermalArgument))
+  return Math.tanh(thermalArgument)
+}
+
+/** Full excess N_parallel - N_antiparallel. */
+export function excessProtonsAt(
+  fieldStrengthTesla: number,
+  temperatureKelvin = BODY_TEMPERATURE_KELVIN,
+) {
+  return Math.round(
+    TOTAL_PROTONS *
+      protonPolarizationAt(fieldStrengthTesla, temperatureKelvin),
+  )
+}
+
+export function protonPopulationsAt(
+  fieldStrengthTesla: number,
+  temperatureKelvin = BODY_TEMPERATURE_KELVIN,
+) {
+  const excessProtons = excessProtonsAt(
+    fieldStrengthTesla,
+    temperatureKelvin,
+  )
+  const halfPopulationDifference = excessProtons / 2
+
+  return {
+    parallel: HALF_PROTONS + halfPopulationDifference,
+    antiparallel: HALF_PROTONS - halfPopulationDifference,
+    excess: excessProtons,
+  }
 }
 
 export function formatProtonCount(value: number) {

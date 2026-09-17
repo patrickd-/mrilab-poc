@@ -4,12 +4,15 @@ import {
   TOTAL_PROTONS,
   excessProtonsAt,
   formatProtonCount,
+  protonPolarizationAt,
+  protonPopulationsAt,
 } from './physics'
 
 describe('presentation proton populations', () => {
-  it('matches the rounded 3 T teaching reference', () => {
+  it('derives the physical polarization and excess at 3 T and 310 K', () => {
     expect(excessProtonsAt(0)).toBe(0)
-    expect(excessProtonsAt(3)).toBeCloseTo(1.48e16, -10)
+    expect(protonPolarizationAt(3)).toBeCloseTo(9.887_403_312e-6, 15)
+    expect(excessProtonsAt(3)).toBeCloseTo(1.977_480_662e16, -7)
   })
 
   it('responds monotonically to field strength', () => {
@@ -18,10 +21,16 @@ describe('presentation proton populations', () => {
     expect(excessProtonsAt(7)).toBeGreaterThan(excessProtonsAt(3))
   })
 
-  it('keeps the two populations centered on half of the total', () => {
-    const excess = excessProtonsAt(7)
-    expect(HALF_PROTONS + excess + (HALF_PROTONS - excess)).toBe(
-      TOTAL_PROTONS,
+  it('uses half the full excess to shift each population', () => {
+    const populations = protonPopulationsAt(3)
+    expect(populations.parallel + populations.antiparallel).toBe(TOTAL_PROTONS)
+    expect(
+      (populations.parallel - populations.antiparallel) /
+        populations.excess,
+    ).toBeCloseTo(1, 10)
+    expect(populations.parallel - HALF_PROTONS).toBeCloseTo(
+      populations.excess / 2,
+      -7,
     )
     expect(formatProtonCount(TOTAL_PROTONS)).toBe(
       '2,000,000,000,000,000,000,000',

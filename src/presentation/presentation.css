@@ -494,8 +494,8 @@ input {
   width: 10px;
   height: 10px;
   content: '';
-  border-top: 2px solid #90eea9;
-  border-left: 2px solid #90eea9;
+  border-right: 2px solid #90eea9;
+  border-bottom: 2px solid #90eea9;
   transform: translate(-50%, -50%) rotate(45deg);
 }
 

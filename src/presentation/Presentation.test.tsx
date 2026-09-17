@@ -91,10 +91,10 @@ describe('MRI Intuition presentation', () => {
     expect(screen.getByText('3.0 Tesla')).toBeTruthy()
     expect(screen.getByText('3.0 T')).toBeTruthy()
     expect(screen.getByTestId('up-population').textContent).toContain(
-      '1,000,014,800,000,000,000,000',
+      '1,000,009,887,403,312,200,000',
     )
     expect(screen.getByTestId('down-population').textContent).toContain(
-      '999,985,200,000,000,000,000',
+      '999,990,112,596,687,800,000',
     )
     expect(
       (container.querySelector('.spin-system') as HTMLElement).style.getPropertyValue(

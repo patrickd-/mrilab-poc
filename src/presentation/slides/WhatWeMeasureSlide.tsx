@@ -8,8 +8,8 @@ import { ProtonSphereGraphic } from '../ProtonSphereGraphic'
 import {
   HALF_PROTONS,
   TOTAL_PROTONS,
-  excessProtonsAt,
   formatProtonCount,
+  protonPopulationsAt,
 } from '../physics'
 import type { PresentationSlideModule, SlideStateProps } from './types'
 
@@ -181,7 +181,7 @@ function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
   const labelsOnDrop = step >= 6
   const showField = step >= 8
   const finalExcessState = step >= 9
-  const excess = excessProtonsAt(fieldStrengthTesla)
+  const populations = protonPopulationsAt(fieldStrengthTesla)
   const arrowOpacity = showField
     ? Math.min(0.86, fieldStrengthTesla / 11.5)
     : 0
@@ -235,8 +235,8 @@ function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
                 : step === 7
                   ? `≈${formatProtonCount(HALF_PROTONS)}`
                   : finalExcessState
-                    ? `≈${formatProtonCount(excess)}`
-                    : `≈${formatProtonCount(HALF_PROTONS + excess)}`}
+                    ? `≈${formatProtonCount(populations.excess)}`
+                    : `≈${formatProtonCount(populations.parallel)}`}
             </div>
             <ProtonSphere
               animateConeChange={direction === 'forward'}
@@ -266,7 +266,7 @@ function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
                 ? 'DOWN'
                 : step === 7
                   ? `≈${formatProtonCount(HALF_PROTONS)}`
-                  : `≈${formatProtonCount(HALF_PROTONS - excess)}`}
+                  : `≈${formatProtonCount(populations.antiparallel)}`}
             </div>
           </div>
         </div>
