@@ -3,6 +3,7 @@ import { MagneticFieldBackdrop } from '../components/MagneticFieldBackdrop'
 import { ProtonSphere } from '../components/ProtonSphere'
 import { FlickingHand } from './howWeMeasure/FlickingHand'
 import { SpinningTopGraphic } from './howWeMeasure/SpinningTopGraphic'
+import { FLICK_DURATION_MS } from './howWeMeasure/flickTiming'
 import './howWeMeasure/how-we-measure.css'
 import type { PresentationSlideModule, SlideStateProps } from './types'
 
@@ -17,7 +18,7 @@ function HowWeMeasureSlide({
 
   useEffect(() => {
     if (!isFlicking) return
-    const rechargeTimer = window.setTimeout(() => setIsFlicking(false), 780)
+    const rechargeTimer = window.setTimeout(() => setIsFlicking(false), FLICK_DURATION_MS)
     return () => window.clearTimeout(rechargeTimer)
   }, [isFlicking])
 

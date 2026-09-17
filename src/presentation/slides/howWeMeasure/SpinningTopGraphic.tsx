@@ -1,15 +1,10 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { FLICK_CONTACT_MS } from './flickTiming'
 
-const BELT_COLORS = [
-  '#ff3659',
-  '#ff9f1c',
-  '#ffe84a',
-  '#31e981',
-  '#20c9ff',
-  '#5271ff',
-  '#a855f7',
-  '#ff4fd8',
+const SECTOR_COLORS = [
+  '#eb4052', '#ffb638', '#ffe6a0', '#36c49b',
+  '#21a9d0', '#3263b9', '#9063be', '#f27d87',
 ]
 
 export function SpinningTopGraphic({
@@ -19,10 +14,11 @@ export function SpinningTopGraphic({
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const flickStartedAtRef = useRef<number | null>(null)
+  const pendingContactRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (flickSequence > 0) {
-      flickStartedAtRef.current = performance.now()
+      pendingContactRef.current = performance.now() + FLICK_CONTACT_MS
     }
   }, [flickSequence])
 
@@ -51,11 +47,11 @@ export function SpinningTopGraphic({
     const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 30)
     camera.position.set(0, 0.15, 5.4)
 
-    const ambientLight = new THREE.AmbientLight('#cfe6ff', 1.7)
-    const keyLight = new THREE.DirectionalLight('#fff5db', 2.8)
+    const ambientLight = new THREE.HemisphereLight('#eaf4ff', '#384257', 2.1)
+    const keyLight = new THREE.DirectionalLight('#fff0d6', 3.2)
     keyLight.position.set(-3.5, 5, 6)
-    const rimLight = new THREE.DirectionalLight('#64dff5', 1.5)
-    rimLight.position.set(4, -1, 3)
+    const rimLight = new THREE.DirectionalLight('#a3e7ff', 2.4)
+    rimLight.position.set(4, 2, -3)
     scene.add(ambientLight, keyLight, rimLight)
 
     const precessionPivot = new THREE.Group()
@@ -65,72 +61,68 @@ export function SpinningTopGraphic({
     tiltPivot.add(spinner)
     scene.add(precessionPivot)
 
-    const bodyProfile = [
-      new THREE.Vector2(0.035, -1.14),
-      new THREE.Vector2(0.14, -0.91),
-      new THREE.Vector2(0.5, -0.62),
-      new THREE.Vector2(0.76, -0.25),
-      new THREE.Vector2(0.83, 0.02),
-      new THREE.Vector2(0.72, 0.33),
-      new THREE.Vector2(0.47, 0.58),
-      new THREE.Vector2(0.2, 0.68),
-      new THREE.Vector2(0.16, 0.94),
-    ]
-    const bodyGeometry = new THREE.LatheGeometry(bodyProfile, 64)
-    const bodyMaterial = new THREE.MeshPhongMaterial({
-      color: '#f6d27a',
-      emissive: '#372308',
-      specular: '#fff7d6',
-      shininess: 92,
-    })
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
-    spinner.add(body)
-
-    const stemGeometry = new THREE.CylinderGeometry(0.13, 0.17, 0.66, 28)
-    const stemMaterial = new THREE.MeshPhongMaterial({
-      color: '#f1b64d',
-      emissive: '#3c2205',
-      specular: '#fff1c2',
-      shininess: 78,
-    })
-    const stem = new THREE.Mesh(stemGeometry, stemMaterial)
-    stem.position.y = 1.18
-    spinner.add(stem)
-
-    const capGeometry = new THREE.SphereGeometry(0.21, 28, 18)
-    const capMaterial = new THREE.MeshPhongMaterial({
-      color: '#ff4f72',
-      emissive: '#6d0c21',
-      specular: '#ffe8ed',
-      shininess: 88,
-    })
-    const cap = new THREE.Mesh(capGeometry, capMaterial)
-    cap.scale.y = 0.7
-    cap.position.y = 1.52
-    spinner.add(cap)
-
-    const beltPanelGeometry = new THREE.BoxGeometry(0.39, 0.31, 0.11)
-    const beltMaterials = BELT_COLORS.map(
+    // A rounded lacquered crown and tapered underside, with the paint wrapped
+    // around the lathe itself so the equator stays smooth while it rotates.
+    const profileCurve = new THREE.SplineCurve([
+      new THREE.Vector2(0.07, -0.93),
+      new THREE.Vector2(0.3, -0.67),
+      new THREE.Vector2(0.64, -0.37),
+      new THREE.Vector2(0.94, -0.12),
+      new THREE.Vector2(0.99, 0.01),
+      new THREE.Vector2(0.91, 0.23),
+      new THREE.Vector2(0.65, 0.46),
+      new THREE.Vector2(0.31, 0.59),
+      new THREE.Vector2(0.12, 0.61),
+    ])
+    const bodyProfile = profileCurve.getPoints(70)
+    const bodyGeometry = new THREE.LatheGeometry(bodyProfile, 128)
+    const bodyMaterials = SECTOR_COLORS.map(
       (color) =>
-        new THREE.MeshPhongMaterial({
+        new THREE.MeshPhysicalMaterial({
           color,
-          emissive: color,
-          emissiveIntensity: 0.38,
-          specular: '#ffffff',
-          shininess: 74,
+          roughness: 0.32,
+          metalness: 0.08,
+          clearcoat: 0.8,
+          clearcoatRoughness: 0.23,
         }),
     )
-    const panelCount = 16
-    for (let index = 0; index < panelCount; index += 1) {
-      const angle = (index / panelCount) * Math.PI * 2
-      const panel = new THREE.Mesh(
-        beltPanelGeometry,
-        beltMaterials[index % beltMaterials.length],
-      )
-      panel.position.set(Math.cos(angle) * 0.79, 0, Math.sin(angle) * 0.79)
-      panel.rotation.y = -angle - Math.PI / 2
-      spinner.add(panel)
+    const indicesPerSector = 16 * (bodyProfile.length - 1) * 6
+    for (let sector = 0; sector < SECTOR_COLORS.length; sector += 1) {
+      bodyGeometry.addGroup(sector * indicesPerSector, indicesPerSector, sector)
     }
+    spinner.add(new THREE.Mesh(bodyGeometry, bodyMaterials))
+
+    const brassMaterial = new THREE.MeshStandardMaterial({
+      color: '#e9bc69', metalness: 0.65, roughness: 0.3,
+    })
+    const stemMaterial = new THREE.MeshStandardMaterial({
+      color: '#273c59', metalness: 0.25, roughness: 0.3,
+    })
+    const stemGeometry = new THREE.LatheGeometry([
+      new THREE.Vector2(0.13, 0.58),
+      new THREE.Vector2(0.13, 0.66),
+      new THREE.Vector2(0.085, 0.7),
+      new THREE.Vector2(0.085, 1.08),
+      new THREE.Vector2(0.125, 1.13),
+      new THREE.Vector2(0.125, 1.2),
+      new THREE.Vector2(0.09, 1.24),
+      new THREE.Vector2(0, 1.24),
+    ], 48)
+    spinner.add(new THREE.Mesh(stemGeometry, stemMaterial))
+    const tipGeometry = new THREE.ConeGeometry(0.075, 0.24, 32)
+    const tip = new THREE.Mesh(tipGeometry, brassMaterial)
+    tip.rotation.z = Math.PI
+    tip.position.y = -1.025
+    spinner.add(tip)
+    const rimGeometry = new THREE.TorusGeometry(0.985, 0.025, 12, 128)
+    const rim = new THREE.Mesh(rimGeometry, brassMaterial)
+    rim.rotation.x = Math.PI / 2
+    spinner.add(rim)
+    const collarGeometry = new THREE.TorusGeometry(0.135, 0.025, 12, 48)
+    const collar = new THREE.Mesh(collarGeometry, brassMaterial)
+    collar.rotation.x = Math.PI / 2
+    collar.position.y = 0.65
+    spinner.add(collar)
 
     let animationFrame = 0
     let previousTime = performance.now()
@@ -138,9 +130,15 @@ export function SpinningTopGraphic({
     const renderFrame = (now: number) => {
       const deltaSeconds = Math.min(0.05, (now - previousTime) / 1000)
       previousTime = now
-      spinAngle += deltaSeconds * 7.8
+      spinAngle += deltaSeconds * 4.6
       spinner.rotation.y = spinAngle
 
+      // A second flick must not reset the existing wobble before contact.
+      const pendingContact = pendingContactRef.current
+      if (pendingContact !== null && now >= pendingContact) {
+        flickStartedAtRef.current = pendingContact
+        pendingContactRef.current = null
+      }
       const flickStartedAt = flickStartedAtRef.current
       if (flickStartedAt === null) {
         precessionPivot.rotation.y = 0
@@ -178,13 +176,13 @@ export function SpinningTopGraphic({
       resizeObserver.disconnect()
       cancelAnimationFrame(animationFrame)
       bodyGeometry.dispose()
-      bodyMaterial.dispose()
+      bodyMaterials.forEach((material) => material.dispose())
       stemGeometry.dispose()
       stemMaterial.dispose()
-      capGeometry.dispose()
-      capMaterial.dispose()
-      beltPanelGeometry.dispose()
-      beltMaterials.forEach((material) => material.dispose())
+      tipGeometry.dispose()
+      rimGeometry.dispose()
+      collarGeometry.dispose()
+      brassMaterial.dispose()
       renderer.dispose()
       renderer.domElement.remove()
     }
