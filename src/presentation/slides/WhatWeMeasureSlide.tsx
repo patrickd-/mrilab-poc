@@ -174,7 +174,7 @@ function FieldStrengthControl({
   )
 }
 
-function MeasurementSlide({ direction, stateIndex }: SlideStateProps) {
+function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
   const [fieldStrengthTesla, setFieldStrengthTesla] = useState(0)
   const step = stateIndex + 1
   const compactDrop = step >= 5
@@ -193,7 +193,7 @@ function MeasurementSlide({ direction, stateIndex }: SlideStateProps) {
   } as CSSProperties
 
   return (
-    <div className="measurement-scene">
+    <div className="what-we-measure-scene">
       {showField ? <FieldBackdrop fieldStrengthTesla={fieldStrengthTesla} /> : null}
 
       {step >= 2 ? <LiquidDrop compact={compactDrop} /> : null}
@@ -282,9 +282,9 @@ function MeasurementSlide({ direction, stateIndex }: SlideStateProps) {
   )
 }
 
-export const measurementSlideModule: PresentationSlideModule = {
-  id: 'measurement',
+export const whatWeMeasureSlideModule: PresentationSlideModule = {
+  id: 'what-we-measure',
   heading: 'What are we measuring?',
   stateCount: 9,
-  Component: MeasurementSlide,
+  Component: WhatWeMeasureSlide,
 }

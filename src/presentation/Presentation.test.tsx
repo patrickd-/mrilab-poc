@@ -14,7 +14,7 @@ async function advance(user: ReturnType<typeof userEvent.setup>, count: number) 
 }
 
 describe('MRI Intuition presentation', () => {
-  it('steps through the introductory measurement states', async () => {
+  it('steps through the what-we-measure slide states', async () => {
     const user = userEvent.setup()
     const { container } = render(<Presentation />)
 
@@ -31,7 +31,7 @@ describe('MRI Intuition presentation', () => {
 
     await advance(user, 1)
     expect(screen.getByLabelText('A drop of cerebrospinal fluid')).toBeTruthy()
-    expect(document.querySelector('.presentation')?.getAttribute('data-slide')).toBe('measurement')
+    expect(document.querySelector('.presentation')?.getAttribute('data-slide')).toBe('what-we-measure')
     expect(document.querySelector('.presentation')?.getAttribute('data-slide-state')).toBe('1')
     expect(document.querySelector('.presentation')?.classList.contains('presentation--forward')).toBe(true)
 

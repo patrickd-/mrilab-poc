@@ -1,9 +1,9 @@
-import { measurementSlideModule } from './MeasurementSlide'
 import { titleSlideModule } from './TitleSlide'
+import { whatWeMeasureSlideModule } from './WhatWeMeasureSlide'
 
 export const presentationSlides = [
   titleSlideModule,
-  measurementSlideModule,
+  whatWeMeasureSlideModule,
 ]
 
 export type {
