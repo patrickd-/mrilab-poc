@@ -247,7 +247,7 @@ function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
               fieldArrowOpacity={finalExcessState ? 0 : arrowOpacity}
               orientation="up"
               showCone={!finalExcessState}
-              showNetMagnet={finalExcessState}
+              showNetMagnet={finalExcessState && fieldStrengthTesla > 0}
             />
             {finalExcessState ? <div className="spin-state__caption">Excess protons</div> : null}
           </div>

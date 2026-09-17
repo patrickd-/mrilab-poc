@@ -144,6 +144,14 @@ describe('MRI Intuition presentation', () => {
         .disabled,
     ).toBe(true)
 
+    fireEvent.change(slider, { target: { value: '0' } })
+    expect(
+      container
+        .querySelector('[data-cone-orientation="up"]')
+        ?.getAttribute('data-net-magnet-visible'),
+    ).toBe('false')
+    fireEvent.change(slider, { target: { value: '7' } })
+
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect((screen.getByRole('slider') as HTMLInputElement).value).toBe('7')
     expect(

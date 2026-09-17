@@ -22,6 +22,7 @@ export function ProtonSphereGraphic({
   const hostRef = useRef<HTMLDivElement>(null)
   const coneMaterialRef = useRef<THREE.MeshPhongMaterial | null>(null)
   const arrowMaterialRef = useRef<THREE.MeshPhongMaterial | null>(null)
+  const sphereMaterialRef = useRef<THREE.MeshPhongMaterial | null>(null)
   const netMagnetRef = useRef<THREE.Group | null>(null)
   const renderRef = useRef<(() => void) | null>(null)
   const coneAnimationRef = useRef(0)
@@ -89,8 +90,8 @@ export function ProtonSphereGraphic({
     const material = new THREE.MeshPhongMaterial({
       color: '#55c4e8',
       emissive: '#07151b',
-      specular: '#bceeff',
-      shininess: 72,
+      specular: showNetMagnet ? '#000000' : '#bceeff',
+      shininess: showNetMagnet ? 0 : 72,
       transparent: true,
       opacity: 0.5,
       depthWrite: false,
@@ -98,6 +99,7 @@ export function ProtonSphereGraphic({
     const sphere = new THREE.Mesh(geometry, material)
     sphere.renderOrder = 2
     scene.add(sphere)
+    sphereMaterialRef.current = material
 
     const arrowShaftGeometry = new THREE.CylinderGeometry(
       0.065,
@@ -212,6 +214,7 @@ export function ProtonSphereGraphic({
       renderRef.current = null
       coneMaterialRef.current = null
       arrowMaterialRef.current = null
+      sphereMaterialRef.current = null
       netMagnetRef.current = null
       geometry.dispose()
       depthMaterial.dispose()
@@ -234,9 +237,12 @@ export function ProtonSphereGraphic({
 
   useEffect(() => {
     const netMagnet = netMagnetRef.current
+    const sphereMaterial = sphereMaterialRef.current
     const render = renderRef.current
-    if (!netMagnet || !render) return
+    if (!netMagnet || !sphereMaterial || !render) return
     netMagnet.visible = showNetMagnet
+    sphereMaterial.specular.set(showNetMagnet ? '#000000' : '#bceeff')
+    sphereMaterial.shininess = showNetMagnet ? 0 : 72
     render()
   }, [showNetMagnet])
 
