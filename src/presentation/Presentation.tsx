@@ -24,22 +24,41 @@ interface FlyingProton {
   delay: number
   driftX: number
   driftY: number
+  middleX: number
+  middleY: number
+  lateX: number
+  lateY: number
+  size: number
+  finalScale: number
 }
 
-const FLYING_PROTONS: ReadonlyArray<FlyingProton> = [
-  { left: 23, top: 42, delay: 0.03, driftX: 38, driftY: 8 },
-  { left: 20, top: 47, delay: 0.12, driftX: 41, driftY: 3 },
-  { left: 25, top: 52, delay: 0.2, driftX: 36, driftY: -2 },
-  { left: 22, top: 56, delay: 0.29, driftX: 39, driftY: -6 },
-  { left: 26, top: 45, delay: 0.38, driftX: 35, driftY: 5 },
-  { left: 19, top: 51, delay: 0.47, driftX: 42, driftY: -1 },
-  { left: 24, top: 58, delay: 0.56, driftX: 37, driftY: -8 },
-  { left: 21, top: 43, delay: 0.65, driftX: 40, driftY: 7 },
-  { left: 27, top: 49, delay: 0.74, driftX: 34, driftY: 1 },
-  { left: 23, top: 54, delay: 0.83, driftX: 38, driftY: -4 },
-  { left: 20, top: 58, delay: 0.92, driftX: 41, driftY: -8 },
-  { left: 26, top: 41, delay: 1.01, driftX: 35, driftY: 9 },
-]
+const FLYING_PROTONS: ReadonlyArray<FlyingProton> = Array.from(
+  { length: 42 },
+  (_, index) => {
+    const angle = index * 2.399_963_229_728_653
+    const radius = Math.sqrt(((index * 37) % 101) / 100)
+    const left = 23 + Math.cos(angle) * 4.1 * radius
+    const top = 50 + Math.sin(angle) * 8.2 * radius
+    const driftX = 65 - left + Math.sin(angle * 1.7) * 1.1
+    const driftY = 50 - top + Math.cos(angle * 1.3) * 1.4
+    const swerve = Math.sin(angle * 0.73) * (4.5 + (index % 4))
+    const size = 7 + (index % 5) * 1.4
+
+    return {
+      left,
+      top,
+      delay: (index % 14) * 0.035 + Math.floor(index / 14) * 0.11,
+      driftX,
+      driftY,
+      middleX: driftX * 0.36,
+      middleY: driftY * 0.36 + swerve,
+      lateX: driftX * 0.78,
+      lateY: driftY * 0.78 - swerve * 0.42,
+      size,
+      finalScale: 150 / size,
+    }
+  },
+)
 
 function AnimatedCount({
   value,
@@ -149,14 +168,15 @@ function ProtonSphere({
 }
 
 function FieldBackdrop({ fieldStrengthTesla }: { fieldStrengthTesla: number }) {
-  const strength = fieldStrengthTesla / 10
+  const fieldLineOpacity =
+    0.34 * (1 - Math.exp(-fieldStrengthTesla / 1.5))
   return (
     <div aria-hidden="true" className="field-backdrop">
       <div className="magnet magnet--north"><span>N</span></div>
       <div className="magnet magnet--south"><span>S</span></div>
       <div
         className="field-lines"
-        style={{ '--field-opacity': strength * 0.3 } as CSSProperties}
+        style={{ '--field-opacity': fieldLineOpacity } as CSSProperties}
       >
         {Array.from({ length: 7 }, (_, index) => (
           <span className="field-line" key={index} />
@@ -273,6 +293,12 @@ function MeasurementScene({
                   '--fly-top': `${proton.top}%`,
                   '--fly-x': `${proton.driftX}vw`,
                   '--fly-y': `${proton.driftY}vh`,
+                  '--fly-middle-x': `${proton.middleX}vw`,
+                  '--fly-middle-y': `${proton.middleY}vh`,
+                  '--fly-late-x': `${proton.lateX}vw`,
+                  '--fly-late-y': `${proton.lateY}vh`,
+                  '--fly-size': `${proton.size}px`,
+                  '--fly-final-scale': proton.finalScale,
                 } as CSSProperties}
               />
             ))}

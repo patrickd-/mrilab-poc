@@ -4,6 +4,7 @@
   color: #f5f8ff;
   background: #05070b;
   font-family: 'DM Sans', Inter, system-ui, sans-serif;
+  font-size: clamp(17px, 1.15vw, 20px);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -27,7 +28,7 @@ input {
 }
 
 .presentation {
-  --bar-height: 72px;
+  --bar-height: 60px;
   width: 100%;
   height: 100%;
   min-width: 320px;
@@ -79,7 +80,7 @@ input {
   overflow: hidden;
   color: #dbeaf1;
   font-family: Manrope, sans-serif;
-  font-size: clamp(0.95rem, 1.3vw, 1.2rem);
+  font-size: clamp(1.15rem, 1.65vw, 1.55rem);
   font-weight: 600;
   letter-spacing: 0.045em;
   text-overflow: ellipsis;
@@ -93,14 +94,15 @@ input {
 
 .presentation-bar button {
   display: grid;
-  width: 43px;
-  height: 38px;
+  width: 50px;
+  height: 40px;
   padding: 0;
   color: #dffbff;
   cursor: pointer;
   border: 1px solid rgb(107 221 232 / 36%);
   border-radius: 7px;
   background: linear-gradient(180deg, rgb(30 57 67 / 74%), rgb(10 24 31 / 80%));
+  font-size: 1.2rem;
   box-shadow: inset 0 1px rgb(255 255 255 / 8%), 0 8px 24px rgb(0 0 0 / 24%);
   place-items: center;
   transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
@@ -145,7 +147,7 @@ input {
   margin: 0;
   color: #f7fbff;
   font-family: Manrope, sans-serif;
-  font-size: clamp(4rem, 11vw, 9.5rem);
+  font-size: clamp(4.8rem, 12vw, 10.5rem);
   font-weight: 600;
   line-height: 0.82;
   letter-spacing: -0.075em;
@@ -190,14 +192,14 @@ input {
 
 .sample-label--left {
   left: 23%;
-  width: 32vw;
+  width: 36vw;
 }
 
 .sample-label--name {
   top: clamp(38px, 8vh, 90px);
   color: #dffaff;
   font-family: Manrope, sans-serif;
-  font-size: clamp(1.25rem, 2.4vw, 2.4rem);
+  font-size: clamp(1.6rem, 2.9vw, 2.9rem);
   font-weight: 600;
   letter-spacing: -0.025em;
 }
@@ -216,7 +218,7 @@ input {
 .sample-label--count strong {
   color: #f8fcff;
   font-family: Manrope, sans-serif;
-  font-size: clamp(1rem, 2vw, 2rem);
+  font-size: clamp(1.25rem, 2.35vw, 2.35rem);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   letter-spacing: -0.035em;
@@ -224,7 +226,7 @@ input {
 
 .sample-label--count > span {
   color: #8ec8d0;
-  font-size: clamp(0.75rem, 1.05vw, 1rem);
+  font-size: clamp(0.95rem, 1.35vw, 1.25rem);
   font-weight: 500;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -276,7 +278,7 @@ input {
 .proton-sphere--representative {
   z-index: 10;
   top: 50%;
-  left: 62%;
+  left: 65%;
   transform: translate(-50%, -50%);
 }
 
@@ -291,7 +293,7 @@ input {
   position: absolute;
   top: var(--fly-top);
   left: var(--fly-left);
-  width: 12px;
+  width: var(--fly-size);
   aspect-ratio: 1;
   border: 1px solid rgb(177 242 250 / 72%);
   border-radius: 50%;
@@ -309,7 +311,7 @@ input {
 
 .spin-state {
   position: absolute;
-  left: 62%;
+  left: 65%;
   width: clamp(118px, 12vw, 178px);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
@@ -332,10 +334,10 @@ input {
 .spin-state__label {
   position: absolute;
   left: 50%;
-  width: min(32vw, 410px);
+  width: min(38vw, 520px);
   color: #edfaff;
   font-family: Manrope, sans-serif;
-  font-size: clamp(0.75rem, 1.25vw, 1.2rem);
+  font-size: clamp(1rem, 1.55vw, 1.5rem);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   letter-spacing: 0.025em;
@@ -357,7 +359,7 @@ input {
   top: calc(100% + 17px);
   left: 50%;
   color: #79cdd7;
-  font-size: clamp(0.68rem, 0.95vw, 0.88rem);
+  font-size: clamp(0.86rem, 1.15vw, 1.08rem);
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -415,7 +417,7 @@ input {
   position: absolute;
   z-index: -1;
   top: calc(50% - var(--line-gap));
-  left: 49%;
+  left: 52%;
   width: 26%;
   height: 2px;
   background: linear-gradient(90deg, transparent, rgb(219 238 242 / 55%) 18% 82%, transparent);
@@ -464,7 +466,7 @@ input {
 .magnet span {
   color: rgb(255 255 255 / 86%);
   font-family: Manrope, sans-serif;
-  font-size: clamp(1.2rem, 2.2vw, 2.4rem);
+  font-size: clamp(1.45rem, 2.5vw, 2.7rem);
   font-weight: 700;
   text-shadow: 0 2px 9px rgb(0 0 0 / 25%);
 }
@@ -524,7 +526,7 @@ input {
   top: 50%;
   right: clamp(18px, 2.5vw, 46px);
   display: grid;
-  width: clamp(94px, 9vw, 128px);
+  width: clamp(112px, 10vw, 148px);
   padding: 18px 14px 20px;
   border: 1px solid rgb(117 219 229 / 24%);
   border-radius: 12px;
@@ -544,13 +546,13 @@ input {
 
 .field-control__readout > span {
   color: #91edf0;
-  font-size: 1rem;
+  font-size: 1.25rem;
   font-weight: 600;
 }
 
 .field-control__readout output {
   color: #f3f8fa;
-  font-size: 0.82rem;
+  font-size: 1.05rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -597,7 +599,7 @@ input {
   position: absolute;
   left: 47px;
   color: rgb(205 229 233 / 68%);
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   transform: translateY(50%);
@@ -703,9 +705,10 @@ input {
 
 @keyframes proton-fly {
   0% { opacity: 0; transform: translate(0, 0) scale(0.35); }
-  12% { opacity: 0.9; }
-  84% { opacity: 0.72; }
-  100% { opacity: 0; transform: translate(var(--fly-x), var(--fly-y)) scale(12); }
+  10% { opacity: 0.95; }
+  38% { opacity: 1; transform: translate(var(--fly-middle-x), var(--fly-middle-y)) scale(2.2); }
+  76% { opacity: 0.84; transform: translate(var(--fly-late-x), var(--fly-late-y)) scale(6); }
+  100% { opacity: 0; transform: translate(var(--fly-x), var(--fly-y)) scale(var(--fly-final-scale)); }
 }
 
 @keyframes sphere-gather {
@@ -740,12 +743,12 @@ input {
 
 @media (max-width: 760px) {
   .presentation {
-    --bar-height: 62px;
+    --bar-height: 56px;
   }
 
   .sample-label--left {
     left: 24%;
-    width: 42vw;
+    width: 45vw;
   }
 
   .sample-label--name {
@@ -766,7 +769,11 @@ input {
 
   .spin-state,
   .proton-sphere--representative {
-    left: 58%;
+    left: 60%;
+  }
+
+  .energy-separator {
+    left: 47%;
   }
 
   .magnet {
@@ -776,7 +783,7 @@ input {
 
   .field-control {
     right: 8px;
-    width: 86px;
+    width: 104px;
     padding-right: 8px;
     padding-left: 8px;
   }

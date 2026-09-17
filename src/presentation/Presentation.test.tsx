@@ -41,7 +41,7 @@ describe('MRI Intuition presentation', () => {
     await advance(user, 1)
     expect(screen.getByLabelText('Representative proton ensemble')).toBeTruthy()
     expect(container.querySelector('.csf-drop--compact')).toBeTruthy()
-    expect(container.querySelectorAll('.flying-proton')).toHaveLength(12)
+    expect(container.querySelectorAll('.flying-proton')).toHaveLength(42)
     expect(container.querySelector('.proton-sphere__surface')).toBeTruthy()
 
     await advance(user, 2)
@@ -61,7 +61,17 @@ describe('MRI Intuition presentation', () => {
     const slider = screen.getByRole('slider', {
       name: 'B0 magnetic field strength',
     })
+    const fieldLines = container.querySelector('.field-lines') as HTMLElement
+    fireEvent.change(slider, { target: { value: '0.5' } })
+    const lowFieldOpacity = Number(
+      fieldLines.style.getPropertyValue('--field-opacity'),
+    )
+    expect(lowFieldOpacity).toBeGreaterThan(0.09)
+
     fireEvent.change(slider, { target: { value: '3' } })
+    const clinicalFieldOpacity = Number(
+      fieldLines.style.getPropertyValue('--field-opacity'),
+    )
 
     expect(screen.getAllByText('3.0 T')).toHaveLength(2)
     expect(screen.getByTestId('up-population').textContent).toContain(
@@ -75,6 +85,8 @@ describe('MRI Intuition presentation', () => {
         '--spin-split',
       ),
     ).toBe('122px')
+    expect(clinicalFieldOpacity).toBeGreaterThan(lowFieldOpacity)
+    expect(clinicalFieldOpacity).toBeLessThan(0.3)
   })
 
   it('supports keyboard navigation and retains the interactive field value', async () => {
