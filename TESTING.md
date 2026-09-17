@@ -126,6 +126,11 @@ and the 100 ms browser-stall cap.
   layered over a still-active experiment, Escape/close behavior, nested slice
   presets, the three-circle diagonal CSF phantom, reset, camera/view controls,
   and propagation of B0 and realism settings into scene/simulation state.
+- `presentation/Presentation.test.tsx` verifies button and keyboard navigation
+  across the companion lecture's slide states, the CSF proton populations,
+  interactive B0 separation, final excess-population state, and field-value
+  persistence. `presentation/physics.test.ts` separately checks the monotonic
+  Boltzmann-shaped population model and its rounded 3 T teaching reference.
 
 ## Deliberate unit-test boundary
 

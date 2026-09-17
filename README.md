@@ -23,6 +23,15 @@ Run the deterministic simulation tests with:
 npm test
 ```
 
+## MRI Intuition presentation
+
+The companion lecture presentation is available at `/presentation/` while the
+development server is running. It is built and deployed alongside the MRI Lab,
+so the same path also works on GitHub Pages. Use the on-screen ◀ and ▶ controls
+or the keyboard's left and right arrow keys to move through its slide states.
+Forward steps play their teaching animations; backward steps restore the prior
+state immediately.
+
 ## GitHub Pages
 
 Pushes to `main` run the GitHub Pages workflow in

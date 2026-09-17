@@ -17,6 +17,7 @@ export default defineConfig({
         // separately covered sceneMath module.
         'src/components/LabScene.tsx',
         'src/main.tsx',
+        'src/presentation/main.tsx',
         'src/vite-env.d.ts',
       ],
       thresholds: {
