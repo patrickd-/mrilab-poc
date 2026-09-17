@@ -31,7 +31,8 @@ describe('MRI Intuition presentation', () => {
 
     await advance(user, 1)
     expect(screen.getByLabelText('A drop of cerebrospinal fluid')).toBeTruthy()
-    expect(document.querySelector('.presentation')?.getAttribute('data-step')).toBe('2')
+    expect(document.querySelector('.presentation')?.getAttribute('data-slide')).toBe('measurement')
+    expect(document.querySelector('.presentation')?.getAttribute('data-slide-state')).toBe('1')
     expect(document.querySelector('.presentation')?.classList.contains('presentation--forward')).toBe(true)
 
     await advance(user, 2)

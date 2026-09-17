@@ -32,6 +32,12 @@ or the keyboard's left and right arrow keys to move through its slide states.
 Forward steps play their teaching animations; backward steps restore the prior
 state immediately.
 
+Presentation content is organized as self-contained slide modules under
+`src/presentation/slides`. Each module declares its heading, number of reveal
+states, and rendered component, while `slides/index.ts` is the ordered slide
+registry. Interactive state belongs inside its slide module, so new slides can
+be added without extending a single global step component.
+
 ## GitHub Pages
 
 Pushes to `main` run the GitHub Pages workflow in
