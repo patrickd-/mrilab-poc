@@ -12,53 +12,12 @@ import {
   excessProtonsAt,
   formatProtonCount,
 } from './physics'
+import { ProtonBurst } from './ProtonBurst'
 import { ProtonSphereGraphic } from './ProtonSphereGraphic'
 
 const LAST_STEP = 9
 
 type NavigationDirection = 'initial' | 'forward' | 'backward'
-
-interface FlyingProton {
-  left: number
-  top: number
-  delay: number
-  driftX: number
-  driftY: number
-  middleX: number
-  middleY: number
-  lateX: number
-  lateY: number
-  size: number
-  finalScale: number
-}
-
-const FLYING_PROTONS: ReadonlyArray<FlyingProton> = Array.from(
-  { length: 42 },
-  (_, index) => {
-    const angle = index * 2.399_963_229_728_653
-    const radius = Math.sqrt(((index * 37) % 101) / 100)
-    const left = 23 + Math.cos(angle) * 4.1 * radius
-    const top = 50 + Math.sin(angle) * 8.2 * radius
-    const driftX = 65 - left + Math.sin(angle * 1.7) * 1.1
-    const driftY = 50 - top + Math.cos(angle * 1.3) * 1.4
-    const swerve = Math.sin(angle * 0.73) * (4.5 + (index % 4))
-    const size = 7 + (index % 5) * 1.4
-
-    return {
-      left,
-      top,
-      delay: (index % 14) * 0.035 + Math.floor(index / 14) * 0.11,
-      driftX,
-      driftY,
-      middleX: driftX * 0.36,
-      middleY: driftY * 0.36 + swerve,
-      lateX: driftX * 0.78,
-      lateY: driftY * 0.78 - swerve * 0.42,
-      size,
-      finalScale: 150 / size,
-    }
-  },
-)
 
 function AnimatedCount({
   value,
@@ -130,27 +89,17 @@ function LiquidDrop({ compact }: { compact: boolean }) {
   )
 }
 
-function MagnetizationArrow({ opacity }: { opacity: number }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="magnetization-arrow"
-      style={{ opacity }}
-    >
-      <span className="magnetization-arrow__head" />
-    </span>
-  )
-}
-
 function ProtonSphere({
   orientation,
   showCone,
   fieldArrowOpacity = 0,
+  animateConeChange = false,
   className = '',
 }: {
   orientation?: 'up' | 'down'
   showCone: boolean
   fieldArrowOpacity?: number
+  animateConeChange?: boolean
   className?: string
 }) {
   return (
@@ -158,11 +107,12 @@ function ProtonSphere({
       aria-label={orientation ? `${orientation} spin proton ensemble` : 'Representative proton ensemble'}
       className={`proton-sphere ${className}`}
     >
-      <ProtonSphereGraphic />
-      {showCone && orientation ? (
-        <span className={`spin-cone spin-cone--${orientation}`} />
-      ) : null}
-      <MagnetizationArrow opacity={fieldArrowOpacity} />
+      <ProtonSphereGraphic
+        animateConeChange={animateConeChange}
+        fieldArrowOpacity={fieldArrowOpacity}
+        orientation={orientation}
+        showCone={showCone}
+      />
     </div>
   )
 }
@@ -197,7 +147,7 @@ function FieldStrengthControl({
     <aside className="field-control">
       <div className="field-control__readout">
         <span>B<sub>0</sub></span>
-        <output>{value.toFixed(1)} T</output>
+        <output>{value.toFixed(1)} Tesla</output>
       </div>
       <div className="field-control__slider-wrap">
         <input
@@ -282,27 +232,7 @@ function MeasurementScene({
 
       {step === 5 ? (
         <>
-          <div className="proton-stream" aria-hidden="true">
-            {FLYING_PROTONS.map((proton, index) => (
-              <span
-                className="flying-proton"
-                key={index}
-                style={{
-                  '--fly-delay': `${proton.delay}s`,
-                  '--fly-left': `${proton.left}%`,
-                  '--fly-top': `${proton.top}%`,
-                  '--fly-x': `${proton.driftX}vw`,
-                  '--fly-y': `${proton.driftY}vh`,
-                  '--fly-middle-x': `${proton.middleX}vw`,
-                  '--fly-middle-y': `${proton.middleY}vh`,
-                  '--fly-late-x': `${proton.lateX}vw`,
-                  '--fly-late-y': `${proton.lateY}vh`,
-                  '--fly-size': `${proton.size}px`,
-                  '--fly-final-scale': proton.finalScale,
-                } as CSSProperties}
-              />
-            ))}
-          </div>
+          <ProtonBurst animate={direction === 'forward'} />
           <ProtonSphere className="proton-sphere--representative" showCone={false} />
         </>
       ) : null}
@@ -323,10 +253,11 @@ function MeasurementScene({
                     : `≈${formatProtonCount(HALF_PROTONS + excess)}`}
             </div>
             <ProtonSphere
+              animateConeChange={direction === 'forward'}
               className="proton-sphere--spin"
               fieldArrowOpacity={arrowOpacity}
               orientation="up"
-              showCone
+              showCone={!finalExcessState}
             />
             {finalExcessState ? <div className="spin-state__caption">Excess protons</div> : null}
           </div>
@@ -338,6 +269,7 @@ function MeasurementScene({
             className="spin-state spin-state--down"
           >
             <ProtonSphere
+              animateConeChange={direction === 'forward'}
               className="proton-sphere--spin"
               fieldArrowOpacity={arrowOpacity}
               orientation="down"

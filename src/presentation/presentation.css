@@ -242,7 +242,7 @@ input {
 
 .proton-sphere__surface {
   position: absolute;
-  inset: -8%;
+  inset: -16%;
   overflow: visible;
   border-radius: 50%;
   filter: drop-shadow(0 0 13px rgb(62 202 226 / 20%));
@@ -258,7 +258,7 @@ input {
 
 .proton-sphere__fallback {
   position: absolute;
-  inset: 8%;
+  inset: 16%;
   border: 1px solid rgb(139 241 248 / 58%);
   border-radius: 50%;
   background:
@@ -275,6 +275,31 @@ input {
   opacity: 0;
 }
 
+.proton-cone__fallback {
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  width: 54%;
+  height: 38%;
+  background: radial-gradient(ellipse at 50% 10%, #ffd2c8, #ff7866 42%, #6d1c15 100%);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transform: translateX(-50%);
+  transition: opacity 420ms ease;
+}
+
+.proton-cone__fallback--up {
+  top: -2%;
+}
+
+.proton-cone__fallback--down {
+  bottom: -2%;
+  transform: translateX(-50%) rotate(180deg);
+}
+
+.proton-sphere__surface--webgl .proton-cone__fallback {
+  opacity: 0 !important;
+}
+
 .proton-sphere--representative {
   z-index: 10;
   top: 50%;
@@ -282,24 +307,13 @@ input {
   transform: translate(-50%, -50%);
 }
 
-.proton-stream {
+.proton-burst {
   position: absolute;
   z-index: 9;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-}
-
-.flying-proton {
-  position: absolute;
-  top: var(--fly-top);
-  left: var(--fly-left);
-  width: var(--fly-size);
-  aspect-ratio: 1;
-  border: 1px solid rgb(177 242 250 / 72%);
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 28%, rgb(229 252 255 / 82%), rgb(85 196 232 / 58%) 38%, rgb(13 64 83 / 72%) 100%);
-  box-shadow: inset -2px -2px 5px rgb(0 21 32 / 48%), 0 0 12px rgb(76 215 230 / 42%);
-  opacity: 0;
 }
 
 .spin-system {
@@ -334,8 +348,14 @@ input {
 .spin-state__label {
   position: absolute;
   left: 50%;
-  width: min(38vw, 520px);
+  width: max-content;
+  max-width: min(38vw, 520px);
+  padding: 0.45em 0.78em;
   color: #edfaff;
+  border: 1px solid rgb(117 219 229 / 30%);
+  border-radius: 8px;
+  background: #050b10;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 35%), inset 0 1px rgb(255 255 255 / 5%);
   font-family: Manrope, sans-serif;
   font-size: clamp(1rem, 1.55vw, 1.5rem);
   font-variant-numeric: tabular-nums;
@@ -358,59 +378,18 @@ input {
   position: absolute;
   top: calc(100% + 17px);
   left: 50%;
+  padding: 0.42em 0.75em;
   color: #79cdd7;
+  border: 1px solid rgb(117 219 229 / 24%);
+  border-radius: 7px;
+  background: #050b10;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 32%);
   font-size: clamp(0.86rem, 1.15vw, 1.08rem);
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   white-space: nowrap;
   transform: translateX(-50%);
-}
-
-.spin-cone {
-  position: absolute;
-  z-index: 2;
-  left: 50%;
-  width: 50%;
-  height: 20%;
-  background: linear-gradient(90deg, rgb(255 125 104 / 42%), rgb(255 161 128 / 84%), rgb(255 125 104 / 42%));
-  clip-path: polygon(0 0, 100% 0, 72% 100%, 28% 100%);
-  transform: translateX(-50%);
-  filter: drop-shadow(0 0 6px rgb(255 109 90 / 35%));
-  transition: opacity 420ms ease;
-}
-
-.spin-cone--up {
-  top: -7%;
-}
-
-.spin-cone--down {
-  bottom: -7%;
-  transform: translateX(-50%) rotate(180deg);
-}
-
-.magnetization-arrow {
-  position: absolute;
-  z-index: 4;
-  top: 14%;
-  bottom: 14%;
-  left: calc(50% - 3px);
-  width: 6px;
-  border-radius: 99px;
-  background: linear-gradient(180deg, #9dff9c, #36da82 62%, #149656);
-  box-shadow: 0 0 10px rgb(79 239 142 / 48%);
-  transition: opacity 180ms linear;
-}
-
-.magnetization-arrow__head {
-  position: absolute;
-  top: -1px;
-  left: 50%;
-  width: 25px;
-  height: 25px;
-  border-top: 6px solid #95ff9b;
-  border-left: 6px solid #95ff9b;
-  transform: translate(-50%, -20%) rotate(45deg);
 }
 
 .energy-separator {
@@ -434,8 +413,7 @@ input {
 }
 
 .spin-system--excess .spin-state--down,
-.spin-system--excess .energy-separator,
-.spin-system--excess .spin-cone {
+.spin-system--excess .energy-separator {
   opacity: 0;
 }
 
@@ -632,10 +610,6 @@ input {
   animation: drop-move-left 1.05s cubic-bezier(0.22, 0.8, 0.24, 1) both;
 }
 
-.presentation--forward[data-step='5'] .flying-proton {
-  animation: proton-fly 1.15s cubic-bezier(0.2, 0.6, 0.24, 1) calc(720ms + var(--fly-delay)) both;
-}
-
 .presentation--forward[data-step='5'] .proton-sphere--representative {
   animation: sphere-gather 950ms cubic-bezier(0.2, 0.76, 0.22, 1) 1.55s both;
 }
@@ -646,10 +620,6 @@ input {
 
 .presentation--forward[data-step='6'] .spin-state--down {
   animation: split-down 720ms cubic-bezier(0.22, 0.8, 0.24, 1) both;
-}
-
-.presentation--forward[data-step='6'] .spin-cone {
-  animation: label-fade 420ms ease-out 320ms both;
 }
 
 .presentation--forward[data-step='6'] .sample-label--left,
@@ -701,14 +671,6 @@ input {
 @keyframes drop-move-left {
   from { left: 50%; width: clamp(128px, 16vw, 230px); }
   to { left: 23%; width: clamp(92px, 10vw, 156px); }
-}
-
-@keyframes proton-fly {
-  0% { opacity: 0; transform: translate(0, 0) scale(0.35); }
-  10% { opacity: 0.95; }
-  38% { opacity: 1; transform: translate(var(--fly-middle-x), var(--fly-middle-y)) scale(2.2); }
-  76% { opacity: 0.84; transform: translate(var(--fly-late-x), var(--fly-late-y)) scale(6); }
-  100% { opacity: 0; transform: translate(var(--fly-x), var(--fly-y)) scale(var(--fly-final-scale)); }
 }
 
 @keyframes sphere-gather {

@@ -41,7 +41,11 @@ describe('MRI Intuition presentation', () => {
     await advance(user, 1)
     expect(screen.getByLabelText('Representative proton ensemble')).toBeTruthy()
     expect(container.querySelector('.csf-drop--compact')).toBeTruthy()
-    expect(container.querySelectorAll('.flying-proton')).toHaveLength(42)
+    expect(
+      container.querySelector('.proton-burst')?.getAttribute(
+        'data-particle-count',
+      ),
+    ).toBe('4200')
     expect(container.querySelector('.proton-sphere__surface')).toBeTruthy()
 
     await advance(user, 2)
@@ -51,6 +55,9 @@ describe('MRI Intuition presentation', () => {
     expect(screen.getByTestId('down-population').textContent).toContain(
       '1,000,000,000,000,000,000,000',
     )
+    expect(
+      container.querySelectorAll('[data-cone-visible="true"]'),
+    ).toHaveLength(2)
   })
 
   it('updates the populations and energy separation with B0', async () => {
@@ -67,13 +74,21 @@ describe('MRI Intuition presentation', () => {
       fieldLines.style.getPropertyValue('--field-opacity'),
     )
     expect(lowFieldOpacity).toBeGreaterThan(0.09)
+    expect(
+      Number(
+        container
+          .querySelector('[data-cone-orientation="up"]')
+          ?.getAttribute('data-field-arrow-opacity'),
+      ),
+    ).toBeGreaterThan(0)
 
     fireEvent.change(slider, { target: { value: '3' } })
     const clinicalFieldOpacity = Number(
       fieldLines.style.getPropertyValue('--field-opacity'),
     )
 
-    expect(screen.getAllByText('3.0 T')).toHaveLength(2)
+    expect(screen.getByText('3.0 Tesla')).toBeTruthy()
+    expect(screen.getByText('3.0 T')).toBeTruthy()
     expect(screen.getByTestId('up-population').textContent).toContain(
       '1,000,014,800,000,000,000,000',
     )
@@ -108,6 +123,11 @@ describe('MRI Intuition presentation', () => {
     expect(
       container.querySelector('.spin-state--down[aria-hidden="true"]'),
     ).toBeTruthy()
+    expect(
+      container
+        .querySelector('[data-cone-orientation="up"]')
+        ?.getAttribute('data-cone-visible'),
+    ).toBe('false')
     expect(
       (screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement)
         .disabled,
