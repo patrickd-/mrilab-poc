@@ -107,10 +107,11 @@ export function ProtonSphereGraphic({
     )
     const arrowHeadGeometry = new THREE.ConeGeometry(0.2, 0.38, 20)
     const arrowMaterial = new THREE.MeshPhongMaterial({
-      color: '#67e69a',
-      emissive: '#0b4d2a',
-      specular: '#c8ffdc',
-      shininess: 72,
+      color: '#18ff68',
+      emissive: '#00a83f',
+      emissiveIntensity: 1.2,
+      specular: '#effff5',
+      shininess: 88,
       transparent: true,
       opacity: fieldArrowOpacity,
       depthTest: false,
@@ -128,18 +129,20 @@ export function ProtonSphereGraphic({
 
     const magnetHalfGeometry = new THREE.BoxGeometry(0.42, 0.74, 0.3)
     const northMaterial = new THREE.MeshPhongMaterial({
-      color: '#ba4442',
-      emissive: '#421313',
-      specular: '#ffd4d1',
-      shininess: 68,
+      color: '#ff3438',
+      emissive: '#a90008',
+      emissiveIntensity: 1.15,
+      specular: '#fff0f0',
+      shininess: 84,
       depthTest: false,
       toneMapped: false,
     })
     const southMaterial = new THREE.MeshPhongMaterial({
-      color: '#3c6caf',
-      emissive: '#101d44',
-      specular: '#cfddff',
-      shininess: 68,
+      color: '#1976ff',
+      emissive: '#003fae',
+      emissiveIntensity: 1.15,
+      specular: '#edf5ff',
+      shininess: 84,
       depthTest: false,
       toneMapped: false,
     })
