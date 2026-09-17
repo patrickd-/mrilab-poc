@@ -127,22 +127,22 @@ export function ProtonSphereGraphic({
     scene.add(arrowShaft, arrowHead)
     arrowMaterialRef.current = arrowMaterial
 
-    const magnetHalfGeometry = new THREE.BoxGeometry(0.42, 0.74, 0.3)
+    const magnetHalfGeometry = new THREE.BoxGeometry(0.54, 0.78, 0.4)
     const northMaterial = new THREE.MeshPhongMaterial({
-      color: '#ff3438',
-      emissive: '#a90008',
-      emissiveIntensity: 1.15,
-      specular: '#fff0f0',
-      shininess: 84,
+      color: '#ff0018',
+      emissive: '#ff0018',
+      emissiveIntensity: 1.9,
+      specular: '#ffffff',
+      shininess: 96,
       depthTest: false,
       toneMapped: false,
     })
     const southMaterial = new THREE.MeshPhongMaterial({
-      color: '#1976ff',
-      emissive: '#003fae',
-      emissiveIntensity: 1.15,
-      specular: '#edf5ff',
-      shininess: 84,
+      color: '#006cff',
+      emissive: '#006cff',
+      emissiveIntensity: 1.9,
+      specular: '#ffffff',
+      shininess: 96,
       depthTest: false,
       toneMapped: false,
     })
@@ -151,14 +151,14 @@ export function ProtonSphereGraphic({
     netMagnet.visible = showNetMagnet
 
     const northHalf = new THREE.Mesh(magnetHalfGeometry, northMaterial)
-    northHalf.position.y = 0.37
+    northHalf.position.y = 0.39
     northHalf.renderOrder = 3
     const southHalf = new THREE.Mesh(magnetHalfGeometry, southMaterial)
-    southHalf.position.y = -0.37
+    southHalf.position.y = -0.39
     southHalf.renderOrder = 3
     netMagnet.add(northHalf, southHalf)
 
-    const labelPlaneGeometry = new THREE.PlaneGeometry(0.3, 0.3)
+    const labelPlaneGeometry = new THREE.PlaneGeometry(0.38, 0.38)
     const labelTextures: THREE.CanvasTexture[] = []
     const labelMaterials: THREE.MeshBasicMaterial[] = []
     const makePoleLabel = (label: 'N' | 'S', y: number) => {
@@ -184,14 +184,14 @@ export function ProtonSphereGraphic({
         toneMapped: false,
       })
       const labelMesh = new THREE.Mesh(labelPlaneGeometry, labelMaterial)
-      labelMesh.position.set(0, y, 0.155)
+      labelMesh.position.set(0, y, 0.205)
       labelMesh.renderOrder = 4
       netMagnet.add(labelMesh)
       labelTextures.push(texture)
       labelMaterials.push(labelMaterial)
     }
-    makePoleLabel('N', 0.37)
-    makePoleLabel('S', -0.37)
+    makePoleLabel('N', 0.39)
+    makePoleLabel('S', -0.39)
     scene.add(netMagnet)
     netMagnetRef.current = netMagnet
 
