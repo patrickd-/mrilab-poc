@@ -60,6 +60,7 @@ function previousCursor(cursor: PresentationCursor): PresentationCursor {
 export function Presentation() {
   const [cursor, setCursor] = useState(FIRST_CURSOR)
   const [direction, setDirection] = useState<NavigationDirection>('initial')
+  const [fieldStrengthTesla, setFieldStrengthTesla] = useState(0)
   const cursorRef = useRef(cursor)
 
   useEffect(() => {
@@ -131,7 +132,12 @@ export function Presentation() {
       </header>
 
       <section aria-live="polite" className="presentation-stage">
-        <Slide direction={direction} stateIndex={cursor.stateIndex} />
+        <Slide
+          direction={direction}
+          fieldStrengthTesla={fieldStrengthTesla}
+          setFieldStrengthTesla={setFieldStrengthTesla}
+          stateIndex={cursor.stateIndex}
+        />
       </section>
     </main>
   )

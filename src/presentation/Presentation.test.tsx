@@ -142,7 +142,7 @@ describe('MRI Intuition presentation', () => {
     expect(
       (screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement)
         .disabled,
-    ).toBe(true)
+    ).toBe(false)
 
     fireEvent.change(slider, { target: { value: '0' } })
     expect(
@@ -158,6 +158,59 @@ describe('MRI Intuition presentation', () => {
       document.querySelector('.presentation')?.classList.contains(
         'presentation--backward',
       ),
+    ).toBe(true)
+  })
+
+  it('enters the how-we-measure slide and flicks the spinning top', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Presentation />)
+    await advance(user, 8)
+
+    fireEvent.change(
+      screen.getByRole('slider', { name: 'B0 magnetic field strength' }),
+      { target: { value: '3' } },
+    )
+    await advance(user, 2)
+
+    expect(
+      screen.getByRole('heading', { name: 'How are we measuring?' }),
+    ).toBeTruthy()
+    expect(document.querySelector('.presentation')?.getAttribute('data-slide')).toBe(
+      'how-we-measure',
+    )
+    expect(screen.queryByLabelText('A drop of cerebrospinal fluid')).toBeNull()
+    expect(screen.queryByText('Excess protons')).toBeNull()
+    expect(screen.queryByRole('slider')).toBeNull()
+    expect(
+      screen.getByLabelText('Proton sphere with net magnetization'),
+    ).toBeTruthy()
+    expect(
+      container
+        .querySelector('[data-cone-orientation="up"]')
+        ?.getAttribute('data-net-magnet-visible'),
+    ).toBe('true')
+
+    await advance(user, 1)
+    expect(
+      screen.getByRole('img', {
+        name: 'Spinning top representing proton precession',
+      }),
+    ).toBeTruthy()
+
+    await advance(user, 1)
+    const hand = screen.getByRole('button', { name: 'Flick the spinning top' })
+    await user.click(hand)
+    expect(hand.classList.contains('flicking-hand--flicking')).toBe(true)
+    expect(
+      screen
+        .getByRole('img', {
+          name: 'Spinning top representing proton precession',
+        })
+        .getAttribute('data-flick-sequence'),
+    ).toBe('1')
+    expect(
+      (screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement)
+        .disabled,
     ).toBe(true)
   })
 })

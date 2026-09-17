@@ -1,0 +1,255 @@
+.how-we-measure-scene {
+  position: absolute;
+  inset: 0;
+}
+
+.how-we-measure__field .magnet {
+  right: 18%;
+  left: 18%;
+}
+
+.how-we-measure__field .field-lines {
+  inset: 7% 21%;
+}
+
+.how-we-measure__proton {
+  z-index: 18;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 620ms ease, transform 620ms cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+.how-we-measure__proton--replaced {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.76);
+}
+
+.spinning-top {
+  position: absolute;
+  z-index: 19;
+  top: 50%;
+  left: 50%;
+  width: clamp(230px, 27vw, 390px);
+  height: clamp(260px, 32vw, 450px);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 20px 24px rgb(0 0 0 / 38%));
+}
+
+.spinning-top__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.flicking-hand {
+  position: absolute;
+  z-index: 32;
+  top: 50%;
+  left: 50%;
+  width: min(72vw, 1180px);
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  transform: translate(-84%, -60%);
+  transform-origin: 84% 60%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.flicking-hand:disabled {
+  cursor: wait;
+}
+
+.flicking-hand:focus-visible {
+  outline: 3px solid #f8da72;
+  outline-offset: -8px;
+  border-radius: 40%;
+}
+
+.flicking-hand svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 18px 16px rgb(0 0 0 / 38%));
+}
+
+.flicking-hand__sleeve {
+  fill: #278ac1;
+  stroke: #0b4269;
+  stroke-width: 10;
+  stroke-linejoin: round;
+}
+
+.flicking-hand__outline {
+  fill: #5e3028;
+}
+
+.flicking-hand__palm {
+  fill: #f2ad7f;
+}
+
+.flicking-hand__finger-outline,
+.flicking-hand__finger {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.flicking-hand__finger-outline {
+  stroke: #5e3028;
+  stroke-width: 58;
+}
+
+.flicking-hand__finger {
+  stroke: #f2ad7f;
+  stroke-width: 44;
+}
+
+.flicking-hand__nail {
+  fill: #ffd2bd;
+  stroke: #9b5846;
+  stroke-width: 4;
+}
+
+.flicking-hand__curled-fingers {
+  fill: none;
+  stroke: #b66c55;
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.flicking-hand__index,
+.flicking-hand__thumb {
+  transform-box: view-box;
+}
+
+.flicking-hand__index {
+  transform-origin: 348px 174px;
+}
+
+.flicking-hand__thumb {
+  transform-origin: 290px 180px;
+}
+
+.flicking-hand__motion-lines {
+  fill: none;
+  stroke: #ffe675;
+  stroke-width: 10;
+  stroke-linecap: round;
+  opacity: 0;
+}
+
+.flicking-hand--flicking svg {
+  animation: hand-recoil 780ms cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+
+.flicking-hand--flicking .flicking-hand__index {
+  animation: finger-flick 780ms cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+
+.flicking-hand--flicking .flicking-hand__thumb {
+  animation: thumb-release 780ms cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+
+.flicking-hand--flicking .flicking-hand__motion-lines {
+  animation: flick-lines 780ms ease-out both;
+}
+
+.presentation--forward[data-slide='how-we-measure'][data-slide-state='0'] .how-we-measure__field .magnet {
+  animation: center-field-poles 900ms cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+
+.presentation--forward[data-slide='how-we-measure'][data-slide-state='0'] .how-we-measure__field .field-lines {
+  animation: center-field-lines 900ms cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+
+.presentation--forward[data-slide='how-we-measure'][data-slide-state='0'] .how-we-measure__proton {
+  animation: center-proton 900ms cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+
+.presentation--forward[data-slide='how-we-measure'][data-slide-state='1'] .how-we-measure__proton {
+  animation: proton-to-top 720ms ease-in-out both;
+}
+
+.presentation--forward[data-slide='how-we-measure'][data-slide-state='1'] .spinning-top {
+  animation: top-from-proton 720ms ease-in-out both;
+}
+
+.presentation--forward[data-slide='how-we-measure'][data-slide-state='2'] .flicking-hand {
+  animation: hand-enter 1s cubic-bezier(0.16, 0.78, 0.2, 1) both;
+}
+
+@keyframes center-field-poles {
+  from { right: 10%; left: 40%; }
+  to { right: 18%; left: 18%; }
+}
+
+@keyframes center-field-lines {
+  from { inset: 7% 14% 7% 43%; }
+  to { inset: 7% 21%; }
+}
+
+@keyframes center-proton {
+  from { left: 65%; }
+  to { left: 50%; }
+}
+
+@keyframes proton-to-top {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(0.76); }
+}
+
+@keyframes top-from-proton {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.72); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes hand-enter {
+  from { transform: translate(-190%, -60%) rotate(-5deg); }
+  to { transform: translate(-84%, -60%) rotate(0); }
+}
+
+@keyframes finger-flick {
+  0%, 12% { transform: rotate(-5deg); }
+  38% { transform: rotate(22deg); }
+  58% { transform: rotate(14deg); }
+  100% { transform: rotate(0); }
+}
+
+@keyframes thumb-release {
+  0%, 16% { transform: rotate(0); }
+  38% { transform: rotate(-13deg) translate(-5px, 8px); }
+  100% { transform: rotate(0) translate(0, 0); }
+}
+
+@keyframes hand-recoil {
+  0%, 18% { transform: translate(0, 0) rotate(0); }
+  42% { transform: translate(-12px, -5px) rotate(-1.5deg); }
+  100% { transform: translate(0, 0) rotate(0); }
+}
+
+@keyframes flick-lines {
+  0%, 30% { opacity: 0; transform: translate(-8px, -5px); }
+  42% { opacity: 1; }
+  70%, 100% { opacity: 0; transform: translate(18px, 16px); }
+}
+
+@media (max-width: 760px) {
+  .how-we-measure__field .magnet {
+    right: 12%;
+    left: 12%;
+  }
+
+  .how-we-measure__field .field-lines {
+    right: 15%;
+    left: 15%;
+  }
+
+  .flicking-hand {
+    width: 88vw;
+  }
+}

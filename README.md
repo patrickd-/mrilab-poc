@@ -36,7 +36,13 @@ Presentation content is organized as self-contained slide modules under
 `src/presentation/slides`. Each module declares its heading, number of reveal
 states, and rendered component, while `slides/index.ts` is the ordered slide
 registry. Interactive state belongs inside its slide module, so new slides can
-be added without extending a single global step component.
+be added without extending a single global step component. Deck-wide values
+that must survive slide transitions, such as B0, remain in the presentation
+shell and are passed through the common slide interface.
+
+The “How are we measuring?” module continues the centered field into an
+interactive analogy: a multicolor WebGL spinning top precesses after a
+clickable cartoon hand flicks it, then exponentially realigns with B0.
 
 ## GitHub Pages
 

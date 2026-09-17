@@ -3,8 +3,9 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
+import { MagneticFieldBackdrop } from '../components/MagneticFieldBackdrop'
+import { ProtonSphere } from '../components/ProtonSphere'
 import { ProtonBurst } from '../ProtonBurst'
-import { ProtonSphereGraphic } from '../ProtonSphereGraphic'
 import {
   HALF_PROTONS,
   TOTAL_PROTONS,
@@ -83,56 +84,6 @@ function LiquidDrop({ shiftedLeft }: { shiftedLeft: boolean }) {
   )
 }
 
-function ProtonSphere({
-  orientation,
-  showCone,
-  fieldArrowOpacity = 0,
-  animateConeChange = false,
-  showNetMagnet = false,
-  className = '',
-}: {
-  orientation?: 'up' | 'down'
-  showCone: boolean
-  fieldArrowOpacity?: number
-  animateConeChange?: boolean
-  showNetMagnet?: boolean
-  className?: string
-}) {
-  return (
-    <div
-      aria-label={orientation ? `${orientation} spin proton ensemble` : 'Representative proton ensemble'}
-      className={`proton-sphere ${className}`}
-    >
-      <ProtonSphereGraphic
-        animateConeChange={animateConeChange}
-        fieldArrowOpacity={fieldArrowOpacity}
-        orientation={orientation}
-        showCone={showCone}
-        showNetMagnet={showNetMagnet}
-      />
-    </div>
-  )
-}
-
-function FieldBackdrop({ fieldStrengthTesla }: { fieldStrengthTesla: number }) {
-  const fieldLineOpacity =
-    0.34 * (1 - Math.exp(-fieldStrengthTesla / 1.5))
-  return (
-    <div aria-hidden="true" className="field-backdrop">
-      <div className="magnet magnet--north"><span>N</span></div>
-      <div className="magnet magnet--south"><span>S</span></div>
-      <div
-        className="field-lines"
-        style={{ '--field-opacity': fieldLineOpacity } as CSSProperties}
-      >
-        {Array.from({ length: 7 }, (_, index) => (
-          <span className="field-line" key={index} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function FieldStrengthControl({
   value,
   onChange,
@@ -177,8 +128,12 @@ function FieldStrengthControl({
   )
 }
 
-function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
-  const [fieldStrengthTesla, setFieldStrengthTesla] = useState(0)
+function WhatWeMeasureSlide({
+  direction,
+  fieldStrengthTesla,
+  setFieldStrengthTesla,
+  stateIndex,
+}: SlideStateProps) {
   const step = stateIndex + 1
   const shiftDropLeft = step >= 5
   const labelsOnDrop = step >= 6
@@ -197,7 +152,9 @@ function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
 
   return (
     <div className="what-we-measure-scene">
-      {showField ? <FieldBackdrop fieldStrengthTesla={fieldStrengthTesla} /> : null}
+      {showField ? (
+        <MagneticFieldBackdrop fieldStrengthTesla={fieldStrengthTesla} />
+      ) : null}
 
       {step >= 2 ? <LiquidDrop shiftedLeft={shiftDropLeft} /> : null}
 

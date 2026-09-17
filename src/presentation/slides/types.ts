@@ -4,6 +4,8 @@ export type NavigationDirection = 'initial' | 'forward' | 'backward'
 
 export interface SlideStateProps {
   direction: NavigationDirection
+  fieldStrengthTesla: number
+  setFieldStrengthTesla: (value: number) => void
   stateIndex: number
 }
 

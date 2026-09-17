@@ -22,6 +22,7 @@ export default defineConfig({
         // presentation behavior is covered at the surrounding component.
         'src/presentation/ProtonSphereGraphic.tsx',
         'src/presentation/ProtonBurst.tsx',
+        'src/presentation/slides/howWeMeasure/SpinningTopGraphic.tsx',
         'src/vite-env.d.ts',
       ],
       thresholds: {
