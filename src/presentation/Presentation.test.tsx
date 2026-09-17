@@ -16,9 +16,10 @@ async function advance(user: ReturnType<typeof userEvent.setup>, count: number) 
 describe('MRI Intuition presentation', () => {
   it('steps through the introductory measurement states', async () => {
     const user = userEvent.setup()
-    render(<Presentation />)
+    const { container } = render(<Presentation />)
 
     expect(screen.getByRole('heading', { name: /MRI\s*Intuition/i })).toBeTruthy()
+    expect(container.querySelector('.title-slide__orb')).toBeNull()
     expect(
       (screen.getByRole('button', { name: 'Previous step' }) as HTMLButtonElement)
         .disabled,
@@ -30,6 +31,8 @@ describe('MRI Intuition presentation', () => {
 
     await advance(user, 1)
     expect(screen.getByLabelText('A drop of cerebrospinal fluid')).toBeTruthy()
+    expect(document.querySelector('.presentation')?.getAttribute('data-step')).toBe('2')
+    expect(document.querySelector('.presentation')?.classList.contains('presentation--forward')).toBe(true)
 
     await advance(user, 2)
     expect(screen.getByText(/Cerebrospinal Fluid/)).toBeTruthy()
@@ -37,6 +40,9 @@ describe('MRI Intuition presentation', () => {
 
     await advance(user, 1)
     expect(screen.getByLabelText('Representative proton ensemble')).toBeTruthy()
+    expect(container.querySelector('.csf-drop--compact')).toBeTruthy()
+    expect(container.querySelectorAll('.flying-proton')).toHaveLength(12)
+    expect(container.querySelector('.proton-sphere__surface')).toBeTruthy()
 
     await advance(user, 2)
     expect(screen.getByTestId('up-population').textContent).toContain(

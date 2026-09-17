@@ -18,6 +18,9 @@ export default defineConfig({
         'src/components/LabScene.tsx',
         'src/main.tsx',
         'src/presentation/main.tsx',
+        // Static WebGL rendering reuses the LabScene material and lighting;
+        // presentation behavior is covered at the surrounding component.
+        'src/presentation/ProtonSphereGraphic.tsx',
         'src/vite-env.d.ts',
       ],
       thresholds: {

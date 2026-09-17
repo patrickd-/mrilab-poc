@@ -12,6 +12,7 @@ import {
   excessProtonsAt,
   formatProtonCount,
 } from './physics'
+import { ProtonSphereGraphic } from './ProtonSphereGraphic'
 
 const LAST_STEP = 9
 
@@ -138,7 +139,7 @@ function ProtonSphere({
       aria-label={orientation ? `${orientation} spin proton ensemble` : 'Representative proton ensemble'}
       className={`proton-sphere ${className}`}
     >
-      <span className="proton-sphere__glint" />
+      <ProtonSphereGraphic />
       {showCone && orientation ? (
         <span className={`spin-cone spin-cone--${orientation}`} />
       ) : null}
@@ -155,7 +156,7 @@ function FieldBackdrop({ fieldStrengthTesla }: { fieldStrengthTesla: number }) {
       <div className="magnet magnet--south"><span>S</span></div>
       <div
         className="field-lines"
-        style={{ '--field-opacity': strength * 0.56 } as CSSProperties}
+        style={{ '--field-opacity': strength * 0.3 } as CSSProperties}
       >
         {Array.from({ length: 7 }, (_, index) => (
           <span className="field-line" key={index} />
@@ -405,7 +406,6 @@ export function Presentation() {
       <section aria-live="polite" className="presentation-stage">
         {step === 0 ? (
           <div className="title-slide">
-            <div className="title-slide__orb" aria-hidden="true" />
             <h2>MRI<br />Intuition</h2>
           </div>
         ) : (
