@@ -41,7 +41,7 @@ describe('MRI Intuition presentation', () => {
 
     await advance(user, 1)
     expect(screen.getByLabelText('Representative proton ensemble')).toBeTruthy()
-    expect(container.querySelector('.csf-drop--compact')).toBeTruthy()
+    expect(container.querySelector('.csf-drop--left')).toBeTruthy()
     expect(
       container.querySelector('.proton-burst')?.getAttribute(
         'data-particle-count',

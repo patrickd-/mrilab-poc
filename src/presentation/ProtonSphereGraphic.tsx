@@ -116,11 +116,10 @@ export function ProtonSphereGraphic({
       toneMapped: false,
     })
     const arrowShaft = new THREE.Mesh(arrowShaftGeometry, arrowMaterial)
-    arrowShaft.position.y = 0.12
+    arrowShaft.position.y = -0.12
     arrowShaft.renderOrder = 3
     const arrowHead = new THREE.Mesh(arrowHeadGeometry, arrowMaterial)
-    arrowHead.position.y = -0.59
-    arrowHead.rotation.z = Math.PI
+    arrowHead.position.y = 0.59
     arrowHead.renderOrder = 3
     scene.add(arrowShaft, arrowHead)
     arrowMaterialRef.current = arrowMaterial

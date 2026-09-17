@@ -48,11 +48,11 @@ function AnimatedCount({
   return <>{formatProtonCount(displayValue)}</>
 }
 
-function LiquidDrop({ compact }: { compact: boolean }) {
+function LiquidDrop({ shiftedLeft }: { shiftedLeft: boolean }) {
   return (
     <svg
       aria-label="A drop of cerebrospinal fluid"
-      className={`csf-drop${compact ? ' csf-drop--compact' : ''}`}
+      className={`csf-drop${shiftedLeft ? ' csf-drop--left' : ''}`}
       role="img"
       viewBox="0 0 220 280"
     >
@@ -177,7 +177,7 @@ function FieldStrengthControl({
 function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
   const [fieldStrengthTesla, setFieldStrengthTesla] = useState(0)
   const step = stateIndex + 1
-  const compactDrop = step >= 5
+  const shiftDropLeft = step >= 5
   const labelsOnDrop = step >= 6
   const showField = step >= 8
   const finalExcessState = step >= 9
@@ -196,7 +196,7 @@ function WhatWeMeasureSlide({ direction, stateIndex }: SlideStateProps) {
     <div className="what-we-measure-scene">
       {showField ? <FieldBackdrop fieldStrengthTesla={fieldStrengthTesla} /> : null}
 
-      {step >= 2 ? <LiquidDrop compact={compactDrop} /> : null}
+      {step >= 2 ? <LiquidDrop shiftedLeft={shiftDropLeft} /> : null}
 
       {step >= 3 ? (
         <div className={`sample-label sample-label--name${labelsOnDrop ? ' sample-label--left' : ''}`}>
