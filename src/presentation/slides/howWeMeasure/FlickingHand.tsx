@@ -5,9 +5,11 @@ import { FLICK_SOURCE_DURATION_SECONDS, FLICK_PLAYBACK_RATE } from './flickTimin
 export function FlickingHand({
   isFlicking,
   onFlick,
+  ariaLabel = 'Flick the spinning top',
 }: {
   isFlicking: boolean
   onFlick: () => void
+  ariaLabel?: string
 }) {
   const hostRef = useRef<HTMLSpanElement>(null)
   const id = useId()
@@ -52,7 +54,7 @@ export function FlickingHand({
 
   return (
     <button
-      aria-label="Flick the spinning top"
+      aria-label={ariaLabel}
       className={`flicking-hand${isFlicking ? ' flicking-hand--flicking' : ''}`}
       disabled={isFlicking}
       onClick={onFlick}

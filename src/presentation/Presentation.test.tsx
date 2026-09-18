@@ -211,6 +211,9 @@ describe('MRI Intuition presentation', () => {
     expect(
       (screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement)
         .disabled,
-    ).toBe(true)
+    ).toBe(false)
+    await advance(user, 1)
+    expect(screen.getByRole('button', { name: 'Flick the remote control button' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

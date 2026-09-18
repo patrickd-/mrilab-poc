@@ -1,5 +1,7 @@
 .how-we-measure-scene {
   --top-height: clamp(260px, 32vw, 450px);
+  --remote-x: 26%;
+  --remote-width: clamp(100px, 10vw, 144px);
   position: absolute;
   inset: 0;
 }
@@ -38,6 +40,18 @@
   filter: drop-shadow(0 20px 24px rgb(0 0 0 / 38%));
 }
 
+.how-we-measure__top {
+  position: absolute;
+  inset: 0;
+  z-index: 19;
+  pointer-events: none;
+  transition: opacity 720ms ease;
+}
+
+.how-we-measure__top--replaced {
+  opacity: 0;
+}
+
 .spinning-top__canvas {
   display: block;
   width: 100%;
@@ -61,6 +75,67 @@
   transform-origin: 92.5% 32.24%;
   pointer-events: none;
   -webkit-tap-highlight-color: transparent;
+  transition: left 900ms cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+.how-we-measure-scene--remote .flicking-hand {
+  left: calc(var(--remote-x) - 5px);
+}
+
+.rf-remote {
+  position: absolute;
+  z-index: 25;
+  left: var(--remote-x);
+  top: calc(50% - var(--top-height) * 0.36);
+  width: var(--remote-width);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform: translate(-50%, -54.615%);
+  animation: remote-appear 900ms ease both;
+  filter: drop-shadow(0 12px 14px rgb(0 0 0 / 40%));
+}
+
+.rf-remote:focus-visible {
+  outline: 3px solid #f8da72;
+  outline-offset: 4px;
+  border-radius: 20px;
+}
+
+.rf-remote svg { display: block; width: 100%; overflow: visible; }
+.rf-remote:disabled { cursor: wait; }
+.rf-remote__red-button { transition: transform 90ms ease; }
+.rf-remote--transmitting .rf-remote__red-button { transform: translateY(5px); }
+.rf-remote--transmitting .rf-remote__led { fill: #89ffd1; }
+
+.rf-wavefront {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 24;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rf-wavefront__ring {
+  fill: none;
+  stroke: #ff9d83;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  transform-origin: 0 0;
+  animation: rf-wave-expand linear both;
+}
+
+@keyframes remote-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rf-wave-expand {
+  from { transform: scale(0); opacity: 0.95; }
+  to { transform: scale(1); opacity: 0; }
 }
 
 .flicking-hand:disabled {

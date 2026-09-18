@@ -1,4 +1,5 @@
 import { ProtonSphereGraphic } from '../ProtonSphereGraphic'
+import type { ProtonExcitation } from '../slides/howWeMeasure/protonExcitation'
 
 export function ProtonSphere({
   orientation,
@@ -8,6 +9,7 @@ export function ProtonSphere({
   showNetMagnet = false,
   className = '',
   ariaLabel,
+  excitation,
 }: {
   orientation?: 'up' | 'down'
   showCone: boolean
@@ -16,6 +18,7 @@ export function ProtonSphere({
   showNetMagnet?: boolean
   className?: string
   ariaLabel?: string
+  excitation?: ProtonExcitation
 }) {
   return (
     <div
@@ -33,6 +36,7 @@ export function ProtonSphere({
         orientation={orientation}
         showCone={showCone}
         showNetMagnet={showNetMagnet}
+        excitation={excitation}
       />
     </div>
   )
