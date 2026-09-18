@@ -1,4 +1,4 @@
-import { HydrogenEnsemble } from '../../../models/HydrogenEnsemble'
+import { HydrogenEnsemble, PROTON_GYROMAGNETIC_RATIO } from '../../../models/HydrogenEnsemble'
 import { createFidEnsembleStates, fidEnsembleMagnetizationStateAt } from '../../../simulation/fid'
 
 export interface ProtonExcitation {
@@ -42,4 +42,21 @@ export function presentationMagnetizationAt(
     y: magnetization.xFraction * Math.sin(phase) + magnetization.yFraction * Math.cos(phase),
     z: magnetization.zFraction,
   }
+}
+
+/** Relative receive voltage for a coil whose sensitive axis is transverse x. */
+export function presentationReceivedVoltageAt(
+  state: ReturnType<typeof createPresentationCsfState>,
+  excitation: ProtonExcitation,
+  nowMilliseconds: number,
+) {
+  if (excitation.fieldStrengthTesla <= 0) return 0
+  const m = presentationMagnetizationAt(state, excitation, nowMilliseconds)
+  const omega = PROTON_GYROMAGNETIC_RATIO * excitation.fieldStrengthTesla / 1000
+  const decayRate = 1 / state.transverseRelaxationTimeMilliseconds
+  // Faraday: V ∝ -dMx/dt = Mx/T2 + omega*My. Display the same slowed
+  // carrier phase as the magnet, with physical T2 attenuation. Fixed gain
+  // relative to M0 (not renormalized each frame) preserves the shrinking FID.
+  // Coil geometry/gain aren't calibrated, so this is a relative voltmeter scale.
+  return (decayRate * m.x + omega * m.y) / Math.hypot(omega, decayRate)
 }

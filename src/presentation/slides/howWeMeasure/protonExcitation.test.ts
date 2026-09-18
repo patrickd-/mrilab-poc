@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPresentationCsfState, presentationMagnetizationAt } from './protonExcitation'
+import { createPresentationCsfState, presentationMagnetizationAt, presentationReceivedVoltageAt } from './protonExcitation'
 
 describe('presentation CSF magnetization', () => {
   it.each([[1.5, 2100], [3, 2000], [7, 1000]])('uses lab CSF relaxation at %s T', (field, t2) => {
@@ -45,5 +45,32 @@ describe('presentation CSF magnetization', () => {
     expect(presentationMagnetizationAt(createPresentationCsfState(0), {
       fieldStrengthTesla: 0, pulseTimesMilliseconds: [0],
     }, 1000)).toEqual({ x: 0, y: 0, z: 1 })
+  })
+})
+
+describe('receive-coil voltage', () => {
+  const state = createPresentationCsfState(3)
+  const excitation = { fieldStrengthTesla: 3, pulseTimesMilliseconds: [1000] }
+  const period = 1000 / 0.7
+
+  it('reads zero before RF, then alternates polarity with precession', () => {
+    expect(presentationReceivedVoltageAt(state, excitation, 999)).toBe(0)
+    expect(presentationReceivedVoltageAt(state, excitation, 1000 + period / 4)).toBeGreaterThan(0.8)
+    expect(presentationReceivedVoltageAt(state, excitation, 1000 + period * 3 / 4)).toBeLessThan(-0.5)
+  })
+
+  it('keeps a fixed gain so successive swings decay with T2', () => {
+    const first = presentationReceivedVoltageAt(state, excitation, 1000 + period / 4)
+    const later = presentationReceivedVoltageAt(state, excitation, 1000 + period * 5 / 4)
+    expect(later / first).toBeCloseTo(Math.exp(-period / 2000), 10)
+    expect(Math.abs(presentationReceivedVoltageAt(state, excitation, 50000))).toBeLessThan(1e-8)
+  })
+
+  it('reflects repeated pulse rotations, including a reduced transverse signal', () => {
+    const now = 1100
+    const once = presentationReceivedVoltageAt(state, { ...excitation, pulseTimesMilliseconds: [0] }, now)
+    const twice = presentationReceivedVoltageAt(state, { ...excitation, pulseTimesMilliseconds: [0, 1000] }, now)
+    expect(Math.abs(twice)).toBeLessThan(Math.abs(once))
+    expect(presentationReceivedVoltageAt(state, { ...excitation, fieldStrengthTesla: 0 }, now)).toBe(0)
   })
 })

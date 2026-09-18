@@ -128,6 +128,20 @@
   animation: rf-wave-expand linear both;
 }
 
+.receive-coil {
+  position: absolute;
+  z-index: 22;
+  left: calc(50% + clamp(85px, 8.5vw, 125px));
+  top: 50%;
+  width: min(38vw, 540px);
+  height: auto;
+  overflow: visible;
+  pointer-events: none;
+  transform: translateY(-50%);
+  animation: remote-appear 900ms ease both;
+  filter: drop-shadow(0 10px 12px rgb(0 0 0 / 35%));
+}
+
 @keyframes remote-appear {
   from { opacity: 0; }
   to { opacity: 1; }

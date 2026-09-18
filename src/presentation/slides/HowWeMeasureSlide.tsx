@@ -3,6 +3,7 @@ import { MagneticFieldBackdrop } from '../components/MagneticFieldBackdrop'
 import { ProtonSphere } from '../components/ProtonSphere'
 import { FlickingHand } from './howWeMeasure/FlickingHand'
 import { SpinningTopGraphic } from './howWeMeasure/SpinningTopGraphic'
+import { ReceiveCoil } from './howWeMeasure/ReceiveCoil'
 import { FLICK_CONTACT_MS, FLICK_DURATION_MS } from './howWeMeasure/flickTiming'
 import { RfRemote, RfWavefront, RF_WAVE_DURATION_MS, RF_WAVE_TRAVEL_MS, type RfWave } from './howWeMeasure/RfRemote'
 import './howWeMeasure/how-we-measure.css'
@@ -32,7 +33,7 @@ function HowWeMeasureSlide({
     setFlickSequence(0)
     setWave(null)
     setPulseTimes([])
-  }, [stateIndex])
+  }, [showRemote])
 
   useEffect(() => {
     if (showTop) {
@@ -68,7 +69,7 @@ function HowWeMeasureSlide({
       window.clearTimeout(contactTimer)
       window.clearTimeout(excitationTimer)
     }
-  }, [isFlicking, showRemote, fieldStrengthTesla, stateIndex])
+  }, [isFlicking, showRemote, fieldStrengthTesla])
 
   const flick = () => {
     if (isFlicking) return
@@ -104,6 +105,7 @@ function HowWeMeasureSlide({
         <FlickingHand isFlicking={isFlicking} onFlick={flick}
           ariaLabel={showRemote ? 'Flick the remote control button' : undefined} />
       ) : null}
+      {stateIndex >= 4 && excitation ? <ReceiveCoil excitation={excitation} /> : null}
     </div>
   )
 }
@@ -111,6 +113,6 @@ function HowWeMeasureSlide({
 export const howWeMeasureSlideModule: PresentationSlideModule = {
   id: 'how-we-measure',
   heading: 'How are we measuring?',
-  stateCount: 4,
+  stateCount: 5,
   Component: HowWeMeasureSlide,
 }
