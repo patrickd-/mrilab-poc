@@ -17,13 +17,13 @@
   z-index: 18;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(1.2);
   transition: opacity 620ms ease, transform 620ms cubic-bezier(0.22, 0.8, 0.24, 1);
 }
 
 .how-we-measure__proton--replaced {
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.76);
+  transform: translate(-50%, -50%) scale(0.912);
 }
 
 .spinning-top {
@@ -121,13 +121,13 @@
 }
 
 @keyframes center-proton {
-  from { left: 65%; }
-  to { left: 50%; }
+  from { left: 65%; transform: translate(-50%, -50%) scale(1); }
+  to { left: 50%; transform: translate(-50%, -50%) scale(1.2); }
 }
 
 @keyframes proton-to-top {
-  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  to { opacity: 0; transform: translate(-50%, -50%) scale(0.76); }
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(0.912); }
 }
 
 @keyframes top-from-proton {
