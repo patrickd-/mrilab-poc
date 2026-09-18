@@ -49,15 +49,16 @@
   z-index: 32;
   top: calc(50% - var(--top-height) * 0.36);
   left: calc(50% - 5px);
-  width: clamp(430px, 49vw, 710px);
+  width: max(600px, 58vw);
   margin: 0;
   padding: 0;
   cursor: pointer;
   border: 0;
   outline: 0;
   background: transparent;
-  transform: translate(-94%, -40%);
-  transform-origin: 94% 40%;
+  /* Anchor the supplied artwork's fully extended fingertip to the top's handle. */
+  transform: translate(-92.5%, -32.24%);
+  transform-origin: 92.5% 32.24%;
   pointer-events: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -72,60 +73,17 @@
   border-radius: 40%;
 }
 
+.flicking-hand__artwork {
+  display: block;
+}
+
 .flicking-hand svg {
   display: block;
   width: 100%;
+  height: auto;
   overflow: visible;
   filter: drop-shadow(0 12px 12px rgb(0 0 0 / 32%));
-}
-
-.flicking-hand__drawing {
   pointer-events: visiblePainted;
-}
-
-.flicking-hand .flicking-hand__arm {
-  pointer-events: none;
-}
-
-.flicking-hand__shade {
-  fill: #be7654;
-  stroke: none;
-  opacity: 0.22;
-}
-
-.flicking-hand__creases {
-  fill: none;
-  stroke: #b47b60;
-  stroke-width: 2.5;
-}
-
-.flicking-hand__thumb {
-  transform-box: view-box;
-  transform-origin: 435px 222px;
-}
-
-.flicking-hand__motion-lines {
-  fill: none;
-  stroke: #ffe675;
-  stroke-width: 4;
-  stroke-linecap: round;
-  opacity: 0;
-}
-
-.flicking-hand--flicking .flicking-hand__index {
-  animation: finger-flick 900ms ease-in-out both;
-}
-
-.flicking-hand--flicking .flicking-hand__nail {
-  animation: nail-flick 900ms ease-in-out both;
-}
-
-.flicking-hand--flicking .flicking-hand__thumb {
-  animation: thumb-release 900ms ease-in-out both;
-}
-
-.flicking-hand--flicking .flicking-hand__motion-lines {
-  animation: flick-lines 900ms ease-out both;
 }
 
 .presentation--forward[data-slide='how-we-measure'][data-slide-state='0'] .how-we-measure__field .magnet {
@@ -178,37 +136,8 @@
 }
 
 @keyframes hand-enter {
-  from { transform: translate(-210%, -40%) rotate(-4deg); }
-  to { transform: translate(-94%, -40%) rotate(0); }
-}
-
-@keyframes finger-flick {
-  0%, 12%, 100% {
-    d: path('M474 158C471 125 493 102 523 103C551 101 577 113 586 137C592 153 586 175 570 185C558 194 542 188 539 177C536 166 545 158 553 150C549 141 533 136 521 141C513 145 509 153 508 166Z');
-  }
-  27%, 42% {
-    d: path('M474 158C490 136 522 132 552 132C581 133 616 135 644 132C665 128 688 133 689 147C690 161 675 167 661 163C628 160 596 166 571 171C551 175 531 178 515 180C499 179 489 168 474 158Z');
-  }
-}
-
-@keyframes nail-flick {
-  0%, 12%, 100% {
-    d: path('M544 174C546 166 553 161 560 159C567 161 573 167 573 173C568 183 550 187 544 174Z');
-  }
-  27%, 42% {
-    d: path('M659 138C667 135 678 138 682 143C685 149 682 154 679 156C668 160 655 155 659 138Z');
-  }
-}
-
-@keyframes thumb-release {
-  0%, 10%, 100% { transform: rotate(0); }
-  24%, 45% { transform: rotate(12deg); }
-}
-
-@keyframes flick-lines {
-  0%, 23% { opacity: 0; }
-  27% { opacity: 1; }
-  46%, 100% { opacity: 0; }
+  from { transform: translate(-210%, -32.24%) rotate(-4deg); }
+  to { transform: translate(-92.5%, -32.24%) rotate(0); }
 }
 
 @media (max-width: 760px) {
