@@ -1,7 +1,9 @@
 .how-we-measure-scene {
   --top-height: clamp(260px, 32vw, 450px);
+  --hand-width: max(600px, 58vw);
   --remote-x: 26%;
-  --remote-width: clamp(100px, 10vw, 144px);
+  /* Keep the remote proportional to the hand, including beyond desktop widths. */
+  --remote-width: calc(var(--hand-width) * 10 / 58);
   position: absolute;
   inset: 0;
 }
@@ -63,7 +65,7 @@
   z-index: 32;
   top: calc(50% - var(--top-height) * 0.36);
   left: calc(50% - 5px);
-  width: max(600px, 58vw);
+  width: var(--hand-width);
   margin: 0;
   padding: 0;
   cursor: pointer;
