@@ -32,10 +32,10 @@ export function presentationMagnetizationAt(
     ? excitation.pulseEvents
     : []
   const magnetization = fidEnsembleMagnetizationStateAt(state, nowMilliseconds, pulses)
-  // Only the visible laboratory-frame carrier is slowed (0.7 turns/s at 3 T).
+  // Only the visible laboratory-frame carrier is slowed (1.4 turns/s at 3 T).
   // Pulse rotations and real-time CSF T1/T2 relaxation use the lab's Bloch model.
   const phase = magnetization.excited
-    ? (nowMilliseconds - pulses[0].timeMilliseconds) / 1000 * 2 * Math.PI * 0.7 * excitation.fieldStrengthTesla / 3
+    ? (nowMilliseconds - pulses[0].timeMilliseconds) / 1000 * 2 * Math.PI * 1.4 * excitation.fieldStrengthTesla / 3
     : 0
   return {
     x: magnetization.xFraction * Math.cos(phase) - magnetization.yFraction * Math.sin(phase),

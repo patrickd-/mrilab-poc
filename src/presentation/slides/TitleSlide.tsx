@@ -17,4 +17,5 @@ export const titleSlideModule: PresentationSlideModule = {
   heading: '',
   stateCount: 1,
   Component: TitleSlide,
+  preserveFieldStrength: true,
 }

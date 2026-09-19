@@ -42,7 +42,7 @@ it('resets and restarts the animation on repeated replay, without stale loops', 
     reset()
     const stop = animateProtonMagnet({ fieldStrengthTesla: 3, pulseEvents: [{ timeMilliseconds: time, kind: '90-y' }] }, apply)
     expect(apply.mock.lastCall![0].x).toBeCloseTo(1)
-    h.now.mockReturnValue(time + 300)
+    h.now.mockReturnValue(time + 175)
     h.frame(time - 1)
     expect(apply.mock.lastCall![0].y).toBeGreaterThan(0.7)
     stop()

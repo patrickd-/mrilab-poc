@@ -15,6 +15,33 @@ async function advance(user: ReturnType<typeof userEvent.setup>, count: number) 
 }
 
 describe('MRI Intuition presentation', () => {
+  it.each([0, 7])('uses 1.5 T throughout later slides after leaving the slider at %s T', field => {
+    vi.useFakeTimers()
+    try {
+      const { container } = render(<Presentation />)
+      const fieldValue = () => container.querySelector('main')?.getAttribute('data-field-strength-tesla')
+      for (let i = 0; i < 8; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })
+      fireEvent.change(screen.getByRole('slider'), { target: { value: String(field) } })
+      expect(fieldValue()).toBe(String(field))
+      for (let i = 0; i < 2; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })
+      for (let i = 0; i < 6; i++) {
+        expect(screen.queryByRole('slider')).toBeNull()
+        expect(fieldValue()).toBe('1.5')
+        fireEvent.click(screen.getByRole('button', { name: 'Replay current step' }))
+        expect(fieldValue()).toBe('1.5')
+        fireEvent.keyDown(window, { key: 'ArrowRight' })
+      }
+      for (let i = 0; i < 6; i++) fireEvent.keyDown(window, { key: 'ArrowLeft' })
+      expect((screen.getByRole('slider') as HTMLInputElement).value).toBe('1.5')
+      fireEvent.change(screen.getByRole('slider'), { target: { value: '3' } })
+      expect(fieldValue()).toBe('3')
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      expect(fieldValue()).toBe('1.5')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('replays the current acquisition without changing the step or B0', () => {
     vi.useFakeTimers()
     try {
@@ -40,9 +67,9 @@ describe('MRI Intuition presentation', () => {
       act(() => vi.advanceTimersByTime(wait + 300))
       expect(newMagnet.getAttribute('data-rf-pulse-count')).toBe('1')
       expect(Number(screen.getByTestId('voltmeter-needle').getAttribute('data-relative-voltage'))).toBeGreaterThan(0.5)
-      // The preserved field value is visible again when navigating to its slider.
+      // Leaving the exploratory slide resets the shared field to 1.5 T.
       for (let i = 0; i < 7; i++) fireEvent.keyDown(window, { key: 'ArrowLeft' })
-      expect((screen.getByRole('slider') as HTMLInputElement).value).toBe('3')
+      expect((screen.getByRole('slider') as HTMLInputElement).value).toBe('1.5')
     } finally {
       vi.useRealTimers()
     }

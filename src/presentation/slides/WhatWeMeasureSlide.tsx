@@ -248,4 +248,5 @@ export const whatWeMeasureSlideModule: PresentationSlideModule = {
   heading: 'What are we measuring?',
   stateCount: 9,
   Component: WhatWeMeasureSlide,
+  preserveFieldStrength: true,
 }

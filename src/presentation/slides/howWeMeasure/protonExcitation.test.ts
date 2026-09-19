@@ -31,6 +31,16 @@ describe('presentation CSF magnetization', () => {
     expect(Math.hypot(relaxed.x, relaxed.y)).toBeLessThan(1e-8)
   })
 
+  it.each([[1.5, 0.7], [3, 1.4]])('uses the doubled visual carrier at %s T without speeding relaxation', (field, hertz) => {
+    const state = createPresentationCsfState(field)
+    const excitation = { fieldStrengthTesla: field, pulseEvents: [{ timeMilliseconds: 0, kind: '90-y' as const }] }
+    const quarterPeriod = 1000 / hertz / 4
+    const m = presentationMagnetizationAt(state, excitation, quarterPeriod)
+    expect(m.x).toBeCloseTo(0, 10)
+    expect(m.y).toBeCloseTo(Math.exp(-quarterPeriod / state.transverseRelaxationTimeMilliseconds), 10)
+    expect(m.z).toBeCloseTo(1 - Math.exp(-quarterPeriod / 4300), 10)
+  })
+
   it('rotates the existing state on another pulse rather than restarting recovery', () => {
     const state = createPresentationCsfState(3)
     const second = presentationMagnetizationAt(state, {
@@ -69,7 +79,7 @@ describe('presentation CSF magnetization', () => {
 describe('receive-coil voltage', () => {
   const state = createPresentationCsfState(3)
   const excitation = { fieldStrengthTesla: 3, pulseEvents: [{ timeMilliseconds: 1000, kind: '90-y' as const }] }
-  const period = 1000 / 0.7
+  const period = 1000 / 1.4
 
   it('reads zero before RF, then alternates polarity with precession', () => {
     expect(presentationReceivedVoltageAt(state, excitation, 999)).toBe(0)

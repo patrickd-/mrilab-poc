@@ -20,6 +20,8 @@ const FIRST_CURSOR: PresentationCursor = {
   stateIndex: 0,
 }
 
+const DEMONSTRATION_FIELD_TESLA = 1.5
+
 function isFirstCursor(cursor: PresentationCursor) {
   return cursor.slideIndex === 0 && cursor.stateIndex === 0
 }
@@ -96,6 +98,11 @@ export function Presentation() {
   }, [goBackward, goForward])
 
   const slide = presentationSlides[cursor.slideIndex]
+  const activeFieldStrengthTesla = slide.preserveFieldStrength
+    ? fieldStrengthTesla : DEMONSTRATION_FIELD_TESLA
+  useEffect(() => {
+    if (!slide.preserveFieldStrength) setFieldStrengthTesla(DEMONSTRATION_FIELD_TESLA)
+  }, [slide.preserveFieldStrength])
   const Slide = slide.Component
   const presentationClassName = useMemo(
     () => `presentation presentation--${direction}`,
@@ -107,6 +114,7 @@ export function Presentation() {
       className={presentationClassName}
       data-slide={slide.id}
       data-slide-state={cursor.stateIndex}
+      data-field-strength-tesla={activeFieldStrengthTesla}
     >
       <header className="presentation-bar">
         <h1 aria-label={slide.heading || 'Title slide'}>
@@ -145,7 +153,7 @@ export function Presentation() {
         <Slide
           key={`${slide.id}:${replayVersion}`}
           direction={direction}
-          fieldStrengthTesla={fieldStrengthTesla}
+          fieldStrengthTesla={activeFieldStrengthTesla}
           setFieldStrengthTesla={setFieldStrengthTesla}
           stateIndex={cursor.stateIndex}
         />
