@@ -185,11 +185,12 @@
 .voltage-trace__pulse-line { stroke: #ff6c65; stroke-width: 1.5; }
 .voltage-trace__tag { fill: #cb434c; stroke: #ff9590; stroke-width: 1.5; }
 .voltage-trace__rf-symbol { fill: none; stroke: #fff6f2; stroke-width: 2; stroke-linecap: round; }
-.voltage-trace__signal { fill: none; stroke: #87e0ef; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.voltage-trace__signal { fill: none; stroke: #f6cf75; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.voltage-trace--longitudinal .voltage-trace__signal { stroke: #87e0ef; }
 .voltage-trace__signal--reference { opacity: 0.25; }
 .voltage-trace__hover { stroke: #dae6eb; stroke-width: 1.5; stroke-dasharray: 2 5; pointer-events: none; }
-.voltage-trace__envelope { fill: none; stroke: #f6cf75; stroke-width: 2.5; stroke-linejoin: round; }
-.voltage-trace__identity { fill: #f6cf75; font: 700 32px Manrope, sans-serif; animation: remote-appear 450ms ease both; }
+.voltage-trace__envelope { fill: none; stroke: #87e0ef; stroke-width: 2.5; stroke-linejoin: round; }
+.voltage-trace__identity { fill: #87e0ef; font: 700 32px Manrope, sans-serif; animation: remote-appear 450ms ease both; }
 
 @keyframes remote-appear {
   from { opacity: 0; }
