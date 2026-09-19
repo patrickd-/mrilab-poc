@@ -104,7 +104,7 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
           {ticks.slice(1).map(time => <line key={time} x1={timeX(time)} x2={timeX(time)} y1="54" y2={ZERO_Y} />)}
         </g>
         <path className="voltage-trace__axis" d={`M34 54 V${ZERO_Y} H${right + 8} M29 63 L34 54 L39 63 M${right - 1} ${ZERO_Y - 5} L${right + 8} ${ZERO_Y} L${right - 1} ${ZERO_Y + 5}`} />
-        <text className="voltage-trace__label" x="-18" y="42">{kind === 'signal' ? 'S' : 'M'}</text>
+        <text className="tissue-plot__identity" x="-18" y="42">T<tspan baselineShift="sub" fontSize="22">{kind === 'signal' ? '2' : '1'}</tspan></text>
         <text className="tissue-plot__time-unit" x={right} y="239" textAnchor="end">t (s)</text>
         <text className="voltage-trace__tick" x="26" y="260" textAnchor="end">0</text>
         <text className="voltage-trace__tick" x="26" y="76" textAnchor="end">1</text>
@@ -122,7 +122,6 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
         </g>
         {hoverFraction !== null ? <line className="voltage-trace__hover" data-testid={`tissue-${kind}-hover`}
           x1={LEFT + hoverFraction * (right - LEFT)} x2={LEFT + hoverFraction * (right - LEFT)} y1="44" y2={ZERO_Y} /> : null}
-        <text className="tissue-plot__identity" x={right - 6} y="37" textAnchor="end">T<tspan baselineShift="sub" fontSize="22">{kind === 'signal' ? '2' : '1'}</tspan></text>
         {entering && kind === 'signal' ? <path className="tissue-plot__outgoing-voltage" d={`M${LEFT} 162 H${timeX(0)}`} /> : null}
       </svg>
     </div>})}

@@ -91,6 +91,14 @@ it('keeps both graphs at 12 seconds without zoom controls while sharing hover ti
   act(() => vi.advanceTimersByTime(5000))
   const upper = screen.getByRole('img', { name: 'Tissue transverse signal over time' })
   const lower = screen.getByRole('img', { name: 'Tissue longitudinal magnetization over time' })
+  for (const [graph, label] of [[upper, 'T2'], [lower, 'T1']] as const) {
+    const identities = graph.querySelectorAll('.tissue-plot__identity')
+    expect(identities).toHaveLength(1)
+    expect(identities[0].textContent).toBe(label)
+    expect(identities[0].getAttribute('x')).toBe('-18')
+    expect(identities[0].querySelector('tspan')?.getAttribute('baseline-shift')).toBe('sub')
+    expect([...graph.querySelectorAll('text')].some(text => text.textContent === 'S' || text.textContent === 'M')).toBe(false)
+  }
   const signal = screen.getByTestId('cerebrospinal-fluid-signal')
   const elapsed = Number(signal.getAttribute('data-elapsed-ms'))
   const curve = signal.getAttribute('d')
