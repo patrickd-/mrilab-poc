@@ -6,7 +6,7 @@ import { createPresentationTissueState, presentationMagnetizationAt, type Proton
 
 export const TISSUE_COMPARISON_PLAN = {
   ...FID_PLAY_PLAN,
-  layoutDurationMilliseconds: 1600,
+  layoutDurationMilliseconds: 2200,
   durationMilliseconds: 12000,
 }
 

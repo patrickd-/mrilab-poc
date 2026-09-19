@@ -33,6 +33,7 @@ export function ProtonSphereGraphic({
   const netMagnetRef = useRef<THREE.Group | null>(null)
   const renderRef = useRef<(() => void) | null>(null)
   const coneAnimationRef = useRef(0)
+  const lastMagnetizationRef = useRef<{ x: number; y: number; z: number } | null>(null)
 
   useEffect(() => {
     const host = hostRef.current
@@ -226,6 +227,7 @@ export function ProtonSphereGraphic({
       arrowMaterialRef.current = null
       sphereMaterialRef.current = null
       netMagnetRef.current = null
+      lastMagnetizationRef.current = null
       geometry.dispose()
       depthMaterial.dispose()
       coneGeometry?.dispose()
@@ -256,6 +258,7 @@ export function ProtonSphereGraphic({
     const render = renderRef.current
     if (!magnet || !render) return
     if (!excitation) {
+      lastMagnetizationRef.current = null
       magnet.rotation.set(0, -0.18, 0)
       magnet.scale.set(1, 1, 1)
       render()
@@ -266,6 +269,11 @@ export function ProtonSphereGraphic({
     const direction = new THREE.Vector3()
     const facing = new THREE.Quaternion().setFromAxisAngle(up, -0.18)
     return animateProtonMagnet(excitation, m => {
+      // The pre-pulse state is static. Avoid four expensive canvas redraws per
+      // frame while CSS is rearranging the tissue spheres around it.
+      const previous = lastMagnetizationRef.current
+      if (previous && m.x === previous.x && m.y === previous.y && m.z === previous.z) return
+      lastMagnetizationRef.current = m
       // Lab coordinates use z for B0; this presentation has B0 pointing up (y).
       direction.set(m.x, m.z, -m.y)
       const length = direction.length()

@@ -8,6 +8,21 @@ import { COMPARISON_TISSUE_IDS, TISSUE_COMPARISON_PLAN } from './howWeMeasure2/t
 const Slide = howWeMeasure2SlideModule.Component
 afterEach(() => vi.useRealTimers())
 
+it('starts playback on backward entry without waiting for disabled CSS animations', () => {
+  vi.useFakeTimers()
+  const { container } = render(<Slide fieldStrengthTesla={1.5} stateIndex={0} direction="backward" setFieldStrengthTesla={() => {}} />)
+  expect(container.querySelector('.tissue-comparison')?.getAttribute('data-transition-complete')).toBe('true')
+  for (const sphere of container.querySelectorAll('[data-rf-pulse-count]')) expect(sphere.getAttribute('data-rf-pulse-count')).toBe('1')
+  act(() => vi.advanceTimersByTime(TISSUE_COMPARISON_PLAN.settleDelayMilliseconds + 30))
+  expect(screen.getByTestId('cerebrospinal-fluid-signal').getAttribute('d')).not.toBe('')
+})
+
+function finishEntrance() {
+  act(() => vi.advanceTimersByTime(32))
+  act(() => vi.advanceTimersByTime(TISSUE_COMPARISON_PLAN.layoutDurationMilliseconds))
+  fireEvent.animationEnd(screen.getByTestId('specimen-cerebrospinal-fluid'))
+}
+
 it('rearranges into four lab-colored tissues, then excites them together with fixed RF timing', () => {
   vi.useFakeTimers()
   const { container } = render(<Slide fieldStrengthTesla={1.5} stateIndex={0} direction="forward" setFieldStrengthTesla={() => {}} />)
@@ -16,11 +31,23 @@ it('rearranges into four lab-colored tissues, then excites them together with fi
     const sphere = screen.getByTestId(`specimen-${id}`).querySelector('[data-sphere-color]')!
     expect(sphere.getAttribute('data-sphere-color')).toBe(SAMPLE_COLORS[id])
     expect(sphere.getAttribute('data-sample-preset')).toBe(id)
-    expect(sphere.getAttribute('data-rf-pulse-count')).toBe('1')
+    expect(sphere.getAttribute('data-rf-pulse-count')).toBe('0')
     expect(screen.getByTestId(`${id}-signal`).getAttribute('d')).toBe('')
   }
   expect(container.querySelector('.tissue-comparison__outgoing-receiver')).toBeTruthy()
-  act(() => vi.advanceTimersByTime(delay + 30))
+  expect(container.querySelector('.tissue-comparison')?.getAttribute('data-transition-started')).toBe('false')
+  act(() => vi.advanceTimersByTime(16))
+  expect(container.querySelector('.tissue-comparison')?.getAttribute('data-transition-started')).toBe('false')
+  act(() => vi.advanceTimersByTime(16))
+  expect(container.querySelector('.tissue-comparison')?.getAttribute('data-transition-started')).toBe('true')
+  // A slow frame must not start RF before the actual CSS motion is complete.
+  act(() => vi.advanceTimersByTime(delay + 1000))
+  for (const sphere of container.querySelectorAll('[data-rf-pulse-count]')) expect(sphere.getAttribute('data-rf-pulse-count')).toBe('0')
+  fireEvent.animationEnd(screen.getByTestId('specimen-cerebrospinal-fluid').querySelector('figcaption')!)
+  expect(container.querySelector('.tissue-comparison')?.getAttribute('data-transition-complete')).toBe('false')
+  fireEvent.animationEnd(screen.getByTestId('specimen-cerebrospinal-fluid'))
+  for (const sphere of container.querySelectorAll('[data-rf-pulse-count]')) expect(sphere.getAttribute('data-rf-pulse-count')).toBe('1')
+  act(() => vi.advanceTimersByTime(TISSUE_COMPARISON_PLAN.settleDelayMilliseconds + 30))
   expect(container.querySelector('.tissue-comparison__outgoing-receiver')).toBeNull()
   expect(container.querySelector('.tissue-plot__outgoing-voltage')).toBeNull()
   for (const id of COMPARISON_TISSUE_IDS) expect(screen.getByTestId(`${id}-signal`).getAttribute('d')).not.toBe('')
@@ -39,6 +66,7 @@ it('rearranges into four lab-colored tissues, then excites them together with fi
 it('highlights both tissue curves on hover or keyboard focus without resetting playback', () => {
   vi.useFakeTimers()
   render(<Slide fieldStrengthTesla={1.5} stateIndex={0} direction="forward" setFieldStrengthTesla={() => {}} />)
+  finishEntrance()
   act(() => vi.advanceTimersByTime(4000))
   const csf = screen.getByTestId('cerebrospinal-fluid-signal')
   const curve = csf.getAttribute('d')
@@ -59,6 +87,7 @@ it('highlights both tissue curves on hover or keyboard focus without resetting p
 it('zooms both graphs with either wheel, shares hover time, and never changes the playback epoch', () => {
   vi.useFakeTimers()
   const { container } = render(<Slide fieldStrengthTesla={1.5} stateIndex={0} direction="forward" setFieldStrengthTesla={() => {}} />)
+  finishEntrance()
   act(() => vi.advanceTimersByTime(5000))
   const upper = screen.getByRole('img', { name: 'Tissue transverse signal over time' })
   const lower = screen.getByRole('img', { name: 'Tissue longitudinal magnetization over time' })
