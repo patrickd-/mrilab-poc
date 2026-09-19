@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createPresentationCsfState, presentationMagnetizationAt, presentationReceivedVoltageAt } from './protonExcitation'
+import { createPresentationCsfState, createTransverseReturnPulse, presentationMagnetizationAt, presentationReceivedVoltageAt } from './protonExcitation'
+import { fidEnsembleMagnetizationStateAt } from '../../../simulation/fid'
 
 describe('presentation CSF magnetization', () => {
   it.each([[1.5, 2100], [3, 2000], [7, 1000]])('uses lab CSF relaxation at %s T', (field, t2) => {
@@ -57,22 +58,62 @@ describe('presentation CSF magnetization', () => {
     }, 1000)).toEqual({ x: 0, y: 0, z: 1 })
   })
 
-  it.each([100, 1000, 4300, 20000])('tips only T1-recovered magnetization after %s ms in the teaching reset', delay => {
+  it.each([100, 1000, 4300, 20000])('returns to 90° after %s ms with only the missing angle, preserving length and phase', delay => {
     const state = createPresentationCsfState(3)
     const initial = { timeMilliseconds: 1000, kind: '90-y' as const }
-    const excitation = { fieldStrengthTesla: 3, pulseEvents: [initial, {
-      timeMilliseconds: 1000 + delay, kind: '90-y' as const, spoilTransverseBeforePulse: true,
-    }] }
+    const repeat = createTransverseReturnPulse(state, 1000 + delay, [initial])
+    const excitation = { fieldStrengthTesla: 3, pulseEvents: [initial, repeat] }
     expect(presentationMagnetizationAt(state, excitation, 1000 + delay - 1)).toEqual(
       presentationMagnetizationAt(state, { ...excitation, pulseEvents: [initial] }, 1000 + delay - 1),
     )
     const flipped = presentationMagnetizationAt(state, excitation, 1000 + delay)
     const recovered = 1 - Math.exp(-delay / 4300)
-    expect(Math.hypot(flipped.x, flipped.y)).toBeCloseTo(recovered, 10)
+    const remaining = Math.exp(-delay / 2000)
+    const length = Math.hypot(remaining, recovered)
+    expect(repeat.rotation!.angleRadians).toBeCloseTo(Math.atan2(recovered, remaining), 10)
+    expect(repeat.rotation!.angleRadians).toBeGreaterThan(0)
+    expect(repeat.rotation!.angleRadians).toBeLessThan(Math.PI / 2)
+    expect(Math.hypot(flipped.x, flipped.y)).toBeCloseTo(length, 10)
+    const before = presentationMagnetizationAt(state, { ...excitation, pulseEvents: [initial] }, 1000 + delay)
+    expect(Math.atan2(flipped.y, flipped.x)).toBeCloseTo(Math.atan2(before.y, before.x), 10)
     expect(flipped.z).toBeCloseTo(0, 10)
     const later = presentationMagnetizationAt(state, excitation, 1000 + delay + 2000)
-    expect(Math.hypot(later.x, later.y)).toBeCloseTo(recovered * Math.exp(-1), 10)
+    expect(Math.hypot(later.x, later.y)).toBeCloseTo(length * Math.exp(-1), 10)
     expect(later.z).toBeCloseTo(1 - Math.exp(-2000 / 4300), 10)
+  })
+
+  it('aligns the RF axis with a nonzero rotating-frame phase rather than assuming +x magnetization', () => {
+    const state = createPresentationCsfState(1.5)
+    state.spinPackets = state.spinPackets.map(packet => ({ ...packet, angularFrequencyOffsetRadiansPerMillisecond: 0.003 }))
+    const initial = { timeMilliseconds: 0, kind: '90-y' as const }
+    const before = fidEnsembleMagnetizationStateAt(state, 750, [initial])
+    const pulse = createTransverseReturnPulse(state, 750, [initial])
+    const after = fidEnsembleMagnetizationStateAt(state, 750, [initial, pulse])
+    expect(pulse.rotation!.axisPhaseRadians).toBeCloseTo(before.precessionPhaseRadians + Math.PI / 2, 10)
+    expect(after.zFraction).toBeCloseTo(0, 10)
+    expect(after.transverseFraction).toBeCloseTo(Math.hypot(before.transverseFraction, before.zFraction), 10)
+    expect(after.precessionPhaseRadians).toBeCloseTo(before.precessionPhaseRadians, 10)
+  })
+
+  it('uses no extra rotation while already transverse and approaches a full 90° pulse after recovery', () => {
+    const state = createPresentationCsfState(1.5)
+    const initial = { timeMilliseconds: 0, kind: '90-y' as const }
+    expect(createTransverseReturnPulse(state, 0, [initial]).rotation!.angleRadians).toBeCloseTo(0, 10)
+    expect(createTransverseReturnPulse(state, 100000, [initial]).rotation!.angleRadians).toBeCloseTo(Math.PI / 2, 10)
+  })
+
+  it.each(['90-y', '180-x'] as const)('matches the original %s pulse when explicitly prescribing the same rotation', kind => {
+    const state = createPresentationCsfState(1.5)
+    const initial = { timeMilliseconds: 0, kind: '90-y' as const }
+    const pulse = { timeMilliseconds: 1000, kind }
+    const rotation = kind === '90-y'
+      ? { angleRadians: Math.PI / 2, axisPhaseRadians: Math.PI / 2 }
+      : { angleRadians: Math.PI, axisPhaseRadians: 0 }
+    const expected = fidEnsembleMagnetizationStateAt(state, 1400, [initial, pulse])
+    const actual = fidEnsembleMagnetizationStateAt(state, 1400, [initial, { ...pulse, rotation }])
+    expect(actual.xFraction).toBeCloseTo(expected.xFraction, 10)
+    expect(actual.yFraction).toBeCloseTo(expected.yFraction, 10)
+    expect(actual.zFraction).toBeCloseTo(expected.zFraction, 10)
   })
 })
 

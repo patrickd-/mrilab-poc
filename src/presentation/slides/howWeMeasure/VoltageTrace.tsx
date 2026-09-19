@@ -87,7 +87,7 @@ export function VoltageTrace({ excitation, startedAt, plan = FID_PLAY_PLAN, onPl
           Induced voltage on a relative scale, using the same slowed precession
           as the magnet and voltmeter. Negative time records the lead-in before
           the pulse at t=0; time is in seconds.
-          {onPlaceRepeatPulse ? ' Click after t=0 to place or move a repeat pulse and replay. The repeat pulse ideally spoils remaining transverse magnetization before tipping the T1-recovered longitudinal magnetization by 90 degrees. The original trace stays dimmed for comparison.' : ''}
+          {onPlaceRepeatPulse ? ' Click after t=0 to place or move a repeat pulse and replay. The repeat pulse applies only the additional angle needed to return the current magnetization to the transverse plane, preserving its length and phase. This idealized instantaneous pulse can still produce a voltage step. The original trace stays dimmed for comparison.' : ''}
         </desc>
         <g className="voltage-trace__grid">
           {[70, ZERO_Y, 254].map(y => <line key={y} x1="34" x2="426" y1={y} y2={y} />)}

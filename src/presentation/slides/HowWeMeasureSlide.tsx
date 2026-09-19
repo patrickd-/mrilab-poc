@@ -5,6 +5,7 @@ import { FlickingHand } from './howWeMeasure/FlickingHand'
 import { SpinningTopGraphic } from './howWeMeasure/SpinningTopGraphic'
 import { ReceiveCoil } from './howWeMeasure/ReceiveCoil'
 import { VoltageTrace } from './howWeMeasure/VoltageTrace'
+import { createPresentationCsfState, createTransverseReturnPulse } from './howWeMeasure/protonExcitation'
 import { FID_PLAY_PLAN } from '../playback/playPlan'
 import { usePlayPlan } from '../playback/usePlayPlan'
 import type { RfPulseEvent } from '../../simulation/fid'
@@ -29,11 +30,11 @@ function HowWeMeasureSlide({
   const tracePlan = useMemo(() => repeatPulse ? {
     ...FID_PLAY_PLAN,
     events: [...FID_PLAY_PLAN.events, {
-      type: 'rf-pulse' as const, kind: '90-y' as const,
-      timeMilliseconds: repeatPulse.time, label: 'Recovered 90°',
-      spoilTransverseBeforePulse: true,
+      ...createTransverseReturnPulse(createPresentationCsfState(fieldStrengthTesla),
+        repeatPulse.time, FID_PLAY_PLAN.events),
+      type: 'rf-pulse' as const, label: 'Adaptive tip to 90°',
     }],
-  } : FID_PLAY_PLAN, [repeatPulse])
+  } : FID_PLAY_PLAN, [repeatPulse, fieldStrengthTesla])
   const [renderControls, setRenderControls] = useState(!showTrace)
   const playback = usePlayPlan(tracePlan, showTrace, fieldStrengthTesla)
   const showTop = stateIndex >= 1 && !showRemote

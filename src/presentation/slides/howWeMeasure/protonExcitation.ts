@@ -44,6 +44,25 @@ export function presentationMagnetizationAt(
   }
 }
 
+/** Calibrate one RF pulse from the homogeneous CSF vector at the chosen time.
+ * Its axis follows the current transverse phase, so only the missing polar
+ * angle is applied. No spoiling, rescaling, or phase reset is performed. */
+export function createTransverseReturnPulse(
+  state: ReturnType<typeof createPresentationCsfState>,
+  timeMilliseconds: number,
+  precedingPulses: readonly RfPulseEvent[],
+): RfPulseEvent {
+  const m = fidEnsembleMagnetizationStateAt(state, timeMilliseconds, precedingPulses)
+  return {
+    timeMilliseconds,
+    kind: '90-y',
+    rotation: {
+      angleRadians: Math.atan2(m.zFraction, m.transverseFraction),
+      axisPhaseRadians: m.precessionPhaseRadians + Math.PI / 2,
+    },
+  }
+}
+
 /** Relative receive voltage for a coil whose sensitive axis is transverse x. */
 export function presentationReceivedVoltageAt(
   state: ReturnType<typeof createPresentationCsfState>,

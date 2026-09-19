@@ -74,9 +74,9 @@ export type RfPulseKind = '90-y' | '180-x'
 export interface RfPulseEvent {
   timeMilliseconds: number
   kind: RfPulseKind
-  /** Idealized spoiling immediately before RF: retain Mz, discard transverse
-   * coherence. Used by the presentation's T1-recovery teaching demonstration. */
-  spoilTransverseBeforePulse?: boolean
+  /** Optional calibrated rotation, overriding the nominal kind. The axis lies
+   * in the rotating-frame xy plane; its phase is measured from +x. */
+  rotation?: { angleRadians: number; axisPhaseRadians: number }
 }
 
 export interface FidEnsembleMagnetizationState {
@@ -210,12 +210,22 @@ export function fidEnsembleMagnetizationStateAt(
         ),
       )
 
-      if (pulseEvent.spoilTransverseBeforePulse) {
-        packetXFraction = 0
-        packetYFraction = 0
-      }
-
-      if (pulseEvent.kind === '90-y') {
+      if (pulseEvent.rotation) {
+        // Rodrigues rotation: RF changes direction, not vector length. Every
+        // spin packet receives the same prescribed pulse angle and phase.
+        const angle = pulseEvent.rotation.angleRadians * state.transmitFieldScale
+        const cos = Math.cos(angle)
+        const sin = Math.sin(angle)
+        const axisX = Math.cos(pulseEvent.rotation.axisPhaseRadians)
+        const axisY = Math.sin(pulseEvent.rotation.axisPhaseRadians)
+        const x = packetXFraction
+        const y = packetYFraction
+        const z = packetZFraction
+        const dot = axisX * x + axisY * y
+        packetXFraction = x * cos + axisY * z * sin + axisX * dot * (1 - cos)
+        packetYFraction = y * cos - axisX * z * sin + axisY * dot * (1 - cos)
+        packetZFraction = z * cos + (axisX * y - axisY * x) * sin
+      } else if (pulseEvent.kind === '90-y') {
         // An instantaneous rotation about the rotating-frame y-axis.
         const angleRadians = (Math.PI / 2) * state.transmitFieldScale
         const cosAngle = Math.cos(angleRadians)
