@@ -32,7 +32,10 @@ it('cancels obsolete starts and creates a fresh epoch on replay', () => {
     initialProps: { enabled: true, version: 0 },
   })
   act(() => vi.advanceTimersByTime(delay - 1))
-  expect(result.current).toBeNull()
+  expect(result.current!.startedAt).toBeGreaterThan(performance.now())
+  expect(presentationMagnetizationAt(createPresentationCsfState(3), {
+    fieldStrengthTesla: 3, pulseEvents: result.current!.pulseEvents,
+  }, performance.now())).toEqual({ x: 0, y: 0, z: 1 })
   rerender({ enabled: false, version: 0 })
   act(() => vi.advanceTimersByTime(2000))
   expect(result.current).toBeNull()
@@ -41,7 +44,7 @@ it('cancels obsolete starts and creates a fresh epoch on replay', () => {
   const first = result.current!.startedAt
   expect(result.current!.pulseEvents[0].timeMilliseconds).toBe(first)
   rerender({ enabled: true, version: 2 })
-  expect(result.current).toBeNull()
+  expect(result.current!.startedAt).toBeGreaterThan(performance.now())
   act(() => vi.advanceTimersByTime(delay))
   expect(result.current!.startedAt).toBeGreaterThan(first)
   unmount()

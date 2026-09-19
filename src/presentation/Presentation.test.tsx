@@ -32,8 +32,9 @@ describe('MRI Intuition presentation', () => {
       fireEvent.click(buttons[0])
       const newMagnet = container.querySelector('[data-rf-pulse-count]')!
       expect(newMagnet).not.toBe(oldMagnet)
-      expect(newMagnet.getAttribute('data-rf-pulse-count')).toBe('0')
-      expect(screen.getByTestId('voltage-trace-signal').getAttribute('d')).toBe('')
+      // The pulse is scheduled, but the new trace is still in its flat lead-in.
+      expect(newMagnet.getAttribute('data-rf-pulse-count')).toBe('1')
+      expect(Number(screen.getByTestId('voltage-trace-signal').getAttribute('data-elapsed-ms'))).toBeLessThan(0)
       expect(container.querySelector('.presentation')?.getAttribute('data-slide-state')).toBe('5')
       expect(screen.getByTestId('voltmeter-needle').getAttribute('data-relative-voltage')).toBe('0')
       act(() => vi.advanceTimersByTime(wait + 300))

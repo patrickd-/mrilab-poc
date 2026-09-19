@@ -169,10 +169,10 @@
 .voltage-trace {
   position: absolute;
   z-index: 23;
-  left: 67%;
-  right: 2%;
-  top: 5%;
-  height: 44%;
+  left: 66.5%;
+  right: 0.7%;
+  top: 2%;
+  height: 48%;
   animation: remote-appear var(--measurement-layout-duration) ease both;
 }
 
@@ -183,7 +183,7 @@
 .voltage-trace__tick { fill: #b6c9cf; font: 18px Manrope, sans-serif; }
 .voltage-trace__pulse-line { stroke: #ff6c65; stroke-width: 1.5; }
 .voltage-trace__tag { fill: #cb434c; stroke: #ff9590; stroke-width: 1.5; }
-.voltage-trace__tag-label { fill: #fff6f2; font: 700 24px Manrope, sans-serif; }
+.voltage-trace__rf-symbol { fill: none; stroke: #fff6f2; stroke-width: 2; stroke-linecap: round; }
 .voltage-trace__signal { fill: none; stroke: #87e0ef; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 
 @keyframes remote-appear {
