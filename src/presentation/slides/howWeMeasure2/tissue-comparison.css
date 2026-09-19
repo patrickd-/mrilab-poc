@@ -99,6 +99,6 @@
   100% { opacity: 1; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .tissue-comparison *, .tissue-comparison *::before, .tissue-comparison *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; }
-}
+/* Keep this explicitly choreographed teaching transition visible even when
+   reduced motion is requested. The spheres move only while fully hidden;
+   collapsing the fades to 1 ms makes the entire rearrangement look instant. */
