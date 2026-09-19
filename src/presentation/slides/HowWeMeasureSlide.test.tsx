@@ -4,7 +4,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { howWeMeasureSlideModule } from './HowWeMeasureSlide'
 import { FLICK_CONTACT_MS, FLICK_DURATION_MS } from './howWeMeasure/flickTiming'
 import { RF_WAVE_TRAVEL_MS } from './howWeMeasure/RfRemote'
-import { MEASUREMENT_LAYOUT_MS, MEASUREMENT_PULSE_DELAY_MS } from './howWeMeasure/VoltageTrace'
+import { FID_PLAY_PLAN } from '../playback/playPlan'
+
+const MEASUREMENT_LAYOUT_MS = FID_PLAY_PLAN.layoutDurationMilliseconds
+const MEASUREMENT_PULSE_DELAY_MS = FID_PLAY_PLAN.settleDelayMilliseconds
 
 const Slide = howWeMeasureSlideModule.Component
 const props = { stateIndex: 3, fieldStrengthTesla: 3, setFieldStrengthTesla: () => {}, direction: 'forward' as const }

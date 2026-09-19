@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Presentation } from './Presentation'
 import { excessProtonsAt, formatProtonCount } from './physics'
+import { FID_PLAY_PLAN } from './playback/playPlan'
 
 async function advance(user: ReturnType<typeof userEvent.setup>, count: number) {
   const next = screen.getByRole('button', { name: 'Next step' })
@@ -14,6 +15,38 @@ async function advance(user: ReturnType<typeof userEvent.setup>, count: number) 
 }
 
 describe('MRI Intuition presentation', () => {
+  it('replays the current acquisition without changing the step or B0', () => {
+    vi.useFakeTimers()
+    try {
+      const { container } = render(<Presentation />)
+      for (let i = 0; i < 8; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })
+      fireEvent.change(screen.getByRole('slider'), { target: { value: '3' } })
+      for (let i = 0; i < 7; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })
+      const wait = FID_PLAY_PLAN.layoutDurationMilliseconds + FID_PLAY_PLAN.settleDelayMilliseconds
+      act(() => vi.advanceTimersByTime(wait + 1000))
+      const oldMagnet = container.querySelector('[data-rf-pulse-count]')!
+      expect(oldMagnet.getAttribute('data-rf-pulse-count')).toBe('1')
+      expect(Number(screen.getByTestId('voltage-trace-signal').getAttribute('data-elapsed-ms'))).toBeGreaterThan(900)
+      const buttons = screen.getByRole('navigation', { name: 'Presentation navigation' }).querySelectorAll('button')
+      expect(buttons[0].getAttribute('aria-label')).toBe('Replay current step')
+      fireEvent.click(buttons[0])
+      const newMagnet = container.querySelector('[data-rf-pulse-count]')!
+      expect(newMagnet).not.toBe(oldMagnet)
+      expect(newMagnet.getAttribute('data-rf-pulse-count')).toBe('0')
+      expect(screen.getByTestId('voltage-trace-signal').getAttribute('d')).toBe('')
+      expect(container.querySelector('.presentation')?.getAttribute('data-slide-state')).toBe('5')
+      expect(screen.getByTestId('voltmeter-needle').getAttribute('data-relative-voltage')).toBe('0')
+      act(() => vi.advanceTimersByTime(wait + 300))
+      expect(newMagnet.getAttribute('data-rf-pulse-count')).toBe('1')
+      expect(Number(screen.getByTestId('voltmeter-needle').getAttribute('data-relative-voltage'))).toBeGreaterThan(0.5)
+      // The preserved field value is visible again when navigating to its slider.
+      for (let i = 0; i < 7; i++) fireEvent.keyDown(window, { key: 'ArrowLeft' })
+      expect((screen.getByRole('slider') as HTMLInputElement).value).toBe('3')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('steps through the what-we-measure slide states', async () => {
     const user = userEvent.setup()
     const { container } = render(<Presentation />)

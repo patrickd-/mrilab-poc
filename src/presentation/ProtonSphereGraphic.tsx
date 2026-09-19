@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { createPresentationCsfState, presentationMagnetizationAt, type ProtonExcitation } from './slides/howWeMeasure/protonExcitation'
+import type { ProtonExcitation } from './slides/howWeMeasure/protonExcitation'
+import { animateProtonMagnet } from './slides/howWeMeasure/animateProtonMagnet'
 
 /**
  * A single proton-ensemble sphere using the MRI Lab's geometry, CSF
@@ -245,20 +246,17 @@ export function ProtonSphereGraphic({
     const magnet = netMagnetRef.current
     const render = renderRef.current
     if (!magnet || !render) return
-    if (!excitation || excitation.pulseTimesMilliseconds.length === 0) {
+    if (!excitation) {
       magnet.rotation.set(0, -0.18, 0)
       magnet.scale.set(1, 1, 1)
       render()
       return
     }
 
-    const state = createPresentationCsfState(excitation.fieldStrengthTesla)
     const up = new THREE.Vector3(0, 1, 0)
     const direction = new THREE.Vector3()
     const facing = new THREE.Quaternion().setFromAxisAngle(up, -0.18)
-    let frame = 0
-    const animate = (now: number) => {
-      const m = presentationMagnetizationAt(state, excitation, now)
+    return animateProtonMagnet(excitation, m => {
       // Lab coordinates use z for B0; this presentation has B0 pointing up (y).
       direction.set(m.x, m.z, -m.y)
       const length = direction.length()
@@ -267,13 +265,7 @@ export function ProtonSphereGraphic({
       }
       magnet.scale.set(1, Math.max(1e-5, length), 1)
       render()
-      if (Math.hypot(m.x, m.y) > 1e-4 || Math.abs(1 - m.z) > 1e-4) {
-        frame = requestAnimationFrame(animate)
-      }
-    }
-    // Apply a new pulse immediately; don't flash the equilibrium pose between pulses.
-    animate(performance.now())
-    return () => cancelAnimationFrame(frame)
+    })
   }, [excitation, orientation])
 
   useEffect(() => {
@@ -334,7 +326,7 @@ export function ProtonSphereGraphic({
       data-cone-visible={orientation ? showCone : undefined}
       data-field-arrow-opacity={fieldArrowOpacity}
       data-net-magnet-visible={showNetMagnet}
-      data-rf-pulse-count={excitation?.pulseTimesMilliseconds.length ?? 0}
+      data-rf-pulse-count={excitation?.pulseEvents.length ?? 0}
       ref={hostRef}
     />
   )

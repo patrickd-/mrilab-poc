@@ -61,6 +61,7 @@ export function Presentation() {
   const [cursor, setCursor] = useState(FIRST_CURSOR)
   const [direction, setDirection] = useState<NavigationDirection>('initial')
   const [fieldStrengthTesla, setFieldStrengthTesla] = useState(0)
+  const [replayVersion, setReplayVersion] = useState(0)
   const cursorRef = useRef(cursor)
 
   useEffect(() => {
@@ -112,6 +113,15 @@ export function Presentation() {
           {slide.heading || '\u00a0'}
         </h1>
         <nav aria-label="Presentation navigation">
+          <button aria-label="Replay current step" type="button" onClick={() => {
+            setDirection('forward')
+            setReplayVersion(version => version + 1)
+          }}>
+            <svg width="23" height="23" viewBox="0 0 24 24" aria-hidden="true"
+              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 5v6h-6 M20 11a8 8 0 1 0-2 6" />
+            </svg>
+          </button>
           <button
             aria-label="Previous step"
             disabled={isFirstCursor(cursor)}
@@ -133,6 +143,7 @@ export function Presentation() {
 
       <section aria-live="polite" className="presentation-stage">
         <Slide
+          key={`${slide.id}:${replayVersion}`}
           direction={direction}
           fieldStrengthTesla={fieldStrengthTesla}
           setFieldStrengthTesla={setFieldStrengthTesla}

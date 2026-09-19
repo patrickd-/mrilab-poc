@@ -11,7 +11,7 @@ describe('presentation CSF magnetization', () => {
 
   it('stays aligned until RF arrives, then flips 90 degrees', () => {
     const state = createPresentationCsfState(3)
-    const excitation = { fieldStrengthTesla: 3, pulseTimesMilliseconds: [720] }
+    const excitation = { fieldStrengthTesla: 3, pulseEvents: [{ timeMilliseconds: 720, kind: '90-y' as const }] }
     expect(presentationMagnetizationAt(state, excitation, 719)).toEqual({ x: 0, y: 0, z: 1 })
     const flipped = presentationMagnetizationAt(state, excitation, 720)
     expect(flipped.x).toBeCloseTo(1)
@@ -20,7 +20,7 @@ describe('presentation CSF magnetization', () => {
 
   it('precesses while T2 decays and T1 recovers in real time', () => {
     const state = createPresentationCsfState(3)
-    const excitation = { fieldStrengthTesla: 3, pulseTimesMilliseconds: [0] }
+    const excitation = { fieldStrengthTesla: 3, pulseEvents: [{ timeMilliseconds: 0, kind: '90-y' as const }] }
     const afterT2 = presentationMagnetizationAt(state, excitation, 2000)
     expect(Math.hypot(afterT2.x, afterT2.y)).toBeCloseTo(Math.exp(-1))
     expect(Math.abs(afterT2.y)).toBeGreaterThan(0.1)
@@ -34,7 +34,7 @@ describe('presentation CSF magnetization', () => {
   it('rotates the existing state on another pulse rather than restarting recovery', () => {
     const state = createPresentationCsfState(3)
     const second = presentationMagnetizationAt(state, {
-      fieldStrengthTesla: 3, pulseTimesMilliseconds: [0, 1000],
+      fieldStrengthTesla: 3, pulseEvents: [{ timeMilliseconds: 0, kind: '90-y' as const }, { timeMilliseconds: 1000, kind: '90-y' as const }],
     }, 1000)
     expect(second.z).toBeCloseTo(-Math.exp(-1000 / 2000))
     expect(Math.hypot(second.x, second.y)).toBeCloseTo(1 - Math.exp(-1000 / 4300))
@@ -43,14 +43,14 @@ describe('presentation CSF magnetization', () => {
   it('interpolates continuous slider fields and does not excite at zero field', () => {
     expect(createPresentationCsfState(5).transverseRelaxationTimeMilliseconds).toBe(1500)
     expect(presentationMagnetizationAt(createPresentationCsfState(0), {
-      fieldStrengthTesla: 0, pulseTimesMilliseconds: [0],
+      fieldStrengthTesla: 0, pulseEvents: [{ timeMilliseconds: 0, kind: '90-y' as const }],
     }, 1000)).toEqual({ x: 0, y: 0, z: 1 })
   })
 })
 
 describe('receive-coil voltage', () => {
   const state = createPresentationCsfState(3)
-  const excitation = { fieldStrengthTesla: 3, pulseTimesMilliseconds: [1000] }
+  const excitation = { fieldStrengthTesla: 3, pulseEvents: [{ timeMilliseconds: 1000, kind: '90-y' as const }] }
   const period = 1000 / 0.7
 
   it('reads zero before RF, then alternates polarity with precession', () => {
@@ -68,8 +68,8 @@ describe('receive-coil voltage', () => {
 
   it('reflects repeated pulse rotations, including a reduced transverse signal', () => {
     const now = 1100
-    const once = presentationReceivedVoltageAt(state, { ...excitation, pulseTimesMilliseconds: [0] }, now)
-    const twice = presentationReceivedVoltageAt(state, { ...excitation, pulseTimesMilliseconds: [0, 1000] }, now)
+    const once = presentationReceivedVoltageAt(state, { ...excitation, pulseEvents: [{ timeMilliseconds: 0, kind: '90-y' as const }] }, now)
+    const twice = presentationReceivedVoltageAt(state, { ...excitation, pulseEvents: [{ timeMilliseconds: 0, kind: '90-y' as const }, { timeMilliseconds: 1000, kind: '90-y' as const }] }, now)
     expect(Math.abs(twice)).toBeLessThan(Math.abs(once))
     expect(presentationReceivedVoltageAt(state, { ...excitation, fieldStrengthTesla: 0 }, now)).toBe(0)
   })

@@ -19,18 +19,19 @@ export function ReceiveCoil({ excitation }: { excitation: ProtonExcitation }) {
     const needle = needleRef.current
     if (!needle) return
     const state = createPresentationCsfState(excitation.fieldStrengthTesla)
-    const lastPulse = excitation.pulseTimesMilliseconds.at(-1)
+    const lastPulse = excitation.pulseEvents.at(-1)?.timeMilliseconds
     const settlesAt = lastPulse === undefined ? 0 : lastPulse +
       state.transverseRelaxationTimeMilliseconds * Math.log(1e4)
     let frame = 0
-    const animate = (now: number) => {
+    const animate = () => {
+      const now = performance.now()
       const active = lastPulse !== undefined && excitation.fieldStrengthTesla > 0 && now < settlesAt
       const voltage = active ? presentationReceivedVoltageAt(state, excitation, now) : 0
       needle.setAttribute('transform', `rotate(${voltage * NEEDLE_MAX_ANGLE} 390 252)`)
       needle.setAttribute('data-relative-voltage', String(voltage))
       if (active) frame = requestAnimationFrame(animate)
     }
-    animate(performance.now())
+    animate()
     return () => cancelAnimationFrame(frame)
   }, [excitation])
 

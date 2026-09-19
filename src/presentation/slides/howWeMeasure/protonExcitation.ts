@@ -1,9 +1,9 @@
 import { HydrogenEnsemble, PROTON_GYROMAGNETIC_RATIO } from '../../../models/HydrogenEnsemble'
-import { createFidEnsembleStates, fidEnsembleMagnetizationStateAt } from '../../../simulation/fid'
+import { createFidEnsembleStates, fidEnsembleMagnetizationStateAt, type RfPulseEvent } from '../../../simulation/fid'
 
 export interface ProtonExcitation {
   fieldStrengthTesla: number
-  pulseTimesMilliseconds: readonly number[]
+  pulseEvents: readonly RfPulseEvent[]
 }
 
 export function createPresentationCsfState(fieldStrengthTesla: number) {
@@ -29,7 +29,7 @@ export function presentationMagnetizationAt(
   nowMilliseconds: number,
 ) {
   const pulses = excitation.fieldStrengthTesla > 0
-    ? excitation.pulseTimesMilliseconds.map(timeMilliseconds => ({ timeMilliseconds, kind: '90-y' as const }))
+    ? excitation.pulseEvents
     : []
   const magnetization = fidEnsembleMagnetizationStateAt(state, nowMilliseconds, pulses)
   // Only the visible laboratory-frame carrier is slowed (0.7 turns/s at 3 T).

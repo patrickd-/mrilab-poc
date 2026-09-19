@@ -4,7 +4,10 @@ import { ProtonSphere } from '../components/ProtonSphere'
 import { FlickingHand } from './howWeMeasure/FlickingHand'
 import { SpinningTopGraphic } from './howWeMeasure/SpinningTopGraphic'
 import { ReceiveCoil } from './howWeMeasure/ReceiveCoil'
-import { VoltageTrace, MEASUREMENT_LAYOUT_MS, MEASUREMENT_PULSE_DELAY_MS } from './howWeMeasure/VoltageTrace'
+import { VoltageTrace } from './howWeMeasure/VoltageTrace'
+import { FID_PLAY_PLAN } from '../playback/playPlan'
+import { usePlayPlan } from '../playback/usePlayPlan'
+import type { RfPulseEvent } from '../../simulation/fid'
 import { FLICK_CONTACT_MS, FLICK_DURATION_MS } from './howWeMeasure/flickTiming'
 import { RfRemote, RfWavefront, RF_WAVE_DURATION_MS, RF_WAVE_TRAVEL_MS, type RfWave } from './howWeMeasure/RfRemote'
 import './howWeMeasure/how-we-measure.css'
@@ -16,31 +19,31 @@ function HowWeMeasureSlide({
 }: SlideStateProps) {
   const [flickSequence, setFlickSequence] = useState(0)
   const [isFlicking, setIsFlicking] = useState(false)
-  const [pulseTimes, setPulseTimes] = useState<number[]>([])
+  const [manualPulses, setManualPulses] = useState<RfPulseEvent[]>([])
   const [wave, setWave] = useState<RfWave | null>(null)
   const sceneRef = useRef<HTMLDivElement>(null)
   const antennaRef = useRef<SVGCircleElement>(null)
   const showRemote = stateIndex >= 3
   const showTrace = stateIndex >= 5
   const [renderControls, setRenderControls] = useState(!showTrace)
-  const [measurementStart, setMeasurementStart] = useState<number | null>(null)
+  const playback = usePlayPlan(FID_PLAY_PLAN, showTrace, fieldStrengthTesla)
   const showTop = stateIndex >= 1 && !showRemote
   const [renderTop, setRenderTop] = useState(showTop)
   const showHand = stateIndex >= 2
   const excitation = useMemo(() => showRemote ? {
     fieldStrengthTesla,
-    pulseTimesMilliseconds: pulseTimes,
-  } : undefined, [showRemote, fieldStrengthTesla, pulseTimes])
+    pulseEvents: fieldStrengthTesla > 0
+      ? (showTrace ? playback?.pulseEvents ?? [] : manualPulses) : [],
+  } : undefined, [showRemote, showTrace, fieldStrengthTesla, manualPulses, playback])
 
   useEffect(() => {
     setIsFlicking(false)
     setFlickSequence(0)
     setWave(null)
-    setPulseTimes([])
+    setManualPulses([])
   }, [showRemote])
 
   useEffect(() => {
-    setMeasurementStart(null)
     if (!showTrace) {
       setRenderControls(true)
       return
@@ -48,17 +51,11 @@ function HowWeMeasureSlide({
     // This next demonstration is a fresh acquisition from equilibrium, so the
     // first recorded pulse is a 90-degree flip regardless of earlier flicks.
     setIsFlicking(false)
-    setPulseTimes([])
+    setManualPulses([])
     setWave(null)
-    const exitTimer = window.setTimeout(() => setRenderControls(false), MEASUREMENT_LAYOUT_MS)
-    const pulseTimer = window.setTimeout(() => {
-      const start = performance.now()
-      setPulseTimes(fieldStrengthTesla > 0 ? [start] : [])
-      setMeasurementStart(start)
-    }, MEASUREMENT_LAYOUT_MS + MEASUREMENT_PULSE_DELAY_MS)
+    const exitTimer = window.setTimeout(() => setRenderControls(false), FID_PLAY_PLAN.layoutDurationMilliseconds)
     return () => {
       window.clearTimeout(exitTimer)
-      window.clearTimeout(pulseTimer)
     }
   }, [showTrace, fieldStrengthTesla])
 
@@ -89,7 +86,10 @@ function HowWeMeasureSlide({
         radius: distance * RF_WAVE_DURATION_MS / RF_WAVE_TRAVEL_MS })
     }, FLICK_CONTACT_MS)
     const excitationTimer = window.setTimeout(() => {
-      if (fieldStrengthTesla > 0) setPulseTimes(times => [...times, performance.now()])
+      if (fieldStrengthTesla > 0) {
+        const timeMilliseconds = performance.now()
+        setManualPulses(pulses => [...pulses, { timeMilliseconds, kind: '90-y' }])
+      }
     }, FLICK_CONTACT_MS + RF_WAVE_TRAVEL_MS)
     return () => {
       window.clearTimeout(rechargeTimer)
@@ -107,7 +107,7 @@ function HowWeMeasureSlide({
 
   return (
     <div className={`how-we-measure-scene${showRemote ? ' how-we-measure-scene--remote' : ''}${showTrace ? ' how-we-measure-scene--trace' : ''}`} ref={sceneRef}
-      style={{ '--measurement-layout-duration': `${MEASUREMENT_LAYOUT_MS}ms` } as CSSProperties}>
+      style={{ '--measurement-layout-duration': `${FID_PLAY_PLAN.layoutDurationMilliseconds}ms` } as CSSProperties}>
       <MagneticFieldBackdrop
         className="how-we-measure__field"
         fieldStrengthTesla={fieldStrengthTesla}
@@ -134,7 +134,7 @@ function HowWeMeasureSlide({
           ariaLabel={showRemote ? 'Flick the remote control button' : undefined} />
       ) : null}
       {stateIndex >= 4 && excitation ? <ReceiveCoil excitation={excitation} /> : null}
-      {showTrace && excitation ? <VoltageTrace excitation={excitation} startedAt={measurementStart} /> : null}
+      {showTrace && excitation ? <VoltageTrace excitation={excitation} startedAt={playback?.startedAt ?? null} plan={FID_PLAY_PLAN} /> : null}
     </div>
   )
 }
