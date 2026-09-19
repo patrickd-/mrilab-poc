@@ -25,8 +25,17 @@ function HowWeMeasureSlide({
   const antennaRef = useRef<SVGCircleElement>(null)
   const showRemote = stateIndex >= 3
   const showTrace = stateIndex >= 5
+  const [repeatPulse, setRepeatPulse] = useState<{ time: number; revision: number } | null>(null)
+  const tracePlan = useMemo(() => repeatPulse ? {
+    ...FID_PLAY_PLAN,
+    events: [...FID_PLAY_PLAN.events, {
+      type: 'rf-pulse' as const, kind: '90-y' as const,
+      timeMilliseconds: repeatPulse.time, label: 'Recovered 90°',
+      spoilTransverseBeforePulse: true,
+    }],
+  } : FID_PLAY_PLAN, [repeatPulse])
   const [renderControls, setRenderControls] = useState(!showTrace)
-  const playback = usePlayPlan(FID_PLAY_PLAN, showTrace, fieldStrengthTesla)
+  const playback = usePlayPlan(tracePlan, showTrace, fieldStrengthTesla)
   const showTop = stateIndex >= 1 && !showRemote
   const [renderTop, setRenderTop] = useState(showTop)
   const showHand = stateIndex >= 2
@@ -35,6 +44,10 @@ function HowWeMeasureSlide({
     pulseEvents: fieldStrengthTesla > 0
       ? (showTrace ? playback?.pulseEvents ?? [] : manualPulses) : [],
   } : undefined, [showRemote, showTrace, fieldStrengthTesla, manualPulses, playback])
+
+  useEffect(() => {
+    setRepeatPulse(null)
+  }, [showTrace, fieldStrengthTesla])
 
   useEffect(() => {
     setIsFlicking(false)
@@ -134,7 +147,9 @@ function HowWeMeasureSlide({
           ariaLabel={showRemote ? 'Flick the remote control button' : undefined} />
       ) : null}
       {stateIndex >= 4 && excitation ? <ReceiveCoil excitation={excitation} /> : null}
-      {showTrace && excitation ? <VoltageTrace excitation={excitation} startedAt={playback?.startedAt ?? null} plan={FID_PLAY_PLAN} /> : null}
+      {showTrace && excitation ? <VoltageTrace key={fieldStrengthTesla}
+        excitation={excitation} startedAt={playback?.startedAt ?? null} plan={tracePlan}
+        onPlaceRepeatPulse={time => setRepeatPulse(previous => ({ time, revision: (previous?.revision ?? 0) + 1 }))} /> : null}
     </div>
   )
 }

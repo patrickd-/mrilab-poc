@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, useState, type MouseEvent } from 'react'
 import {
   createPresentationCsfState,
   presentationReceivedVoltageAt,
@@ -11,12 +11,15 @@ const END_X = 420
 const ZERO_Y = 162
 const VOLTAGE_SCALE = 92
 
-export function VoltageTrace({ excitation, startedAt, plan = FID_PLAY_PLAN }: {
+export function VoltageTrace({ excitation, startedAt, plan = FID_PLAY_PLAN, onPlaceRepeatPulse }: {
   excitation: ProtonExcitation
   startedAt: number | null
   plan?: PlayPlan
+  onPlaceRepeatPulse?: (timeMilliseconds: number) => void
 }) {
   const pathRef = useRef<SVGPathElement>(null)
+  const [hoverX, setHoverX] = useState<number | null>(null)
+  const [referenceCurve, setReferenceCurve] = useState<string | null>(null)
   const descriptionId = useId()
   const leadIn = plan.layoutDurationMilliseconds + plan.settleDelayMilliseconds
 
@@ -51,15 +54,40 @@ export function VoltageTrace({ excitation, startedAt, plan = FID_PLAY_PLAN }: {
 
   const timeTicks = Array.from({ length: 7 }, (_, index) => index / 6 * plan.durationMilliseconds / 1000)
   const timeX = (milliseconds: number) => START_X + (milliseconds + leadIn) / (plan.durationMilliseconds + leadIn) * (END_X - START_X)
+  const cursorX = (event: MouseEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    // Match xMidYMin meet, including the horizontal letterbox on tall screens.
+    const scale = Math.min(rect.width / 440, rect.height / 310)
+    if (scale <= 0) return null
+    const x = (event.clientX - rect.left - (rect.width - 440 * scale) / 2) / scale
+    const y = (event.clientY - rect.top) / scale
+    return x >= START_X && x <= END_X && y >= 0 && y <= 276 ? x : null
+  }
+  const placePulse = (event: MouseEvent<SVGSVGElement>) => {
+    if (!onPlaceRepeatPulse || startedAt === null) return
+    const x = cursorX(event)
+    if (x === null || x <= timeX(0)) return
+    const time = (x - START_X) / (END_X - START_X) * (plan.durationMilliseconds + leadIn) - leadIn
+    // Stay after the fixed excitation and leave one sample after the new pulse.
+    const snappedTime = Math.max(plan.sampleIntervalMilliseconds, Math.min(
+      plan.durationMilliseconds - plan.sampleIntervalMilliseconds,
+      Math.round(time / plan.sampleIntervalMilliseconds) * plan.sampleIntervalMilliseconds,
+    ))
+    setReferenceCurve(previous => previous ?? pathRef.current?.getAttribute('d') ?? '')
+    onPlaceRepeatPulse(snappedTime)
+  }
 
   return (
     <div className="voltage-trace">
       <svg viewBox="0 0 440 310" preserveAspectRatio="xMidYMin meet" role="img" aria-label="Induced voltage over time"
-        aria-describedby={descriptionId}>
+        aria-describedby={descriptionId}
+        onMouseMove={event => setHoverX(cursorX(event))} onMouseLeave={() => setHoverX(null)}
+        onClick={placePulse}>
         <desc id={descriptionId}>
           Induced voltage on a relative scale, using the same slowed precession
           as the magnet and voltmeter. Negative time records the lead-in before
           the pulse at t=0; time is in seconds.
+          {onPlaceRepeatPulse ? ' Click after t=0 to place or move a repeat pulse and replay. The repeat pulse ideally spoils remaining transverse magnetization before tipping the T1-recovered longitudinal magnetization by 90 degrees. The original trace stays dimmed for comparison.' : ''}
         </desc>
         <g className="voltage-trace__grid">
           {[70, ZERO_Y, 254].map(y => <line key={y} x1="34" x2="426" y1={y} y2={y} />)}
@@ -76,6 +104,9 @@ export function VoltageTrace({ excitation, startedAt, plan = FID_PLAY_PLAN }: {
           <text className="voltage-trace__tick" key={second}
             x={timeX(second * 1000)} y="300" textAnchor="middle">{Number(second.toFixed(2))}</text>
         ))}
+        {referenceCurve !== null ? <path className="voltage-trace__signal voltage-trace__signal--reference"
+          data-testid="voltage-trace-reference" d={referenceCurve} /> : null}
+        <path className="voltage-trace__signal" data-testid="voltage-trace-signal" ref={pathRef} />
         {plan.events.map((event, index) => (
           <g key={index} transform={`translate(${timeX(event.timeMilliseconds)} 0)`}
             role="img" aria-label={`${event.label} RF pulse at ${event.timeMilliseconds / 1000} s`}>
@@ -84,7 +115,8 @@ export function VoltageTrace({ excitation, startedAt, plan = FID_PLAY_PLAN }: {
             <path className="voltage-trace__rf-symbol" d="M-7 13 Q2 20 -7 27 M0 10 Q12 20 0 30" />
           </g>
         ))}
-        <path className="voltage-trace__signal" data-testid="voltage-trace-signal" ref={pathRef} />
+        {hoverX !== null ? <line className="voltage-trace__hover" data-testid="voltage-trace-hover"
+          x1={hoverX} x2={hoverX} y1="44" y2="276" /> : null}
       </svg>
     </div>
   )

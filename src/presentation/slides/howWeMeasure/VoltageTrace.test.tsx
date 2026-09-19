@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { VoltageTrace } from './VoltageTrace'
 import { FID_PLAY_PLAN, startPlayPlan } from '../../playback/playPlan'
@@ -64,4 +64,31 @@ it('derives additional pulse markers and the time range from the play plan', () 
   expect(Number(markerTransform.match(/translate\(([^ ]+)/)![1])).toBeCloseTo(40 + 3300 / 7300 * 380)
   expect(screen.getByText('6')).toBeTruthy()
   expect(screen.queryByText('12')).toBeNull()
+})
+
+it('tracks the cursor, freezes the original trace once, and maps clicks through SVG letterboxing', () => {
+  vi.stubGlobal('requestAnimationFrame', () => 1)
+  vi.stubGlobal('cancelAnimationFrame', vi.fn())
+  vi.spyOn(performance, 'now').mockReturnValue(4000)
+  const onPlace = vi.fn()
+  const excitation = { fieldStrengthTesla: 3, pulseEvents: startPlayPlan(FID_PLAY_PLAN, 1000).pulseEvents }
+  const { rerender } = render(<VoltageTrace excitation={excitation} startedAt={1000} onPlaceRepeatPulse={onPlace} />)
+  const svg = screen.getByRole('img', { name: 'Induced voltage over time' })
+  // 2x scale plus 60px horizontal letterboxing on both sides.
+  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({ left: 10, top: 20, width: 1000, height: 620 } as DOMRect)
+  const point = (time: number) => ({ clientX: 70 + 2 * (40 + (time + 1300) / 13300 * 380), clientY: 220 })
+  fireEvent.mouseMove(svg, point(2000))
+  expect(Number(screen.getByTestId('voltage-trace-hover').getAttribute('x1'))).toBeCloseTo(40 + 3300 / 13300 * 380)
+  const original = screen.getByTestId('voltage-trace-signal').getAttribute('d')
+  fireEvent.click(svg, point(-500))
+  expect(onPlace).not.toHaveBeenCalled()
+  fireEvent.click(svg, point(2000))
+  expect(onPlace).toHaveBeenLastCalledWith(2000)
+  expect(screen.getByTestId('voltage-trace-reference').getAttribute('d')).toBe(original)
+  rerender(<VoltageTrace excitation={excitation} startedAt={5000} onPlaceRepeatPulse={onPlace} />)
+  fireEvent.click(svg, point(5000))
+  expect(onPlace).toHaveBeenLastCalledWith(5000)
+  expect(screen.getByTestId('voltage-trace-reference').getAttribute('d')).toBe(original)
+  fireEvent.mouseLeave(svg)
+  expect(screen.queryByTestId('voltage-trace-hover')).toBeNull()
 })

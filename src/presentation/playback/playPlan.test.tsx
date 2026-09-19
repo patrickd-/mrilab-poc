@@ -54,3 +54,13 @@ it('rejects invalid plan timing', () => {
   expect(() => startPlayPlan({ ...FID_PLAY_PLAN, sampleIntervalMilliseconds: 0 }, 0)).toThrow()
   expect(() => startPlayPlan({ ...FID_PLAY_PLAN, durationMilliseconds: -1 }, 0)).toThrow()
 })
+
+it('preserves the idealized spoiling instruction when scheduling a recovery pulse', () => {
+  const plan = { ...FID_PLAY_PLAN, events: [...FID_PLAY_PLAN.events, {
+    type: 'rf-pulse' as const, kind: '90-y' as const, timeMilliseconds: 2000,
+    label: 'Recovered 90°', spoilTransverseBeforePulse: true,
+  }] }
+  expect(startPlayPlan(plan, 500).pulseEvents[1]).toEqual({
+    timeMilliseconds: 2500, kind: '90-y', spoilTransverseBeforePulse: true,
+  })
+})

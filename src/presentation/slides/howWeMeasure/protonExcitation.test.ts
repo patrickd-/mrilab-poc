@@ -46,6 +46,24 @@ describe('presentation CSF magnetization', () => {
       fieldStrengthTesla: 0, pulseEvents: [{ timeMilliseconds: 0, kind: '90-y' as const }],
     }, 1000)).toEqual({ x: 0, y: 0, z: 1 })
   })
+
+  it.each([100, 1000, 4300, 20000])('tips only T1-recovered magnetization after %s ms in the teaching reset', delay => {
+    const state = createPresentationCsfState(3)
+    const initial = { timeMilliseconds: 1000, kind: '90-y' as const }
+    const excitation = { fieldStrengthTesla: 3, pulseEvents: [initial, {
+      timeMilliseconds: 1000 + delay, kind: '90-y' as const, spoilTransverseBeforePulse: true,
+    }] }
+    expect(presentationMagnetizationAt(state, excitation, 1000 + delay - 1)).toEqual(
+      presentationMagnetizationAt(state, { ...excitation, pulseEvents: [initial] }, 1000 + delay - 1),
+    )
+    const flipped = presentationMagnetizationAt(state, excitation, 1000 + delay)
+    const recovered = 1 - Math.exp(-delay / 4300)
+    expect(Math.hypot(flipped.x, flipped.y)).toBeCloseTo(recovered, 10)
+    expect(flipped.z).toBeCloseTo(0, 10)
+    const later = presentationMagnetizationAt(state, excitation, 1000 + delay + 2000)
+    expect(Math.hypot(later.x, later.y)).toBeCloseTo(recovered * Math.exp(-1), 10)
+    expect(later.z).toBeCloseTo(1 - Math.exp(-2000 / 4300), 10)
+  })
 })
 
 describe('receive-coil voltage', () => {

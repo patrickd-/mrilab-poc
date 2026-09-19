@@ -185,6 +185,8 @@
 .voltage-trace__tag { fill: #cb434c; stroke: #ff9590; stroke-width: 1.5; }
 .voltage-trace__rf-symbol { fill: none; stroke: #fff6f2; stroke-width: 2; stroke-linecap: round; }
 .voltage-trace__signal { fill: none; stroke: #87e0ef; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.voltage-trace__signal--reference { opacity: 0.25; }
+.voltage-trace__hover { stroke: #dae6eb; stroke-width: 1.5; stroke-dasharray: 2 5; pointer-events: none; }
 
 @keyframes remote-appear {
   from { opacity: 0; }

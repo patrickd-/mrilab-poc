@@ -74,6 +74,9 @@ export type RfPulseKind = '90-y' | '180-x'
 export interface RfPulseEvent {
   timeMilliseconds: number
   kind: RfPulseKind
+  /** Idealized spoiling immediately before RF: retain Mz, discard transverse
+   * coherence. Used by the presentation's T1-recovery teaching demonstration. */
+  spoilTransverseBeforePulse?: boolean
 }
 
 export interface FidEnsembleMagnetizationState {
@@ -206,6 +209,11 @@ export function fidEnsembleMagnetizationStateAt(
           pulseEvent.timeMilliseconds - previousTimeMilliseconds,
         ),
       )
+
+      if (pulseEvent.spoilTransverseBeforePulse) {
+        packetXFraction = 0
+        packetYFraction = 0
+      }
 
       if (pulseEvent.kind === '90-y') {
         // An instantaneous rotation about the rotating-frame y-axis.

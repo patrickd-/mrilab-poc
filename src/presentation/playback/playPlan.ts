@@ -36,6 +36,8 @@ export function startPlayPlan(plan: PlayPlan, startedAt: number): PlanPlayback {
     startedAt,
     pulseEvents: [...plan.events]
       .sort((a, b) => a.timeMilliseconds - b.timeMilliseconds)
-      .map(event => ({ timeMilliseconds: startedAt + event.timeMilliseconds, kind: event.kind })),
+      .map(({ type: _type, label: _label, ...event }) => ({
+        ...event, timeMilliseconds: startedAt + event.timeMilliseconds,
+      })),
   }
 }
