@@ -10,6 +10,7 @@ export function ProtonSphere({
   className = '',
   ariaLabel,
   excitation,
+  color,
 }: {
   orientation?: 'up' | 'down'
   showCone: boolean
@@ -19,6 +20,7 @@ export function ProtonSphere({
   className?: string
   ariaLabel?: string
   excitation?: ProtonExcitation
+  color?: string
 }) {
   return (
     <div
@@ -37,6 +39,7 @@ export function ProtonSphere({
         showCone={showCone}
         showNetMagnet={showNetMagnet}
         excitation={excitation}
+        color={color}
       />
     </div>
   )

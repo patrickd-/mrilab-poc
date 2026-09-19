@@ -6,6 +6,7 @@ import {
 } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { SAMPLE_COLORS } from '../models/sampleColors'
 import type {
   FieldUniformity,
   HydrogenEnsemble,
@@ -67,11 +68,11 @@ const FULL_SCALE_COMBINED_GRADIENT_FIELD_OFFSET_TESLA =
   MAXIMUM_GRADIENT_TESLA_PER_METER * GRID_SIZE * 1e-3
 const SELECTED_SPHERE_COLOR = new THREE.Color('#ffd166')
 const SAMPLE_SPHERE_COLORS: Readonly<Record<SamplePresetId, THREE.Color>> = {
-  air: new THREE.Color('#526c78'),
-  'cortical-bone': new THREE.Color('#d6a15f'),
-  'cerebrospinal-fluid': new THREE.Color('#55c4e8'),
-  'gray-matter': new THREE.Color('#b28da9'),
-  'white-matter': new THREE.Color('#e7dfba'),
+  air: new THREE.Color(SAMPLE_COLORS.air),
+  'cortical-bone': new THREE.Color(SAMPLE_COLORS['cortical-bone']),
+  'cerebrospinal-fluid': new THREE.Color(SAMPLE_COLORS['cerebrospinal-fluid']),
+  'gray-matter': new THREE.Color(SAMPLE_COLORS['gray-matter']),
+  'white-matter': new THREE.Color(SAMPLE_COLORS['white-matter']),
 }
 const CAMERA_DISTANCE =
   (GRID_OFFSET / Math.tan(THREE.MathUtils.degToRad(20))) * 1.12

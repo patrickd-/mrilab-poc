@@ -1,18 +1,19 @@
-import { createPresentationCsfState, presentationMagnetizationAt, type ProtonExcitation } from './protonExcitation'
+import { createPresentationTissueState, presentationMagnetizationAt, type ProtonExcitation } from './protonExcitation'
 
 /** Own one cancellable render loop per excitation/session. */
 export function animateProtonMagnet(
   excitation: ProtonExcitation,
   apply: (magnetization: ReturnType<typeof presentationMagnetizationAt>) => void,
 ) {
-  const state = createPresentationCsfState(excitation.fieldStrengthTesla)
+  const state = createPresentationTissueState(excitation.fieldStrengthTesla, excitation.samplePreset)
   let frame = 0
   const animate = () => {
     // RAF's timestamp is the start of its frame; it can precede a pulse created
     // in that same frame. Read the same monotonic clock used to stamp the pulses.
     const now = performance.now()
     const m = presentationMagnetizationAt(state, excitation, now)
-    apply(m)
+    const scale = excitation.equilibriumScale ?? 1
+    apply({ x: m.x * scale, y: m.y * scale, z: m.z * scale })
     const pendingPulse = excitation.fieldStrengthTesla > 0 &&
       excitation.pulseEvents.some(pulse => pulse.timeMilliseconds > now)
     if (pendingPulse || Math.hypot(m.x, m.y) > 1e-4 || Math.abs(1 - m.z) > 1e-4) {

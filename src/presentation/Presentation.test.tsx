@@ -24,14 +24,14 @@ describe('MRI Intuition presentation', () => {
       fireEvent.change(screen.getByRole('slider'), { target: { value: String(field) } })
       expect(fieldValue()).toBe(String(field))
       for (let i = 0; i < 2; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 9; i++) {
         expect(screen.queryByRole('slider')).toBeNull()
         expect(fieldValue()).toBe('1.5')
         fireEvent.click(screen.getByRole('button', { name: 'Replay current step' }))
         expect(fieldValue()).toBe('1.5')
         fireEvent.keyDown(window, { key: 'ArrowRight' })
       }
-      for (let i = 0; i < 8; i++) fireEvent.keyDown(window, { key: 'ArrowLeft' })
+      for (let i = 0; i < 9; i++) fireEvent.keyDown(window, { key: 'ArrowLeft' })
       expect((screen.getByRole('slider') as HTMLInputElement).value).toBe('1.5')
       fireEvent.change(screen.getByRole('slider'), { target: { value: '3' } })
       expect(fieldValue()).toBe('3')
@@ -287,6 +287,11 @@ describe('MRI Intuition presentation', () => {
     expect(screen.queryByTestId('voltage-trace-envelope')).toBeNull()
     await advance(user, 1)
     expect(screen.getByTestId('voltage-trace-envelope')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement).disabled).toBe(false)
+    await advance(user, 1)
+    expect(screen.getByRole('heading', { name: 'How are we measuring?' })).toBeTruthy()
+    expect(container.querySelector('main')?.getAttribute('data-slide')).toBe('how-we-measure-2')
+    expect(screen.getByRole('img', { name: 'Tissue transverse signal over time' })).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

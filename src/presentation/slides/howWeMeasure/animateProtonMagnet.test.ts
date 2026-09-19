@@ -68,3 +68,17 @@ it('waits for later plan events even while the magnet is aligned', () => {
   expect(apply.mock.lastCall![0].z).toBeCloseTo(-1, 4)
   stop()
 })
+
+it('uses the selected tissue relaxation and common density scale for comparison magnets', () => {
+  const h = animationHarness(0)
+  const apply = vi.fn()
+  const scale = 1.7 / 6.6
+  const stop = animateProtonMagnet({ fieldStrengthTesla: 1.5, samplePreset: 'cortical-bone',
+    equilibriumScale: scale, pulseEvents: [{ timeMilliseconds: 0, kind: '90-y' }] }, apply)
+  expect(apply.mock.lastCall![0].x).toBeCloseTo(scale, 12)
+  h.now.mockReturnValue(110)
+  h.frame(110)
+  expect(apply.mock.lastCall![0].z).toBeCloseTo(scale * (1 - Math.exp(-1)), 12)
+  expect(Math.hypot(apply.mock.lastCall![0].x, apply.mock.lastCall![0].y)).toBeLessThan(1e-10)
+  stop()
+})

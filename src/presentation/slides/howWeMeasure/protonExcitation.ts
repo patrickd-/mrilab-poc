@@ -1,14 +1,21 @@
-import { HydrogenEnsemble, PROTON_GYROMAGNETIC_RATIO } from '../../../models/HydrogenEnsemble'
+import { HydrogenEnsemble, PROTON_GYROMAGNETIC_RATIO, type SamplePresetId } from '../../../models/HydrogenEnsemble'
 import { createFidEnsembleStates, fidEnsembleMagnetizationStateAt, type RfPulseEvent } from '../../../simulation/fid'
 
 export interface ProtonExcitation {
   fieldStrengthTesla: number
   pulseEvents: readonly RfPulseEvent[]
+  samplePreset?: SamplePresetId
+  /** Optional common M0 reference for comparisons between tissues. */
+  equilibriumScale?: number
 }
 
 export function createPresentationCsfState(fieldStrengthTesla: number) {
+  return createPresentationTissueState(fieldStrengthTesla, 'cerebrospinal-fluid')
+}
+
+export function createPresentationTissueState(fieldStrengthTesla: number, samplePreset: SamplePresetId = 'cerebrospinal-fluid') {
   const ensemble = new HydrogenEnsemble(0, 1, 1, 3)
-  ensemble.samplePreset = 'cerebrospinal-fluid'
+  ensemble.samplePreset = samplePreset
   // The presentation slider is continuous. Interpolate the lab's tissue table
   // between supported fields, holding its endpoints outside the table range.
   const low = fieldStrengthTesla <= 3 ? 1.5 : 3
@@ -20,6 +27,8 @@ export function createPresentationCsfState(fieldStrengthTesla: number) {
     (upper.longitudinalRelaxationTimeMilliseconds - state.longitudinalRelaxationTimeMilliseconds)
   state.transverseRelaxationTimeMilliseconds += fraction *
     (upper.transverseRelaxationTimeMilliseconds - state.transverseRelaxationTimeMilliseconds)
+  state.equilibriumMagnetization += fraction *
+    (ensemble.magneticProperties(high, 'uniform').boltzmannMagnetization - state.equilibriumMagnetization)
   return state
 }
 
@@ -33,7 +42,7 @@ export function presentationMagnetizationAt(
     : []
   const magnetization = fidEnsembleMagnetizationStateAt(state, nowMilliseconds, pulses)
   // Only the visible laboratory-frame carrier is slowed (1.4 turns/s at 3 T).
-  // Pulse rotations and real-time CSF T1/T2 relaxation use the lab's Bloch model.
+  // Pulse rotations and real-time tissue T1/T2 relaxation use the lab's Bloch model.
   const phase = magnetization.excited
     ? (nowMilliseconds - pulses[0].timeMilliseconds) / 1000 * 2 * Math.PI * 1.4 * excitation.fieldStrengthTesla / 3
     : 0

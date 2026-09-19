@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { ProtonExcitation } from './slides/howWeMeasure/protonExcitation'
 import { animateProtonMagnet } from './slides/howWeMeasure/animateProtonMagnet'
+import { SAMPLE_COLORS } from '../models/sampleColors'
 
 /**
- * A single proton-ensemble sphere using the MRI Lab's geometry, CSF
- * color, Phong shading, and lighting. Opacity is slightly higher here so the
+ * A single proton-ensemble sphere using the MRI Lab's geometry and tissue
+ * colors (CSF by default), Phong shading, and lighting. Opacity is slightly higher here so the
  * lecture-sized sphere stays legible over the magnetic-field lines.
  */
 export function ProtonSphereGraphic({
@@ -15,6 +16,7 @@ export function ProtonSphereGraphic({
   animateConeChange,
   showNetMagnet,
   excitation,
+  color = SAMPLE_COLORS['cerebrospinal-fluid'],
 }: {
   orientation?: 'up' | 'down'
   showCone: boolean
@@ -22,6 +24,7 @@ export function ProtonSphereGraphic({
   animateConeChange: boolean
   showNetMagnet: boolean
   excitation?: ProtonExcitation
+  color?: string
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const coneMaterialRef = useRef<THREE.MeshPhongMaterial | null>(null)
@@ -92,7 +95,7 @@ export function ProtonSphereGraphic({
     }
 
     const material = new THREE.MeshPhongMaterial({
-      color: '#55c4e8',
+      color,
       emissive: '#07151b',
       specular: showNetMagnet ? '#000000' : '#bceeff',
       shininess: showNetMagnet ? 0 : 72,
@@ -238,9 +241,15 @@ export function ProtonSphereGraphic({
       labelTextures.forEach((texture) => texture.dispose())
       labelMaterials.forEach((labelMaterial) => labelMaterial.dispose())
       renderer.dispose()
+      renderer.forceContextLoss()
       renderer.domElement.remove()
     }
   }, [orientation])
+
+  useEffect(() => {
+    sphereMaterialRef.current?.color.set(color)
+    renderRef.current?.()
+  }, [color])
 
   useEffect(() => {
     const magnet = netMagnetRef.current
@@ -327,6 +336,8 @@ export function ProtonSphereGraphic({
       data-field-arrow-opacity={fieldArrowOpacity}
       data-net-magnet-visible={showNetMagnet}
       data-rf-pulse-count={excitation?.pulseEvents.length ?? 0}
+      data-sample-preset={excitation?.samplePreset}
+      data-sphere-color={color}
       ref={hostRef}
     />
   )
