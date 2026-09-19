@@ -147,3 +147,25 @@ it('replays with one movable recovery pulse, retains the original trace, and cle
   expect(screen.queryByRole('img', { name: /Adaptive tip to 90°/ })).toBeNull()
   expect(container.querySelector('[data-rf-pulse-count]')?.getAttribute('data-rf-pulse-count')).toBe('1')
 })
+
+it('starts fresh when entering either new graph step, including backward navigation', () => {
+  vi.useFakeTimers()
+  const { container, rerender } = render(<Slide {...props} stateIndex={5} />)
+  for (const nextStep of [6, 7, 6]) {
+    act(() => vi.advanceTimersByTime(15000))
+    const svg = screen.getByRole('img', { name: 'Induced voltage over time' })
+    vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 440, height: 310 } as DOMRect)
+    fireEvent.click(svg, { clientX: 200, clientY: 160 })
+    expect(container.querySelector('[data-rf-pulse-count]')?.getAttribute('data-rf-pulse-count')).toBe('2')
+    expect(screen.getByTestId('voltage-trace-reference')).toBeTruthy()
+    rerender(<Slide {...props} stateIndex={nextStep} />)
+    expect(container.querySelector('[data-rf-pulse-count]')?.getAttribute('data-rf-pulse-count')).toBe('1')
+    expect(screen.queryByTestId('voltage-trace-reference')).toBeNull()
+    expect(screen.queryByTestId('magnetization-trace-reference')).toBeNull()
+    expect(screen.queryByTestId('voltage-trace-identity')).toBeNull()
+    expect(screen.queryByTestId('magnetization-trace-identity')).toBeNull()
+    expect(Number(screen.getByTestId('voltage-trace-signal').getAttribute('data-elapsed-ms'))).toBeLessThan(0)
+    expect(screen.getByTestId('magnetization-trace-signal').getAttribute('d')).toBe('M40.00 70.00 ')
+    expect(Boolean(screen.queryByTestId('voltage-trace-envelope'))).toBe(nextStep === 7)
+  }
+})

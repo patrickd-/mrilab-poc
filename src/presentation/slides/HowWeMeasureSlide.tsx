@@ -26,17 +26,17 @@ function HowWeMeasureSlide({
   const antennaRef = useRef<SVGCircleElement>(null)
   const showRemote = stateIndex >= 3
   const showTrace = stateIndex >= 5
-  const [repeatPulse, setRepeatPulse] = useState<{ time: number; revision: number } | null>(null)
-  const tracePlan = useMemo(() => repeatPulse ? {
+  const [repeatPulse, setRepeatPulse] = useState<{ time: number; revision: number; stateIndex: number } | null>(null)
+  const tracePlan = useMemo(() => repeatPulse?.stateIndex === stateIndex ? {
     ...FID_PLAY_PLAN,
     events: [...FID_PLAY_PLAN.events, {
       ...createTransverseReturnPulse(createPresentationCsfState(fieldStrengthTesla),
         repeatPulse.time, FID_PLAY_PLAN.events),
       type: 'rf-pulse' as const, label: 'Adaptive tip to 90°',
     }],
-  } : FID_PLAY_PLAN, [repeatPulse, fieldStrengthTesla])
+  } : FID_PLAY_PLAN, [repeatPulse, fieldStrengthTesla, stateIndex])
   const [renderControls, setRenderControls] = useState(!showTrace)
-  const playback = usePlayPlan(tracePlan, showTrace, fieldStrengthTesla)
+  const playback = usePlayPlan(tracePlan, showTrace, `${fieldStrengthTesla}:${stateIndex}`)
   const showTop = stateIndex >= 1 && !showRemote
   const [renderTop, setRenderTop] = useState(showTop)
   const showHand = stateIndex >= 2
@@ -48,7 +48,7 @@ function HowWeMeasureSlide({
 
   useEffect(() => {
     setRepeatPulse(null)
-  }, [showTrace, fieldStrengthTesla])
+  }, [stateIndex, fieldStrengthTesla])
 
   useEffect(() => {
     setIsFlicking(false)
@@ -148,9 +148,10 @@ function HowWeMeasureSlide({
           ariaLabel={showRemote ? 'Flick the remote control button' : undefined} />
       ) : null}
       {stateIndex >= 4 && excitation ? <ReceiveCoil excitation={excitation} /> : null}
-      {showTrace && excitation ? <VoltageTrace key={fieldStrengthTesla}
+      {showTrace && excitation ? <VoltageTrace key={`${fieldStrengthTesla}:${stateIndex}`}
         excitation={excitation} startedAt={playback?.startedAt ?? null} plan={tracePlan}
-        onPlaceRepeatPulse={time => setRepeatPulse(previous => ({ time, revision: (previous?.revision ?? 0) + 1 }))} /> : null}
+        showLongitudinal={stateIndex >= 6} showEnvelope={stateIndex >= 7}
+        onPlaceRepeatPulse={time => setRepeatPulse(previous => ({ time, stateIndex, revision: (previous?.revision ?? 0) + 1 }))} /> : null}
     </div>
   )
 }
@@ -158,6 +159,6 @@ function HowWeMeasureSlide({
 export const howWeMeasureSlideModule: PresentationSlideModule = {
   id: 'how-we-measure',
   heading: 'How are we measuring?',
-  stateCount: 6,
+  stateCount: 8,
   Component: HowWeMeasureSlide,
 }
