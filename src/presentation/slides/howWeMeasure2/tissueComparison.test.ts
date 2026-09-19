@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { HydrogenEnsemble } from '../../../models/HydrogenEnsemble'
 import { SAMPLE_COLORS } from '../../../models/sampleColors'
-import { comparisonSampleTimes, createComparisonTissues, tissueRelaxationAt, zoomComparisonWindow } from './tissueComparison'
+import { comparisonSampleTimes, createComparisonTissues, tissueRelaxationAt } from './tissueComparison'
 
 it.each([1.5, 3, 7] as const)('uses the simulator colors, density and relaxation properties at %s T', field => {
   const tissues = createComparisonTissues(field, [{ timeMilliseconds: 1000, kind: '90-y' }])
@@ -33,12 +33,4 @@ it('retains submillisecond bone samples and the full recovery timeline', () => {
   expect(times).toContain(0.4)
   expect(times.at(-1)).toBe(12000)
   expect(times).toEqual([...new Set(times)].sort((a, b) => a - b))
-})
-
-it('bounds wheel zoom between 1 ms and 12 s and supports zooming both ways', () => {
-  expect(zoomComparisonWindow(6000, -100)).toBeLessThan(6000)
-  expect(zoomComparisonWindow(6000, 100)).toBeGreaterThan(6000)
-  expect(zoomComparisonWindow(1, -300)).toBe(1)
-  expect(zoomComparisonWindow(12000, 300)).toBe(12000)
-  expect(zoomComparisonWindow(6000, 0)).toBe(6000)
 })

@@ -10,12 +10,7 @@ export const TISSUE_COMPARISON_PLAN = {
   durationMilliseconds: 12000,
 }
 
-export const INITIAL_COMPARISON_WINDOW_MS = 6000
 export const PRE_RF_SAMPLE_TIME_MS = -0.000001
-export function zoomComparisonWindow(current: number, wheelDeltaPixels: number) {
-  return Math.max(1, Math.min(TISSUE_COMPARISON_PLAN.durationMilliseconds,
-    current * Math.exp(Math.max(-300, Math.min(300, wheelDeltaPixels)) * 0.004)))
-}
 
 export const COMPARISON_TISSUE_IDS = [
   'cerebrospinal-fluid', 'cortical-bone', 'white-matter', 'gray-matter',
