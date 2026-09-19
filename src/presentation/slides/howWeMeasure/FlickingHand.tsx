@@ -6,10 +6,12 @@ export function FlickingHand({
   isFlicking,
   onFlick,
   ariaLabel = 'Flick the spinning top',
+  disabled = false,
 }: {
   isFlicking: boolean
   onFlick: () => void
   ariaLabel?: string
+  disabled?: boolean
 }) {
   const hostRef = useRef<HTMLSpanElement>(null)
   const id = useId()
@@ -56,7 +58,7 @@ export function FlickingHand({
     <button
       aria-label={ariaLabel}
       className={`flicking-hand${isFlicking ? ' flicking-hand--flicking' : ''}`}
-      disabled={isFlicking}
+      disabled={isFlicking || disabled}
       onClick={onFlick}
       type="button"
     >

@@ -55,9 +55,9 @@ export function ReceiveCoil({ excitation }: { excitation: ProtonExcitation }) {
         transform="translate(-1 -2)" />
 
       {/* Dark instrument enclosure and opaque ivory gauge face. */}
-      <rect x="251" y="74" width="281" height="276" rx="25" fill="#0b111b" />
-      <rect x="246" y="68" width="281" height="276" rx="25" fill="#304352" stroke="#8aa0ae" strokeWidth="2" />
-      <rect x="260" y="86" width="253" height="216" rx="15" fill="#f7edce" stroke="#131f2b" strokeWidth="5" />
+      <rect x="251" y="124" width="281" height="226" rx="25" fill="#0b111b" />
+      <rect x="246" y="118" width="281" height="226" rx="25" fill="#304352" stroke="#8aa0ae" strokeWidth="2" />
+      <rect x="260" y="136" width="253" height="166" rx="15" fill="#f7edce" stroke="#131f2b" strokeWidth="5" />
       <path d="M290 252 A100 100 0 0 1 490 252" fill="none" stroke="#514e46" strokeWidth="2" />
       {Array.from({ length: 13 }, (_, index) => {
         const angle = (-90 + index * 15) * Math.PI / 180
@@ -69,7 +69,6 @@ export function ReceiveCoil({ excitation }: { excitation: ProtonExcitation }) {
           stroke="#45433e" strokeWidth={major ? 3 : 1.5} />
       })}
       <g fill="#343c42" textAnchor="middle" fontFamily="Manrope, sans-serif" fontWeight="700">
-        <text x="390" y="133" fontSize="25">0 V</text>
         <text x="289" y="279" fontSize="29">−</text>
         <text x="490" y="279" fontSize="29">+</text>
         <text x="390" y="220" fontSize="25">V</text>

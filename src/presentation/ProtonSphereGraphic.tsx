@@ -265,9 +265,7 @@ export function ProtonSphereGraphic({
       if (length > 1e-8) {
         magnet.quaternion.setFromUnitVectors(up, direction.normalize()).multiply(facing)
       }
-      // The bar is a rigid visual magnet: show the Bloch vector's direction,
-      // but don't resize the bar as the ensemble magnetization decays/recovers.
-      magnet.scale.set(1, 1, 1)
+      magnet.scale.set(1, Math.max(1e-5, length), 1)
       render()
       if (Math.hypot(m.x, m.y) > 1e-4 || Math.abs(1 - m.z) > 1e-4) {
         frame = requestAnimationFrame(animate)

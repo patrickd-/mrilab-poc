@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { MagneticFieldBackdrop } from '../components/MagneticFieldBackdrop'
 import { ProtonSphere } from '../components/ProtonSphere'
 import { FlickingHand } from './howWeMeasure/FlickingHand'
 import { SpinningTopGraphic } from './howWeMeasure/SpinningTopGraphic'
 import { ReceiveCoil } from './howWeMeasure/ReceiveCoil'
+import { VoltageTrace, MEASUREMENT_LAYOUT_MS, MEASUREMENT_PULSE_DELAY_MS } from './howWeMeasure/VoltageTrace'
 import { FLICK_CONTACT_MS, FLICK_DURATION_MS } from './howWeMeasure/flickTiming'
 import { RfRemote, RfWavefront, RF_WAVE_DURATION_MS, RF_WAVE_TRAVEL_MS, type RfWave } from './howWeMeasure/RfRemote'
 import './howWeMeasure/how-we-measure.css'
@@ -20,6 +21,9 @@ function HowWeMeasureSlide({
   const sceneRef = useRef<HTMLDivElement>(null)
   const antennaRef = useRef<SVGCircleElement>(null)
   const showRemote = stateIndex >= 3
+  const showTrace = stateIndex >= 5
+  const [renderControls, setRenderControls] = useState(!showTrace)
+  const [measurementStart, setMeasurementStart] = useState<number | null>(null)
   const showTop = stateIndex >= 1 && !showRemote
   const [renderTop, setRenderTop] = useState(showTop)
   const showHand = stateIndex >= 2
@@ -36,6 +40,29 @@ function HowWeMeasureSlide({
   }, [showRemote])
 
   useEffect(() => {
+    setMeasurementStart(null)
+    if (!showTrace) {
+      setRenderControls(true)
+      return
+    }
+    // This next demonstration is a fresh acquisition from equilibrium, so the
+    // first recorded pulse is a 90-degree flip regardless of earlier flicks.
+    setIsFlicking(false)
+    setPulseTimes([])
+    setWave(null)
+    const exitTimer = window.setTimeout(() => setRenderControls(false), MEASUREMENT_LAYOUT_MS)
+    const pulseTimer = window.setTimeout(() => {
+      const start = performance.now()
+      setPulseTimes(fieldStrengthTesla > 0 ? [start] : [])
+      setMeasurementStart(start)
+    }, MEASUREMENT_LAYOUT_MS + MEASUREMENT_PULSE_DELAY_MS)
+    return () => {
+      window.clearTimeout(exitTimer)
+      window.clearTimeout(pulseTimer)
+    }
+  }, [showTrace, fieldStrengthTesla])
+
+  useEffect(() => {
     if (showTop) {
       setRenderTop(true)
       return
@@ -45,7 +72,7 @@ function HowWeMeasureSlide({
   }, [showTop])
 
   useEffect(() => {
-    if (!isFlicking) return
+    if (!isFlicking || showTrace) return
     const rechargeTimer = window.setTimeout(() => setIsFlicking(false), FLICK_DURATION_MS)
     if (!showRemote) return () => window.clearTimeout(rechargeTimer)
 
@@ -69,17 +96,18 @@ function HowWeMeasureSlide({
       window.clearTimeout(contactTimer)
       window.clearTimeout(excitationTimer)
     }
-  }, [isFlicking, showRemote, fieldStrengthTesla])
+  }, [isFlicking, showRemote, showTrace, fieldStrengthTesla])
 
   const flick = () => {
-    if (isFlicking) return
+    if (isFlicking || showTrace) return
     setIsFlicking(true)
     if (showRemote) setWave(null)
     if (!showRemote) setFlickSequence((sequence) => sequence + 1)
   }
 
   return (
-    <div className={`how-we-measure-scene${showRemote ? ' how-we-measure-scene--remote' : ''}`} ref={sceneRef}>
+    <div className={`how-we-measure-scene${showRemote ? ' how-we-measure-scene--remote' : ''}${showTrace ? ' how-we-measure-scene--trace' : ''}`} ref={sceneRef}
+      style={{ '--measurement-layout-duration': `${MEASUREMENT_LAYOUT_MS}ms` } as CSSProperties}>
       <MagneticFieldBackdrop
         className="how-we-measure__field"
         fieldStrengthTesla={fieldStrengthTesla}
@@ -97,15 +125,16 @@ function HowWeMeasureSlide({
       {renderTop ? <div className={`how-we-measure__top${showTop ? '' : ' how-we-measure__top--replaced'}`} aria-hidden={!showTop}>
         <SpinningTopGraphic flickSequence={flickSequence} />
       </div> : null}
-      {showRemote ? <>
-        <RfRemote onFlick={flick} disabled={isFlicking} transmitting={isFlicking && wave !== null} antennaRef={antennaRef} />
+      {showRemote && renderControls ? <>
+        <RfRemote onFlick={flick} disabled={isFlicking || showTrace} transmitting={isFlicking && wave !== null} antennaRef={antennaRef} />
         <RfWavefront wave={wave} />
       </> : null}
-      {showHand ? (
-        <FlickingHand isFlicking={isFlicking} onFlick={flick}
+      {showHand && renderControls ? (
+        <FlickingHand isFlicking={isFlicking} onFlick={flick} disabled={showTrace}
           ariaLabel={showRemote ? 'Flick the remote control button' : undefined} />
       ) : null}
       {stateIndex >= 4 && excitation ? <ReceiveCoil excitation={excitation} /> : null}
+      {showTrace && excitation ? <VoltageTrace excitation={excitation} startedAt={measurementStart} /> : null}
     </div>
   )
 }
@@ -113,6 +142,6 @@ function HowWeMeasureSlide({
 export const howWeMeasureSlideModule: PresentationSlideModule = {
   id: 'how-we-measure',
   heading: 'How are we measuring?',
-  stateCount: 5,
+  stateCount: 6,
   Component: HowWeMeasureSlide,
 }
