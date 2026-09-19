@@ -157,7 +157,7 @@ export function VoltageTrace({ excitation, startedAt, plan = FID_PLAY_PLAN, onPl
           x1={hoverX} x2={hoverX} y1="44" y2="276" /> : null}
         {showEnvelope && complete ? <text className="voltage-trace__identity" x="414" y="37" textAnchor="end"
           data-testid={longitudinal ? 'magnetization-trace-identity' : 'voltage-trace-identity'}>
-          T<tspan baselineShift="sub" fontSize="22">{longitudinal ? '1' : '2'}</tspan>
+          T<tspan dy="4" fontSize="22">{longitudinal ? '1' : '2'}</tspan>
         </text> : null}
       </svg>
     </div>

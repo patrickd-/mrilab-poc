@@ -96,7 +96,7 @@ it('keeps both graphs at 12 seconds without zoom controls while sharing hover ti
     expect(identities).toHaveLength(1)
     expect(identities[0].textContent).toBe(label)
     expect(identities[0].getAttribute('x')).toBe('-18')
-    expect(identities[0].querySelector('tspan')?.getAttribute('baseline-shift')).toBe('sub')
+    expect(identities[0].querySelector('tspan')?.getAttribute('dy')).toBe('4')
     expect([...graph.querySelectorAll('text')].some(text => text.textContent === 'S' || text.textContent === 'M')).toBe(false)
   }
   const signal = screen.getByTestId('cerebrospinal-fluid-signal')

@@ -104,7 +104,7 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
           {ticks.slice(1).map(time => <line key={time} x1={timeX(time)} x2={timeX(time)} y1="54" y2={ZERO_Y} />)}
         </g>
         <path className="voltage-trace__axis" d={`M34 54 V${ZERO_Y} H${right + 8} M29 63 L34 54 L39 63 M${right - 1} ${ZERO_Y - 5} L${right + 8} ${ZERO_Y} L${right - 1} ${ZERO_Y + 5}`} />
-        <text className="tissue-plot__identity" x="-18" y="42">T<tspan baselineShift="sub" fontSize="22">{kind === 'signal' ? '2' : '1'}</tspan></text>
+        <text className="tissue-plot__identity" x="-18" y="42">T<tspan dy="4" fontSize="22">{kind === 'signal' ? '2' : '1'}</tspan></text>
         <text className="tissue-plot__time-unit" x={right} y="239" textAnchor="end">t (s)</text>
         <text className="voltage-trace__tick" x="26" y="260" textAnchor="end">0</text>
         <text className="voltage-trace__tick" x="26" y="76" textAnchor="end">1</text>

@@ -143,6 +143,9 @@ it('plots actual longitudinal recovery and transverse envelope and reveals ident
   act(() => frame(12000))
   expect(screen.getByTestId('voltage-trace-identity').textContent).toBe('T2')
   expect(screen.getByTestId('magnetization-trace-identity').textContent).toBe('T1')
+  for (const id of ['voltage-trace-identity', 'magnetization-trace-identity']) {
+    expect(screen.getByTestId(id).querySelector('tspan')?.getAttribute('dy')).toBe('4')
+  }
   rerender(<VoltageTrace excitation={excitation} startedAt={13000} showLongitudinal showEnvelope />)
   expect(screen.queryByTestId('voltage-trace-identity')).toBeNull()
   expect(screen.queryByTestId('magnetization-trace-identity')).toBeNull()
