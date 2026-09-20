@@ -80,6 +80,10 @@
 .tissue-plot__time-unit { fill: #f0f4f5; font: 20px Manrope, sans-serif; paint-order: stroke; stroke: #080d11; stroke-width: 5; stroke-linejoin: round; }
 .tissue-plot__outgoing-voltage { fill: none; stroke: #f6cf75; stroke-width: 2.5; animation: comparison-fade-out 650ms ease both; }
 .tissue-plots:focus-visible { outline: 1px solid #87e0ef; outline-offset: 2px; }
+.tissue-plot__editable { cursor: crosshair; }
+.tissue-plot__refocus .voltage-trace__pulse-line { stroke: #f6cf75; }
+.tissue-plot__refocus .voltage-trace__tag { fill: #f6cf75; stroke: #ffe6a8; }
+.tissue-plot__refocus text { fill: #111820; font: 700 18px Manrope, sans-serif; }
 
 .tissue-comparison:not([data-csf-step='0']) .tissue-comparison__field .magnet,
 .tissue-comparison:not([data-csf-step='0']) .tissue-comparison__field .field-lines,

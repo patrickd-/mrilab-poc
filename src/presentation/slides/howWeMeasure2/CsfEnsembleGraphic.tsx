@@ -15,6 +15,7 @@ interface Props {
   immediate: boolean
   onSettled: () => void
   clock?: PlaybackClock
+  endsAt?: number
 }
 
 /** One renderer and shared geometry for all 36 ensembles, including stacking. */
@@ -137,7 +138,7 @@ export function CsfEnsembleGraphic(props: Props) {
       host.dataset.simulationPaused = String(clock.paused)
       if (fraction === 1 && !settled) { settled = true; input.onSettled() }
       const lastPulse = input.excitation.pulseEvents.at(-1)?.timeMilliseconds
-      if (fraction < 1 || (!clock.paused && (input.step !== 3 && input.step !== 4) && lastPulse !== undefined && now < lastPulse + 12000)) frame = requestAnimationFrame(animate)
+      if (fraction < 1 || (!clock.paused && (input.step !== 3 && input.step !== 4) && lastPulse !== undefined && now < (input.endsAt ?? lastPulse + 12000))) frame = requestAnimationFrame(animate)
     }
     const update = (next: Props) => {
       input = next
@@ -185,7 +186,7 @@ export function CsfEnsembleGraphic(props: Props) {
     }
   }, [])
 
-  useEffect(() => updateRef.current?.(props), [props.step, props.states, props.excitation, props.immediate, props.onSettled, props.clock, props.clock?.paused])
+  useEffect(() => updateRef.current?.(props), [props.step, props.states, props.excitation, props.immediate, props.onSettled, props.clock, props.clock?.paused, props.endsAt])
 
   return <div className="csf-ensemble-scene" ref={hostRef} role="img"
     aria-label={props.step === 6 ? '36 CSF magnetizations in one stacked sphere' : props.step === 1 ? 'Enlarged CSF ensemble' : '6 by 6 CSF ensemble grid'}

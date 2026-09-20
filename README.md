@@ -74,6 +74,14 @@ Left/Right and Space remain presentation shortcuts even after using a slider
 or button; held-key repeats are ignored. Space does nothing before playback
 controls become available. Tab and Enter retain normal control navigation.
 
+Once the imperfect-field CSF grid appears, click either graph after t=0 to
+place or move a yellow 180° refocusing pulse and replay the acquisition.
+The same Bloch pulse rotates every grid/stacked magnet: phase alignment returns
+at twice the selected delay, while irreversible T2 decay remains. The T1 graph
+includes negative magnetization after inversion. The dim intrinsic T2 curve
+remains as a reference. Late pulses extend the timeline to include their echo;
+zoom and pause still work. The pulse carries into stacked view; Refresh clears it.
+
 ## GitHub Pages
 
 Pushes to `main` run the GitHub Pages workflow in

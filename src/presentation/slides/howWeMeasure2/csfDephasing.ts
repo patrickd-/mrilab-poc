@@ -1,10 +1,25 @@
 import { PROTON_GYROMAGNETIC_RATIO } from '../../../models/HydrogenEnsemble'
 import type { FidEnsembleState } from '../../../simulation/fid'
 import { createPresentationCsfState, presentationMagnetizationAt, type ProtonExcitation } from '../howWeMeasure/protonExcitation'
+import { TISSUE_COMPARISON_PLAN } from './tissueComparison'
+import type { PlayPlan } from '../../playback/playPlan'
 
 export const CSF_GRID_SIDE = 6
 export const CSF_LAYOUT_MS = 1400
 export const CSF_FREQUENCY_SPREAD_HZ = 0.4
+
+/** Keep the full echo in view even when the refocusing pulse is placed late. */
+export function csfEchoPlayPlan(refocusTimeMilliseconds: number | null): PlayPlan {
+  return {
+    ...TISSUE_COMPARISON_PLAN,
+    layoutDurationMilliseconds: 0,
+    durationMilliseconds: Math.max(TISSUE_COMPARISON_PLAN.durationMilliseconds,
+      refocusTimeMilliseconds === null ? 0 : 2 * refocusTimeMilliseconds + 1000),
+    events: [...TISSUE_COMPARISON_PLAN.events, ...(refocusTimeMilliseconds === null ? [] : [{
+      type: 'rf-pulse' as const, timeMilliseconds: refocusTimeMilliseconds, kind: '180-x' as const, label: '180°',
+    }])],
+  }
+}
 
 export function csfFieldProfile(x: number, y: number) {
   return 0.75 * x + 0.32 * y + 0.17 * x * y + 0.08 * y * y

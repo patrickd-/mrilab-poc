@@ -10,7 +10,8 @@ const ZERO_Y = 254
 const SCALE_Y = 184
 const HEIGHT = 310
 
-export function TissueRelaxationPlots({ tissues, startedAt, highlighted, entering, csfOnly = false, ensembleStates, showIntrinsicReference = false, clock = realTimeClock }: {
+export function TissueRelaxationPlots({ tissues, startedAt, highlighted, entering, csfOnly = false, ensembleStates, showIntrinsicReference = false, clock = realTimeClock,
+  refocusTime = null, onPlaceRefocusingPulse, durationMilliseconds = TISSUE_COMPARISON_PLAN.durationMilliseconds }: {
   tissues: readonly ComparisonTissue[]
   startedAt: number | null
   highlighted: SamplePresetId | null
@@ -19,6 +20,9 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
   ensembleStates?: readonly FidEnsembleState[]
   showIntrinsicReference?: boolean
   clock?: PlaybackClock
+  refocusTime?: number | null
+  onPlaceRefocusingPulse?: (timeMilliseconds: number) => void
+  durationMilliseconds?: number
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -28,9 +32,16 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
   const descriptionId = useId()
   const plan = TISSUE_COMPARISON_PLAN
   const [timeWindow, setTimeWindow] = useState(plan.durationMilliseconds)
+  const previousDuration = useRef(durationMilliseconds)
   const leadIn = plan.layoutDurationMilliseconds + plan.settleDelayMilliseconds
   const right = width - 20
   const timeX = (time: number) => LEFT + (time + timeWindow * 0.08) / (timeWindow * 1.08) * (right - LEFT)
+
+  useEffect(() => {
+    const previous = previousDuration.current
+    setTimeWindow(current => current === previous ? durationMilliseconds : Math.min(current, durationMilliseconds))
+    previousDuration.current = durationMilliseconds
+  }, [durationMilliseconds])
 
   useEffect(() => {
     const container = containerRef.current
@@ -39,11 +50,11 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
       if (!(event.target instanceof Element) || !event.target.closest('svg')) return
       event.preventDefault()
       const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? container.clientHeight : 1)
-      setTimeWindow(current => zoomComparisonWindow(current, delta))
+      setTimeWindow(current => zoomComparisonWindow(current, delta, durationMilliseconds))
     }
     container.addEventListener('wheel', zoom, { passive: false })
     return () => container.removeEventListener('wheel', zoom)
-  }, [])
+  }, [durationMilliseconds])
 
   useEffect(() => {
     const svg = svgRef.current
@@ -65,12 +76,14 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
     activeKeys.add('intrinsic-reference')
     Object.entries(paths.current).forEach(([key, path]) => { if (activeKeys.has(key)) path?.setAttribute('d', '') })
     if (startedAt === null) return
-    const times = [...new Set([...comparisonSampleTimes(tissues), -timeWindow * 0.08, timeWindow])].sort((a, b) => a - b)
+    // Resolve both sides of the instantaneous inversion and the exact echo time.
+    const extraTimes = refocusTime === null ? [] : [refocusTime + PRE_RF_SAMPLE_TIME_MS, refocusTime, 2 * refocusTime]
+    const times = [...new Set([...comparisonSampleTimes(tissues, durationMilliseconds), ...extraTimes, -timeWindow * 0.08, timeWindow])].sort((a, b) => a - b)
     const curves: Record<string, string> = {}
     let index = 0
     let frame = 0
     const animate = () => {
-      const elapsed = Math.max(-leadIn, Math.min(plan.durationMilliseconds, clock.now() - startedAt))
+      const elapsed = Math.max(-leadIn, Math.min(durationMilliseconds, clock.now() - startedAt))
       while (index < times.length && times[index] <= elapsed) {
         const time = times[index++]
         for (const tissue of activeTissues) {
@@ -81,10 +94,14 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
             if (time < -timeWindow * 0.08 || time > timeWindow) continue
             // The left-hand limit and post-RF value share exactly x(t=0),
             // since the pulse is instantaneous.
-            const plotTime = time === PRE_RF_SAMPLE_TIME_MS ? 0 : time
+            const plotTime = time === PRE_RF_SAMPLE_TIME_MS ? 0
+              : refocusTime !== null && time === refocusTime + PRE_RF_SAMPLE_TIME_MS ? refocusTime : time
             const x = LEFT + (plotTime + timeWindow * 0.08) / (timeWindow * 1.08) * (right - LEFT)
             const key = `${tissue.id}-${kind}`
-            curves[key] = (curves[key] ?? '') + `${curves[key] ? 'L' : 'M'}${x.toFixed(3)} ${(ZERO_Y - SCALE_Y * m[kind]).toFixed(3)} `
+            const bipolar = kind === 'longitudinal' && refocusTime !== null
+            const zero = bipolar ? ZERO_Y - SCALE_Y / 2 : ZERO_Y
+            const scale = bipolar ? SCALE_Y / 2 : SCALE_Y
+            curves[key] = (curves[key] ?? '') + `${curves[key] ? 'L' : 'M'}${x.toFixed(3)} ${(zero - scale * m[kind]).toFixed(3)} `
             if (showIntrinsicReference && kind === 'signal') {
               const key = 'intrinsic-reference'
               curves[key] = (curves[key] ?? '') + `${curves[key] ? 'L' : 'M'}${x.toFixed(3)} ${(ZERO_Y - SCALE_Y * intrinsic.signal).toFixed(3)} `
@@ -97,20 +114,20 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
         path?.setAttribute('d', curves[key] ?? '')
         path?.setAttribute('data-elapsed-ms', String(elapsed))
       }
-      if (elapsed < plan.durationMilliseconds && !clock.paused) frame = requestAnimationFrame(animate)
+      if (elapsed < durationMilliseconds && !clock.paused) frame = requestAnimationFrame(animate)
     }
     animate()
     return () => cancelAnimationFrame(frame)
-  }, [tissues, startedAt, leadIn, right, plan, timeWindow, csfOnly, ensembleStates, showIntrinsicReference, clock, clock.paused])
+  }, [tissues, startedAt, leadIn, right, durationMilliseconds, timeWindow, csfOnly, ensembleStates, showIntrinsicReference, clock, clock.paused, refocusTime])
 
-  const hover = (event: MouseEvent<SVGSVGElement>) => {
+  const cursorFraction = (event: MouseEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
     const scale = Math.min(rect.width / width, rect.height / HEIGHT)
-    if (scale <= 0) return
+    if (scale <= 0) return null
     const x = (event.clientX - rect.left - (rect.width - width * scale) / 2) / scale
     const y = (event.clientY - rect.top) / scale
-    setHoverFraction(x >= LEFT && x <= right && y >= 44 && y <= ZERO_Y
-      ? (x - LEFT) / (right - LEFT) : null)
+    return x >= LEFT && x <= right && y >= 44 && y <= ZERO_Y
+      ? (x - LEFT) / (right - LEFT) : null
   }
 
   const unitScale = timeWindow < 2000 ? 1 : 1000
@@ -124,29 +141,40 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
     onKeyDown={event => {
       if (event.key === '+' || event.key === '=' || event.key === '-') {
         event.preventDefault()
-        setTimeWindow(current => zoomComparisonWindow(current, event.key === '-' ? 100 : -100))
-      } else if (event.key === '0') setTimeWindow(plan.durationMilliseconds)
+        setTimeWindow(current => zoomComparisonWindow(current, event.key === '-' ? 100 : -100, durationMilliseconds))
+      } else if (event.key === '0') setTimeWindow(durationMilliseconds)
     }}>
     {(['signal', 'longitudinal'] as const).map(kind => {
+      const bipolar = kind === 'longitudinal' && refocusTime !== null
+      const zero = bipolar ? ZERO_Y - SCALE_Y / 2 : ZERO_Y
       return <div className={`tissue-plot tissue-plot--${kind}`} key={kind}>
       <svg ref={kind === 'signal' ? svgRef : undefined} viewBox={`0 0 ${width} ${HEIGHT}`}
         preserveAspectRatio="xMidYMin meet" role="img" aria-label={kind === 'signal' ? 'Tissue transverse signal over time' : 'Tissue longitudinal magnetization over time'}
         aria-describedby={`${descriptionId}-${kind}`} data-time-window-ms={timeWindow}
-        onMouseMove={hover} onMouseLeave={() => setHoverFraction(null)}>
+        className={onPlaceRefocusingPulse ? 'tissue-plot__editable' : undefined}
+        onMouseMove={event => setHoverFraction(cursorFraction(event))} onMouseLeave={() => setHoverFraction(null)}
+        onClick={event => {
+          const fraction = cursorFraction(event)
+          if (fraction === null || !onPlaceRefocusingPulse) return
+          const time = (fraction * 1.08 - 0.08) * timeWindow
+          if (time > 0) onPlaceRefocusingPulse(time)
+        }}>
         <desc id={`${descriptionId}-${kind}`}>
           Equal-volume CSF, cortical bone, white matter and gray matter on a common scale relative to CSF equilibrium magnetization.
           {unitScale === 1 ? 'Time is in milliseconds.' : 'Time is in seconds.'} Both time axes zoom together without restarting the simulation.
-          All receive the same 90 degree pulse at zero. Hover or focus a tissue sphere to highlight its curves. RF timing is not editable.
+          All receive the same 90 degree pulse at zero. Hover or focus a tissue sphere to highlight its curves.
+          {onPlaceRefocusingPulse ? 'Click either graph after zero to place or move a 180 degree refocusing pulse and replay. Phase alignment returns at twice its time, with intrinsic T2 attenuation. Refresh clears the pulse.' : 'RF timing is not editable.'}
           {showIntrinsicReference ? 'The observed T2-star signal is the magnitude of the summed ensemble vectors; the dim curve is intrinsic CSF T2.' : ''}
         </desc>
         <g className="voltage-trace__grid">
           {[70, 162, ZERO_Y].map(y => <line key={y} x1="34" x2={right + 6} y1={y} y2={y} />)}
           {ticks.slice(1).map(time => <line key={time} x1={timeX(time)} x2={timeX(time)} y1="54" y2={ZERO_Y} />)}
         </g>
-        <path className="voltage-trace__axis" d={`M34 54 V${ZERO_Y} H${right + 8} M29 63 L34 54 L39 63 M${right - 1} ${ZERO_Y - 5} L${right + 8} ${ZERO_Y} L${right - 1} ${ZERO_Y + 5}`} />
+        <path className="voltage-trace__axis" d={`M34 54 V${ZERO_Y} M34 ${zero} H${right + 8} M29 63 L34 54 L39 63 M${right - 1} ${zero - 5} L${right + 8} ${zero} L${right - 1} ${zero + 5}`} />
         <text className="tissue-plot__identity" x="-18" y="42">T<tspan dy="4" fontSize="22">{kind === 'signal' ? '2' : '1'}</tspan>{kind === 'signal' && showIntrinsicReference ? <tspan dy="-12" fontSize="20">*</tspan> : null}</text>
         <text className="tissue-plot__time-unit" x={right} y="239" textAnchor="end">t ({unitScale === 1 ? 'ms' : 's'})</text>
-        <text className="voltage-trace__tick" x="26" y="260" textAnchor="end">0</text>
+        <text className="voltage-trace__tick" x="26" y={zero + 6} textAnchor="end">0</text>
+        {bipolar ? <text className="voltage-trace__tick" x="26" y="260" textAnchor="end">−1</text> : null}
         <text className="voltage-trace__tick" x="26" y="76" textAnchor="end">1</text>
         {ticks.map(time => <text key={time} className="voltage-trace__tick" x={timeX(time)} y="282" textAnchor="middle">{Number((time / unitScale).toPrecision(4))}</text>)}
         {kind === 'signal' && showIntrinsicReference ? <path ref={path => { paths.current['intrinsic-reference'] = path }}
@@ -162,6 +190,15 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
             <path className="voltage-trace__rf-symbol" d="M-7 13 Q2 20 -7 27 M0 10 Q12 20 0 30" />
           </> : null}
         </g>
+        {refocusTime !== null && refocusTime <= timeWindow ? <g className="tissue-plot__refocus"
+          data-testid={`${kind}-refocus-marker`} data-time-ms={refocusTime}
+          transform={`translate(${timeX(refocusTime)} 0)`} aria-label={`180° RF pulse at ${refocusTime / 1000} s`}>
+          <line className="voltage-trace__pulse-line" x1="0" x2="0" y1="43" y2={ZERO_Y} />
+          {kind === 'signal' ? <>
+            <path className="voltage-trace__tag" d="M-25 5 H25 V32 L0 44 L-25 32Z" />
+            <text x="0" y="27" textAnchor="middle">180°</text>
+          </> : null}
+        </g> : null}
         {hoverFraction !== null ? <line className="voltage-trace__hover" data-testid={`tissue-${kind}-hover`}
           x1={LEFT + hoverFraction * (right - LEFT)} x2={LEFT + hoverFraction * (right - LEFT)} y1="44" y2={ZERO_Y} /> : null}
         {entering && kind === 'signal' ? <path className="tissue-plot__outgoing-voltage" d={`M${LEFT} 162 H${timeX(0)}`} /> : null}

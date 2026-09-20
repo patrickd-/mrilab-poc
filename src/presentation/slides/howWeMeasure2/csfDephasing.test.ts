@@ -1,7 +1,9 @@
 import { expect, it } from 'vitest'
 import { PROTON_GYROMAGNETIC_RATIO } from '../../../models/HydrogenEnsemble'
 import { presentationMagnetizationAt } from '../howWeMeasure/protonExcitation'
-import { createCsfGrid, csfCollectionAt } from './csfDephasing'
+import { createCsfGrid, csfCollectionAt, csfEchoPlayPlan } from './csfDephasing'
+import { startPlayPlan } from '../../playback/playPlan'
+import { fidEnsembleMagnetizationStateAt } from '../../../simulation/fid'
 
 const excitation = { fieldStrengthTesla: 1.5, pulseEvents: [{ timeMilliseconds: 1000, kind: '90-y' as const }] }
 
@@ -52,4 +54,28 @@ it('retains reversible phase dispersion rather than substituting a shorter intri
   const grid = createCsfGrid(1.5, true)
   const refocused = { ...excitation, pulseEvents: [...excitation.pulseEvents, { timeMilliseconds: 1400, kind: '180-x' as const }] }
   expect(csfCollectionAt(grid, refocused, 1800).signal).toBeCloseTo(Math.exp(-800 / 2100), 12)
+})
+
+it.each([350, 1200, 2377.25, 8000])('refocuses actual grid and stacked vectors at twice a %s ms pulse delay, without undoing T2', delay => {
+  const grid = createCsfGrid(1.5, true)
+  const playback = startPlayPlan(csfEchoPlayPlan(delay), 1000)
+  const excitation = { fieldStrengthTesla: 1.5, pulseEvents: playback.pulseEvents }
+  expect(playback.pulseEvents).toEqual([
+    { kind: '90-y', timeMilliseconds: 1000 },
+    { kind: '180-x', timeMilliseconds: 1000 + delay },
+  ])
+  const echoTime = 1000 + 2 * delay
+  const echo = csfCollectionAt(grid, excitation, echoTime)
+  expect(echo.signal).toBeCloseTo(Math.exp(-2 * delay / 2100), 12)
+  expect(csfCollectionAt([...grid].reverse(), excitation, echoTime)).toEqual(echo)
+  const beforePulse = csfCollectionAt(grid, excitation, 1000 + delay - 1e-6)
+  const afterPulse = csfCollectionAt(grid, excitation, 1000 + delay)
+  expect(afterPulse.signal).toBeCloseTo(beforePulse.signal, 8)
+  expect(afterPulse.longitudinal).toBeCloseTo(-beforePulse.longitudinal, 8)
+  for (const state of grid) {
+    const m = fidEnsembleMagnetizationStateAt(state, echoTime, playback.pulseEvents)
+    expect(m.xFraction).toBeCloseTo(Math.exp(-2 * delay / 2100), 12)
+    expect(m.yFraction).toBeCloseTo(0, 12)
+  }
+  expect(csfEchoPlayPlan(delay).durationMilliseconds).toBeGreaterThan(2 * delay)
 })

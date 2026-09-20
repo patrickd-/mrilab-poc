@@ -8,7 +8,7 @@ import { ReceiveCoil } from './howWeMeasure/ReceiveCoil'
 import { TissueRelaxationPlots } from './howWeMeasure2/TissueRelaxationPlots'
 import { createComparisonTissues, TISSUE_COMPARISON_PLAN } from './howWeMeasure2/tissueComparison'
 import { CsfEnsembleGraphic } from './howWeMeasure2/CsfEnsembleGraphic'
-import { createCsfGrid } from './howWeMeasure2/csfDephasing'
+import { createCsfGrid, csfEchoPlayPlan } from './howWeMeasure2/csfDephasing'
 import { realTimeClock } from '../playback/simulationClock'
 import type { PresentationSlideModule, SlideStateProps } from './types'
 import './howWeMeasure/how-we-measure.css'
@@ -24,6 +24,8 @@ function HowWeMeasure2Slide({ fieldStrengthTesla, stateIndex, direction, simulat
   const firstSpecimen = useRef<HTMLElement>(null)
   const initialPlayback = usePlayPlan(POST_LAYOUT_PLAY_PLAN, stateIndex === 0 && !entering, `${fieldStrengthTesla}:${stateIndex}`)
   const [csfPlayback, setCsfPlayback] = useState<PlanPlayback | null>(null)
+  const [refocusTime, setRefocusTime] = useState<number | null>(null)
+  const csfPlan = useMemo(() => csfEchoPlayPlan(stateIndex >= 5 ? refocusTime : null), [stateIndex >= 5, refocusTime])
   const [showComparisonSpheres, setShowComparisonSpheres] = useState(stateIndex === 0)
   const startedStep = useRef(-1)
   const playback = stateIndex === 0 ? initialPlayback : csfPlayback
@@ -35,12 +37,20 @@ function HowWeMeasure2Slide({ fieldStrengthTesla, stateIndex, direction, simulat
     if (startedStep.current === stateIndex) return
     startedStep.current = stateIndex
     if ([1, 2, 5, 6].includes(stateIndex)) {
-      setCsfPlayback(startPlayPlan(POST_LAYOUT_PLAY_PLAN, clock.now() + POST_LAYOUT_PLAY_PLAN.settleDelayMilliseconds))
+      setCsfPlayback(startPlayPlan(csfPlan, clock.now() + csfPlan.settleDelayMilliseconds))
     }
-  }, [stateIndex, clock])
+  }, [stateIndex, clock, csfPlan])
+
+  const placeRefocusingPulse = (timeMilliseconds: number) => {
+    if (stateIndex < 5 || csfPlayback === null) return
+    setRefocusTime(timeMilliseconds)
+    const plan = csfEchoPlayPlan(timeMilliseconds)
+    setCsfPlayback(startPlayPlan(plan, clock.now() + plan.settleDelayMilliseconds))
+  }
 
   useEffect(() => {
     startedStep.current = -1
+    if (stateIndex < 5) setRefocusTime(null)
     if ([1, 2, 5, 6].includes(stateIndex)) setCsfPlayback(null)
     if (stateIndex === 0) {
       setShowComparisonSpheres(true)
@@ -103,10 +113,14 @@ function HowWeMeasure2Slide({ fieldStrengthTesla, stateIndex, direction, simulat
       <figcaption>{tissue.label}</figcaption>
     </figure>)}
     {stateIndex > 0 ? <CsfEnsembleGraphic step={stateIndex} states={grid} excitation={tissues[0].excitation}
-      immediate={direction === 'backward'} onSettled={onCsfSettled} clock={clock} /> : null}
+      immediate={direction === 'backward'} onSettled={onCsfSettled} clock={clock}
+      endsAt={csfPlayback ? csfPlayback.startedAt + csfPlan.durationMilliseconds : undefined} /> : null}
     <TissueRelaxationPlots tissues={tissues} startedAt={playback?.startedAt ?? null} highlighted={stateIndex === 0 ? highlighted : null}
       entering={stateIndex === 0 && entering} csfOnly={stateIndex > 0} ensembleStates={stateIndex >= 2 ? grid : undefined}
-      showIntrinsicReference={stateIndex >= 5} clock={clock} />
+      showIntrinsicReference={stateIndex >= 5} clock={clock}
+      refocusTime={stateIndex >= 5 ? refocusTime : null}
+      onPlaceRefocusingPulse={stateIndex >= 5 && csfPlayback !== null ? placeRefocusingPulse : undefined}
+      durationMilliseconds={csfPlan.durationMilliseconds} />
   </div>
 }
 
