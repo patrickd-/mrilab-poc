@@ -81,6 +81,27 @@
 .tissue-plot__outgoing-voltage { fill: none; stroke: #f6cf75; stroke-width: 2.5; animation: comparison-fade-out 650ms ease both; }
 .tissue-plots:focus-visible { outline: 1px solid #87e0ef; outline-offset: 2px; }
 
+.tissue-comparison:not([data-csf-step='0']) .tissue-comparison__field .magnet,
+.tissue-comparison:not([data-csf-step='0']) .tissue-comparison__field .field-lines,
+.tissue-comparison:not([data-csf-step='0']) .tissue-plots { animation: none; }
+.tissue-comparison:not([data-csf-step='0']) .tissue-plot__curve { transition: opacity 700ms ease; }
+.tissue-comparison:not([data-csf-step='0']) .tissue-specimen {
+  animation: comparison-fade-out 700ms ease both;
+  pointer-events: none;
+}
+.tissue-comparison:not([data-csf-step='0']) .tissue-specimen figcaption { animation: none; }
+.tissue-comparison:not([data-csf-step='0']) .tissue-specimen--0 .proton-sphere { visibility: hidden; }
+.csf-ensemble-scene {
+  position: absolute;
+  inset: 8% 62% 8% 2%;
+  z-index: 20;
+  opacity: 1;
+  transition: opacity 1000ms ease;
+  pointer-events: none;
+}
+.csf-ensemble-scene canvas { display: block; width: 100%; height: 100%; }
+.csf-ensemble-scene[data-hidden='true'] { opacity: 0; }
+
 @keyframes comparison-field-contract { from { right: 36%; } to { right: 62%; } }
 @keyframes comparison-lines-contract { from { right: 39%; } to { right: 65%; } }
 @keyframes comparison-plots-expand { from { left: 66.5%; } to { left: 42%; } }

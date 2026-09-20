@@ -44,6 +44,25 @@ The “How are we measuring?” module continues the centered field into an
 interactive analogy: a multicolor WebGL spinning top precesses after a
 clickable cartoon hand flicks it, then exponentially realigns with B0.
 
+The tissue-comparison module then isolates CSF, splits it into a 6×6 grid,
+introduces B0 imperfections, and recombines the 36 magnetizations into a
+stacked sphere. One WebGL renderer handles the whole grid. The CSF T1/T2
+values come from the simulator; both the magnets and the graphs use its Bloch
+state calculation. Signals are normalized to the same total M0 before and
+after subdivision: `abs(sum(Mx + i*My)) / 36`, not a sum of magnitudes.
+Static frequency offsets cause the extra T2* loss while T1 remains unchanged;
+the dim reference curve shows intrinsic T2. See §5.3 of
+[Hanson's MRI introduction](https://backend.orbit.dtu.dk/ws/portalfiles/portal/106310664/MRI_English_a4.pdf)
+for the underlying dephasing mechanism.
+
+This is an illustrative field profile, not a scanner calibration: offsets
+span a few Hz so dephasing is visible alongside real-time CSF relaxation.
+The field-line bending and color contrast are exaggerated; local direction
+tilts are not simulated. The finite 36-vector sum can have small residual
+ripples rather than a perfectly exponential T2* envelope. Stacking changes
+only the layout and preserves the acquisition; the replay button starts it
+afresh. Both graphs retain shared scroll zoom, initially covering 12 seconds.
+
 ## GitHub Pages
 
 Pushes to `main` run the GitHub Pages workflow in

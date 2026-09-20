@@ -445,6 +445,10 @@ input {
   background: linear-gradient(0deg, transparent, #90eea9 12% 88%, transparent);
 }
 
+.field-lines--curved { opacity: 0; pointer-events: none; transition: opacity 1000ms ease; overflow: visible; }
+.field-backdrop--nonuniform .field-lines:not(.field-lines--curved) { opacity: 0; transition: opacity 1000ms ease; }
+.field-backdrop--nonuniform .field-lines--curved { opacity: var(--field-opacity); }
+
 .field-line::after {
   position: absolute;
   top: 50%;
