@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import type { ProtonExcitation } from './slides/howWeMeasure/protonExcitation'
 import { animateProtonMagnet } from './slides/howWeMeasure/animateProtonMagnet'
 import { SAMPLE_COLORS } from '../models/sampleColors'
+import { createMagnetPoleMaterial } from './components/magnetAppearance'
 
 /**
  * A single proton-ensemble sphere using the MRI Lab's geometry and tissue
@@ -138,24 +139,11 @@ export function ProtonSphereGraphic({
     arrowMaterialRef.current = arrowMaterial
 
     const magnetHalfGeometry = new THREE.BoxGeometry(0.54, 0.78, 0.4)
-    const northMaterial = new THREE.MeshPhongMaterial({
-      color: '#ff0018',
-      emissive: '#ff0018',
-      emissiveIntensity: 1.9,
-      specular: '#ffffff',
-      shininess: 96,
-      depthTest: false,
-      toneMapped: false,
-    })
-    const southMaterial = new THREE.MeshPhongMaterial({
-      color: '#006cff',
-      emissive: '#006cff',
-      emissiveIntensity: 1.9,
-      specular: '#ffffff',
-      shininess: 96,
-      depthTest: false,
-      toneMapped: false,
-    })
+    const northMaterial = createMagnetPoleMaterial('N')
+    const southMaterial = createMagnetPoleMaterial('S')
+    // This scene has a depth-only sphere for clipping the external cones.
+    // The enclosed magnet must bypass that shell's depth mask.
+    northMaterial.depthTest = southMaterial.depthTest = false
     const netMagnet = new THREE.Group()
     netMagnet.rotation.y = -0.18
     netMagnet.visible = showNetMagnet

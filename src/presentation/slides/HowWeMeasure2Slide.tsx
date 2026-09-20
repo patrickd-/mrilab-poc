@@ -32,19 +32,14 @@ function HowWeMeasure2Slide({ fieldStrengthTesla, stateIndex, direction }: Slide
   const onCsfSettled = useCallback(() => {
     if (startedStep.current === stateIndex) return
     startedStep.current = stateIndex
-    if ([1, 2, 5].includes(stateIndex)) {
+    if ([1, 2, 5, 6].includes(stateIndex)) {
       setCsfPlayback(startPlayPlan(POST_LAYOUT_PLAY_PLAN, performance.now() + POST_LAYOUT_PLAY_PLAN.settleDelayMilliseconds))
-    } else if (stateIndex === 6) {
-      // Recombination preserves every vector and the current acquisition.
-      // A direct replay of this step starts a fresh acquisition instead.
-      setCsfPlayback(previous => previous ?? startPlayPlan(POST_LAYOUT_PLAY_PLAN,
-        performance.now() + POST_LAYOUT_PLAY_PLAN.settleDelayMilliseconds))
     }
   }, [stateIndex])
 
   useEffect(() => {
     startedStep.current = -1
-    if ([1, 2, 5].includes(stateIndex)) setCsfPlayback(null)
+    if ([1, 2, 5, 6].includes(stateIndex)) setCsfPlayback(null)
     if (stateIndex === 0) {
       setShowComparisonSpheres(true)
       return

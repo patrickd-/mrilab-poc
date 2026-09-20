@@ -4,6 +4,8 @@ import { SAMPLE_COLORS } from '../../../models/sampleColors'
 import type { FidEnsembleState } from '../../../simulation/fid'
 import { presentationMagnetizationAt, type ProtonExcitation } from '../howWeMeasure/protonExcitation'
 import { CSF_GRID_SIDE, CSF_LAYOUT_MS } from './csfDephasing'
+import { createMagnetPoleMaterial } from '../../components/magnetAppearance'
+import { csfViewVector, splitCsfOrigins, type CsfPose } from './csfView'
 
 interface Props {
   step: number
@@ -12,7 +14,6 @@ interface Props {
   immediate: boolean
   onSettled: () => void
 }
-interface Pose { x: number; y: number; radius: number; shell: number; thickness: number }
 
 /** One renderer and shared geometry for all 36 ensembles, including stacking. */
 export function CsfEnsembleGraphic(props: Props) {
@@ -39,10 +40,7 @@ export function CsfEnsembleGraphic(props: Props) {
     const sphereGeometry = new THREE.SphereGeometry(1, 32, 24)
     const barGeometry = new THREE.BoxGeometry(0.54, 0.78, 0.4)
     const labelGeometry = new THREE.PlaneGeometry(0.38, 0.38)
-    const poleMaterials = ['#ff0018', '#006cff'].map(color => new THREE.MeshPhongMaterial({
-      color, emissive: color, emissiveIntensity: 1.9, shininess: 96,
-      specular: '#ffffff', toneMapped: false, transparent: true,
-    }))
+    const poleMaterials = [createMagnetPoleMaterial('N'), createMagnetPoleMaterial('S')]
     const textures: THREE.CanvasTexture[] = []
     const labelMaterials = ['N', 'S'].map(label => {
       const canvas = document.createElement('canvas')
@@ -85,13 +83,13 @@ export function CsfEnsembleGraphic(props: Props) {
       return { group, magnet, shellMaterial, labels }
     })
     let width = 1, height = 1, frame = 0, transitionAt = 0, lastStep = -1
-    let current: Pose[] = [], from: Pose[] = [], target: Pose[] = []
+    let current: CsfPose[] = [], from: CsfPose[] = [], target: CsfPose[] = []
     let input = latest.current
     let settled = false
     const up = new THREE.Vector3(0, 1, 0)
     const vector = new THREE.Vector3()
     const facing = new THREE.Quaternion().setFromAxisAngle(up, -0.18)
-    const poses = (step: number): Pose[] => {
+    const poses = (step: number): CsfPose[] => {
       const size = Math.min(width, height)
       return objects.map((_, index) => {
         const grid = step >= 2 && step <= 5
@@ -109,7 +107,7 @@ export function CsfEnsembleGraphic(props: Props) {
       const blend = fraction * fraction * (3 - 2 * fraction)
       current = target.map((pose, index) => {
         const start = from[index] ?? pose
-        const mix = (key: keyof Pose) => start[key] + (pose[key] - start[key]) * blend
+        const mix = (key: keyof CsfPose) => start[key] + (pose[key] - start[key]) * blend
         return { x: mix('x'), y: mix('y'), radius: mix('radius'), shell: mix('shell'), thickness: mix('thickness') }
       })
       for (let index = 0; index < objects.length; index++) {
@@ -123,7 +121,8 @@ export function CsfEnsembleGraphic(props: Props) {
         // red/blue halves still identify the poles of every individual magnet.
         labels.forEach(label => { label.visible = pose.thickness > 0.5 })
         const m = presentationMagnetizationAt(input.states[index], input.excitation, now)
-        vector.set(m.x, m.z, -m.y)
+        const view = csfViewVector(m, (input.step === 1 ? blend : 1) * Math.PI / 2)
+        vector.set(view.x, view.y, view.z)
         const length = vector.length()
         if (length > 1e-8) magnet.quaternion.setFromUnitVectors(up, vector.normalize()).multiply(facing)
         magnet.scale.set(pose.thickness, Math.max(1e-5, length), pose.thickness)
@@ -140,6 +139,9 @@ export function CsfEnsembleGraphic(props: Props) {
         if (lastStep === -1 && next.step === 1 && !next.immediate) {
           from[0] = { ...from[0], x: -width * 0.25, y: height * (0.5 - (0.27 - 0.08) / 0.84),
             radius: Math.max(100, Math.min(145, window.innerWidth * 0.09)) * 0.365 }
+        }
+        if (next.step === 2 && (lastStep === 1 || lastStep === -1)) {
+          from = splitCsfOrigins(from[0], objects.length)
         }
         target = poses(next.step)
         transitionAt = performance.now()
@@ -179,6 +181,6 @@ export function CsfEnsembleGraphic(props: Props) {
 
   return <div className="csf-ensemble-scene" ref={hostRef} role="img"
     aria-label={props.step === 6 ? '36 CSF magnetizations in one stacked sphere' : props.step === 1 ? 'Enlarged CSF ensemble' : '6 by 6 CSF ensemble grid'}
-    data-magnet-count={props.step === 1 ? 1 : 36} data-rf-pulse-count={props.excitation.pulseEvents.length}
+    data-view="top-down" data-magnet-count={props.step === 1 ? 1 : 36} data-rf-pulse-count={props.excitation.pulseEvents.length}
     data-hidden={props.step === 3 || props.step === 4} />
 }

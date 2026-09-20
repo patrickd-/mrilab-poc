@@ -59,9 +59,11 @@ This is an illustrative field profile, not a scanner calibration: offsets
 span a few Hz so dephasing is visible alongside real-time CSF relaxation.
 The field-line bending and color contrast are exaggerated; local direction
 tilts are not simulated. The finite 36-vector sum can have small residual
-ripples rather than a perfectly exponential T2* envelope. Stacking changes
-only the layout and preserves the acquisition; the replay button starts it
-afresh. Both graphs retain shared scroll zoom, initially covering 12 seconds.
+ripples rather than a perfectly exponential T2* envelope. The CSF-only steps
+view the spheres from above. Splitting starts all cells at the enlarged
+sphere's center; recombining replays a fresh excitation after the layout
+settles, using the same 36 field offsets in stacked view. Both graphs retain
+shared scroll zoom, initially covering 12 seconds.
 
 ## GitHub Pages
 
