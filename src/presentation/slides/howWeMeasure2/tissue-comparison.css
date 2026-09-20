@@ -83,7 +83,7 @@
 .tissue-plot__editable { cursor: crosshair; }
 .tissue-plot__refocus .voltage-trace__pulse-line { stroke: #f6cf75; }
 .tissue-plot__refocus .voltage-trace__tag { fill: #f6cf75; stroke: #ffe6a8; }
-.tissue-plot__refocus text { fill: #111820; font: 700 18px Manrope, sans-serif; }
+.tissue-plot__refocus .voltage-trace__rf-symbol { stroke: #111820; }
 
 .tissue-comparison:not([data-csf-step='0']) .tissue-comparison__field .magnet,
 .tissue-comparison:not([data-csf-step='0']) .tissue-comparison__field .field-lines,

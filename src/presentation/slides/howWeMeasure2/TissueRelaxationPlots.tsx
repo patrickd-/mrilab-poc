@@ -195,8 +195,8 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
           transform={`translate(${timeX(refocusTime)} 0)`} aria-label={`180° RF pulse at ${refocusTime / 1000} s`}>
           <line className="voltage-trace__pulse-line" x1="0" x2="0" y1="43" y2={ZERO_Y} />
           {kind === 'signal' ? <>
-            <path className="voltage-trace__tag" d="M-25 5 H25 V32 L0 44 L-25 32Z" />
-            <text x="0" y="27" textAnchor="middle">180°</text>
+            <path className="voltage-trace__tag" d="M-14 5 H14 V32 L0 44 L-14 32Z" />
+            <path className="voltage-trace__rf-symbol" d="M-7 13 Q2 20 -7 27 M0 10 Q12 20 0 30" />
           </> : null}
         </g> : null}
         {hoverFraction !== null ? <line className="voltage-trace__hover" data-testid={`tissue-${kind}-hover`}

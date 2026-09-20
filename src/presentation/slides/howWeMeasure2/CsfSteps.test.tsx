@@ -40,6 +40,12 @@ it('places and moves one real 180-degree pulse from either graph, preserving it 
   expect(pulses()).toHaveLength(1)
   clickGraphAt(2000)
   expect(pulses()).toHaveLength(2)
+  const yellowTag = screen.getByTestId('signal-refocus-marker')
+  const redTag = screen.getByLabelText('90° RF pulse at 0 s', { selector: '.tissue-plot--signal g' })
+  for (const part of ['voltage-trace__tag', 'voltage-trace__rf-symbol']) {
+    expect(yellowTag.querySelector(`.${part}`)?.getAttribute('d')).toBe(redTag.querySelector(`.${part}`)?.getAttribute('d'))
+  }
+  expect(yellowTag.querySelector('text')).toBeNull()
   expect(pulses()[1].kind).toBe('180-x')
   expect(pulses()[1].timeMilliseconds - pulses()[0].timeMilliseconds).toBeCloseTo(2000)
   expect(Number(screen.getByTestId('cerebrospinal-fluid-signal').getAttribute('data-elapsed-ms'))).toBe(-200)
