@@ -92,19 +92,38 @@ export function Presentation() {
   }, [pauseSimulation])
 
   useEffect(() => {
+    const isPresentationKey = (event: KeyboardEvent) =>
+      !event.altKey && !event.ctrlKey && !event.metaKey &&
+      ['ArrowRight', 'ArrowLeft', ' '].includes(event.key)
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement) return
-      if (event.key === 'ArrowRight' && !isLastCursor(cursorRef.current)) {
-        event.preventDefault()
-        goForward()
-      } else if (event.key === 'ArrowLeft' && !isFirstCursor(cursorRef.current)) {
-        event.preventDefault()
-        goBackward()
+      if (!isPresentationKey(event)) return
+      // Capture before focused sliders/buttons can consume presentation shortcuts.
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.repeat) return
+      if (event.key === 'ArrowRight') goForward()
+      else if (event.key === 'ArrowLeft') goBackward()
+      else {
+        const current = cursorRef.current
+        const { pauseFromState } = presentationSlides[current.slideIndex]
+        if (pauseFromState !== undefined && current.stateIndex >= pauseFromState) {
+          pauseSimulation(!simulationClock.paused)
+        }
       }
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [goBackward, goForward])
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (!isPresentationKey(event)) return
+      // Space also activates native buttons on keyup; suppress that second action.
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    window.addEventListener('keydown', handleKeyDown, true)
+    window.addEventListener('keyup', handleKeyUp, true)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true)
+      window.removeEventListener('keyup', handleKeyUp, true)
+    }
+  }, [goBackward, goForward, pauseSimulation, simulationClock])
 
   const slide = presentationSlides[cursor.slideIndex]
   const activeFieldStrengthTesla = slide.preserveFieldStrength

@@ -64,12 +64,15 @@ view the spheres from above. Splitting starts all cells at the enlarged
 sphere's center; recombining replays a fresh excitation after the layout
 settles, using the same 36 field offsets in stacked view. Both graphs retain
 shared scroll zoom, initially covering 12 seconds.
-From the first enlarged CSF sphere, the toolbar's play/pause control freezes
+From the first enlarged CSF sphere, Space or the toolbar's play/pause control freezes
 both Bloch evolution and graph sampling on one simulation clock. Resuming
 excludes the paused wall time; zoom still works while paused. Layout transitions
 can finish while paused, but pending RF excitation waits for simulation time.
 Navigation and replay resume playback. Stacked magnets retain the same full
 width/depth proportions as the original enlarged magnet.
+Left/Right and Space remain presentation shortcuts even after using a slider
+or button; held-key repeats are ignored. Space does nothing before playback
+controls become available. Tab and Enter retain normal control navigation.
 
 ## GitHub Pages
 

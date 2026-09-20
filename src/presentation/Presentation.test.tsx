@@ -15,6 +15,55 @@ async function advance(user: ReturnType<typeof userEvent.setup>, count: number) 
 }
 
 describe('MRI Intuition presentation', () => {
+  it('reserves navigation keys after interacting with the B0 slider', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Presentation />)
+    for (let i = 0; i < 8; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })
+    const slider = screen.getByRole('slider') as HTMLInputElement
+    fireEvent.change(slider, { target: { value: '3' } })
+    slider.focus()
+    const sliderKeyHandler = vi.fn()
+    slider.addEventListener('keydown', sliderKeyHandler)
+    await user.keyboard('{ArrowRight}')
+    expect(container.querySelector('main')?.getAttribute('data-slide-state')).toBe('8')
+    expect(slider.value).toBe('3')
+    expect(sliderKeyHandler).not.toHaveBeenCalled()
+    await user.keyboard('{ArrowLeft}')
+    expect(container.querySelector('main')?.getAttribute('data-slide-state')).toBe('7')
+    expect(slider.value).toBe('3')
+  })
+
+  it('uses Space only for playback, not focused buttons, and ignores held-key repeats', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Presentation />)
+    const next = screen.getByRole('button', { name: 'Next step' })
+    await user.click(next)
+    await user.keyboard(' ')
+    // No pause control on early slides: Space must not activate the focused Next button.
+    expect(container.querySelector('main')?.getAttribute('data-slide-state')).toBe('0')
+    for (let i = 0; i < 18; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })
+    const scene = container.querySelector('.csf-ensemble-scene')
+    expect(scene).toBeTruthy()
+    for (const name of ['Next step', 'Previous step', 'Replay current step']) {
+      screen.getByRole('button', { name }).focus()
+      await user.keyboard(' ')
+      expect(screen.getByRole('button', { name: 'Resume simulation' })).toBeTruthy()
+      expect(container.querySelector('main')?.getAttribute('data-slide-state')).toBe('1')
+      expect(container.querySelector('.csf-ensemble-scene')).toBe(scene)
+      fireEvent.keyDown(document.activeElement!, { key: ' ', repeat: true })
+      expect(screen.getByRole('button', { name: 'Resume simulation' })).toBeTruthy()
+      await user.keyboard(' ')
+      expect(screen.getByRole('button', { name: 'Pause simulation' })).toBeTruthy()
+    }
+    screen.getByRole('button', { name: 'Pause simulation' }).focus()
+    await user.keyboard(' ')
+    expect(screen.getByRole('button', { name: 'Resume simulation' })).toBeTruthy()
+    await user.keyboard(' ')
+    expect(screen.getByRole('button', { name: 'Pause simulation' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'ArrowRight', repeat: true })
+    expect(container.querySelector('main')?.getAttribute('data-slide-state')).toBe('1')
+  })
+
   it('shows play/pause before refresh from the first enlarged CSF sphere, and resumes on navigation or replay', () => {
     const { container } = render(<Presentation />)
     for (let i = 0; i < 18; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })

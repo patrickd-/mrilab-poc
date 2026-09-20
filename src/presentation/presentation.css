@@ -598,9 +598,17 @@ input {
   animation: magnet-south-in 720ms cubic-bezier(0.22, 0.8, 0.24, 1) both;
 }
 
-.presentation--forward[data-slide='what-we-measure'][data-slide-state='7'] .field-control,
-.presentation--forward[data-slide='what-we-measure'][data-slide-state='7'] .field-lines {
+.presentation--forward[data-slide='what-we-measure'][data-slide-state='7'] .field-control {
   animation: label-fade 560ms ease-out 420ms both;
+}
+
+.presentation--forward[data-slide='what-we-measure'][data-slide-state='7'] .field-lines:not(.field-lines--curved) {
+  animation: field-lines-fade 560ms ease-out 420ms both;
+}
+
+@keyframes field-lines-fade {
+  from { opacity: 0; }
+  to { opacity: var(--field-opacity); }
 }
 
 .presentation--forward[data-slide='what-we-measure'][data-slide-state='8'] .spin-system--excess .spin-state--up {
