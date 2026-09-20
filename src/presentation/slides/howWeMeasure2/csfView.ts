@@ -1,4 +1,4 @@
-export interface CsfPose { x: number; y: number; radius: number; shell: number; thickness: number }
+export interface CsfPose { x: number; y: number; radius: number; shell: number }
 
 /** All daughters start as coincident full-sized copies, not zero-sized cells.
  * Only one shell is needed at their shared origin; the magnets overlap into

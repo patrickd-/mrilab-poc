@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type MouseEvent } from 'react'
 import type { SamplePresetId } from '../../../models/HydrogenEnsemble'
 import type { FidEnsembleState } from '../../../simulation/fid'
 import { csfCollectionAt } from './csfDephasing'
+import { realTimeClock, type PlaybackClock } from '../../playback/simulationClock'
 import { comparisonSampleTimes, tissueRelaxationAt, PRE_RF_SAMPLE_TIME_MS, zoomComparisonWindow, TISSUE_COMPARISON_PLAN, type ComparisonTissue } from './tissueComparison'
 
 const LEFT = 40
@@ -9,7 +10,7 @@ const ZERO_Y = 254
 const SCALE_Y = 184
 const HEIGHT = 310
 
-export function TissueRelaxationPlots({ tissues, startedAt, highlighted, entering, csfOnly = false, ensembleStates, showIntrinsicReference = false }: {
+export function TissueRelaxationPlots({ tissues, startedAt, highlighted, entering, csfOnly = false, ensembleStates, showIntrinsicReference = false, clock = realTimeClock }: {
   tissues: readonly ComparisonTissue[]
   startedAt: number | null
   highlighted: SamplePresetId | null
@@ -17,6 +18,7 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
   csfOnly?: boolean
   ensembleStates?: readonly FidEnsembleState[]
   showIntrinsicReference?: boolean
+  clock?: PlaybackClock
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -68,7 +70,7 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
     let index = 0
     let frame = 0
     const animate = () => {
-      const elapsed = Math.max(-leadIn, Math.min(plan.durationMilliseconds, performance.now() - startedAt))
+      const elapsed = Math.max(-leadIn, Math.min(plan.durationMilliseconds, clock.now() - startedAt))
       while (index < times.length && times[index] <= elapsed) {
         const time = times[index++]
         for (const tissue of activeTissues) {
@@ -95,11 +97,11 @@ export function TissueRelaxationPlots({ tissues, startedAt, highlighted, enterin
         path?.setAttribute('d', curves[key] ?? '')
         path?.setAttribute('data-elapsed-ms', String(elapsed))
       }
-      if (elapsed < plan.durationMilliseconds) frame = requestAnimationFrame(animate)
+      if (elapsed < plan.durationMilliseconds && !clock.paused) frame = requestAnimationFrame(animate)
     }
     animate()
     return () => cancelAnimationFrame(frame)
-  }, [tissues, startedAt, leadIn, right, plan, timeWindow, csfOnly, ensembleStates, showIntrinsicReference])
+  }, [tissues, startedAt, leadIn, right, plan, timeWindow, csfOnly, ensembleStates, showIntrinsicReference, clock, clock.paused])
 
   const hover = (event: MouseEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()

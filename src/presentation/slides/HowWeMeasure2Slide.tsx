@@ -9,6 +9,7 @@ import { TissueRelaxationPlots } from './howWeMeasure2/TissueRelaxationPlots'
 import { createComparisonTissues, TISSUE_COMPARISON_PLAN } from './howWeMeasure2/tissueComparison'
 import { CsfEnsembleGraphic } from './howWeMeasure2/CsfEnsembleGraphic'
 import { createCsfGrid } from './howWeMeasure2/csfDephasing'
+import { realTimeClock } from '../playback/simulationClock'
 import type { PresentationSlideModule, SlideStateProps } from './types'
 import './howWeMeasure/how-we-measure.css'
 import './howWeMeasure2/tissue-comparison.css'
@@ -16,7 +17,8 @@ import './howWeMeasure2/tissue-comparison.css'
 // The layout has its own completion event; schedule RF only after it finishes.
 const POST_LAYOUT_PLAY_PLAN = { ...TISSUE_COMPARISON_PLAN, layoutDurationMilliseconds: 0 }
 
-function HowWeMeasure2Slide({ fieldStrengthTesla, stateIndex, direction }: SlideStateProps) {
+function HowWeMeasure2Slide({ fieldStrengthTesla, stateIndex, direction, simulationClock }: SlideStateProps) {
+  const clock = stateIndex > 0 ? simulationClock ?? realTimeClock : realTimeClock
   const [transitionStarted, setTransitionStarted] = useState(false)
   const [entering, setEntering] = useState(true)
   const firstSpecimen = useRef<HTMLElement>(null)
@@ -33,9 +35,9 @@ function HowWeMeasure2Slide({ fieldStrengthTesla, stateIndex, direction }: Slide
     if (startedStep.current === stateIndex) return
     startedStep.current = stateIndex
     if ([1, 2, 5, 6].includes(stateIndex)) {
-      setCsfPlayback(startPlayPlan(POST_LAYOUT_PLAY_PLAN, performance.now() + POST_LAYOUT_PLAY_PLAN.settleDelayMilliseconds))
+      setCsfPlayback(startPlayPlan(POST_LAYOUT_PLAY_PLAN, clock.now() + POST_LAYOUT_PLAY_PLAN.settleDelayMilliseconds))
     }
-  }, [stateIndex])
+  }, [stateIndex, clock])
 
   useEffect(() => {
     startedStep.current = -1
@@ -101,10 +103,10 @@ function HowWeMeasure2Slide({ fieldStrengthTesla, stateIndex, direction }: Slide
       <figcaption>{tissue.label}</figcaption>
     </figure>)}
     {stateIndex > 0 ? <CsfEnsembleGraphic step={stateIndex} states={grid} excitation={tissues[0].excitation}
-      immediate={direction === 'backward'} onSettled={onCsfSettled} /> : null}
+      immediate={direction === 'backward'} onSettled={onCsfSettled} clock={clock} /> : null}
     <TissueRelaxationPlots tissues={tissues} startedAt={playback?.startedAt ?? null} highlighted={stateIndex === 0 ? highlighted : null}
       entering={stateIndex === 0 && entering} csfOnly={stateIndex > 0} ensembleStates={stateIndex >= 2 ? grid : undefined}
-      showIntrinsicReference={stateIndex >= 5} />
+      showIntrinsicReference={stateIndex >= 5} clock={clock} />
   </div>
 }
 
@@ -112,5 +114,6 @@ export const howWeMeasure2SlideModule: PresentationSlideModule = {
   id: 'how-we-measure-2',
   heading: 'How are we measuring?',
   stateCount: 7,
+  pauseFromState: 1,
   Component: HowWeMeasure2Slide,
 }

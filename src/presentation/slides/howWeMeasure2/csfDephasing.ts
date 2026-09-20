@@ -4,12 +4,17 @@ import { createPresentationCsfState, presentationMagnetizationAt, type ProtonExc
 
 export const CSF_GRID_SIDE = 6
 export const CSF_LAYOUT_MS = 1400
+export const CSF_FREQUENCY_SPREAD_HZ = 0.4
+
+export function csfFieldProfile(x: number, y: number) {
+  return 0.75 * x + 0.32 * y + 0.17 * x * y + 0.08 * y * y
+}
 
 /** Illustrative smooth B0 imperfection, not a measured scanner field map.
  * Small Hz offsets allow dephasing to be followed on the real CSF T2 timescale.
  * Field-line curvature/colors are exaggerated independently for visibility. */
 export function csfFrequencyOffsetHz(x: number, y: number) {
-  return 2.4 * (0.75 * x + 0.32 * y + 0.17 * x * y + 0.08 * y * y)
+  return CSF_FREQUENCY_SPREAD_HZ * csfFieldProfile(x, y)
 }
 
 export function createCsfGrid(fieldStrengthTesla: number, nonUniform: boolean): FidEnsembleState[] {

@@ -56,7 +56,7 @@ the dim reference curve shows intrinsic T2. See §5.3 of
 for the underlying dephasing mechanism.
 
 This is an illustrative field profile, not a scanner calibration: offsets
-span a few Hz so dephasing is visible alongside real-time CSF relaxation.
+span less than 1 Hz so dephasing develops subtly alongside real-time CSF relaxation.
 The field-line bending and color contrast are exaggerated; local direction
 tilts are not simulated. The finite 36-vector sum can have small residual
 ripples rather than a perfectly exponential T2* envelope. The CSF-only steps
@@ -64,6 +64,12 @@ view the spheres from above. Splitting starts all cells at the enlarged
 sphere's center; recombining replays a fresh excitation after the layout
 settles, using the same 36 field offsets in stacked view. Both graphs retain
 shared scroll zoom, initially covering 12 seconds.
+From the first enlarged CSF sphere, the toolbar's play/pause control freezes
+both Bloch evolution and graph sampling on one simulation clock. Resuming
+excludes the paused wall time; zoom still works while paused. Layout transitions
+can finish while paused, but pending RF excitation waits for simulation time.
+Navigation and replay resume playback. Stacked magnets retain the same full
+width/depth proportions as the original enlarged magnet.
 
 ## GitHub Pages
 

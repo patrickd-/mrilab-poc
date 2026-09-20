@@ -2,14 +2,13 @@ import { expect, it } from 'vitest'
 import { csfViewVector, splitCsfOrigins } from './csfView'
 
 it('splits full-sized copies from the original center instead of growing distant spheres from zero', () => {
-  const source = { x: 0, y: 0, radius: 130, shell: 0.5, thickness: 1 }
+  const source = { x: 0, y: 0, radius: 130, shell: 0.5 }
   const daughters = splitCsfOrigins(source, 36)
   expect(daughters).toHaveLength(36)
   for (const pose of daughters) {
     expect(pose.x).toBe(source.x)
     expect(pose.y).toBe(source.y)
     expect(pose.radius).toBe(source.radius)
-    expect(pose.thickness).toBe(1)
   }
   expect(daughters.reduce((opacity, pose) => opacity + pose.shell, 0)).toBe(0.5)
   daughters[0].x = 10

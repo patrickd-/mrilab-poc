@@ -1,5 +1,5 @@
 import { useId, type CSSProperties } from 'react'
-import { csfFrequencyOffsetHz } from '../slides/howWeMeasure2/csfDephasing'
+import { csfFieldProfile } from '../slides/howWeMeasure2/csfDephasing'
 
 export function MagneticFieldBackdrop({
   fieldStrengthTesla,
@@ -36,7 +36,7 @@ export function MagneticFieldBackdrop({
             const x = (index - 3) / 3
             return <linearGradient id={`${id}-field-${index}`} key={index} gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="0" y2="0">
               {[0, 0.25, 0.5, 0.75, 1].map(t => <stop key={t} offset={t}
-                stopColor={`hsl(${210 - csfFrequencyOffsetHz(x, 2 * t - 1) * 35} 85% 67%)`} />)}
+                stopColor={`hsl(${210 - csfFieldProfile(x, 2 * t - 1) * 84} 85% 67%)`} />)}
             </linearGradient>
           })}
         </defs>

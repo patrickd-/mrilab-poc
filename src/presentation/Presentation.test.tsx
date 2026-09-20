@@ -15,6 +15,29 @@ async function advance(user: ReturnType<typeof userEvent.setup>, count: number) 
 }
 
 describe('MRI Intuition presentation', () => {
+  it('shows play/pause before refresh from the first enlarged CSF sphere, and resumes on navigation or replay', () => {
+    const { container } = render(<Presentation />)
+    for (let i = 0; i < 18; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.queryByRole('button', { name: 'Pause simulation' })).toBeNull()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    const buttons = screen.getByRole('navigation').querySelectorAll('button')
+    expect(buttons[0].getAttribute('aria-label')).toBe('Pause simulation')
+    expect(buttons[1].getAttribute('aria-label')).toBe('Replay current step')
+    fireEvent.click(buttons[0])
+    expect(screen.getByRole('button', { name: 'Resume simulation' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Resume simulation' }))
+    expect(screen.getByRole('button', { name: 'Pause simulation' }).getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(screen.getByRole('button', { name: 'Pause simulation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Replay current step' }))
+    expect(screen.getByRole('button', { name: 'Pause simulation' })).toBeTruthy()
+    expect(container.querySelector('main')?.getAttribute('data-slide-state')).toBe('1')
+    fireEvent.click(screen.getByRole('button', { name: 'Pause simulation' }))
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', { name: 'Pause simulation' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(screen.queryByRole('button', { name: 'Pause simulation' })).toBeNull()
+  })
   it.each([0, 7])('uses 1.5 T throughout later slides after leaving the slider at %s T', field => {
     vi.useFakeTimers()
     try {

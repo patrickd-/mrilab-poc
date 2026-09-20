@@ -9,6 +9,7 @@ import {
   presentationSlides,
   type NavigationDirection,
 } from './slides'
+import { SimulationClock } from './playback/simulationClock'
 
 interface PresentationCursor {
   slideIndex: number
@@ -64,6 +65,12 @@ export function Presentation() {
   const [direction, setDirection] = useState<NavigationDirection>('initial')
   const [fieldStrengthTesla, setFieldStrengthTesla] = useState(0)
   const [replayVersion, setReplayVersion] = useState(0)
+  const [simulationClock] = useState(() => new SimulationClock())
+  const [paused, setPaused] = useState(false)
+  const pauseSimulation = useCallback((pause: boolean) => {
+    simulationClock.setPaused(pause)
+    setPaused(pause)
+  }, [simulationClock])
   const cursorRef = useRef(cursor)
 
   useEffect(() => {
@@ -72,15 +79,17 @@ export function Presentation() {
 
   const goForward = useCallback(() => {
     if (isLastCursor(cursorRef.current)) return
+    pauseSimulation(false)
     setDirection('forward')
     setCursor(nextCursor)
-  }, [])
+  }, [pauseSimulation])
 
   const goBackward = useCallback(() => {
     if (isFirstCursor(cursorRef.current)) return
+    pauseSimulation(false)
     setDirection('backward')
     setCursor(previousCursor)
-  }, [])
+  }, [pauseSimulation])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -121,7 +130,15 @@ export function Presentation() {
           {slide.heading || '\u00a0'}
         </h1>
         <nav aria-label="Presentation navigation">
+          {slide.pauseFromState !== undefined && cursor.stateIndex >= slide.pauseFromState ?
+            <button aria-label={paused ? 'Resume simulation' : 'Pause simulation'} aria-pressed={paused}
+              type="button" onClick={() => pauseSimulation(!paused)}>
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                {paused ? <path d="M7 4 L20 12 L7 20 Z" /> : <path d="M6 4 H10 V20 H6 Z M14 4 H18 V20 H14 Z" />}
+              </svg>
+            </button> : null}
           <button aria-label="Replay current step" type="button" onClick={() => {
+            pauseSimulation(false)
             setDirection('forward')
             setReplayVersion(version => version + 1)
           }}>
@@ -156,6 +173,7 @@ export function Presentation() {
           fieldStrengthTesla={activeFieldStrengthTesla}
           setFieldStrengthTesla={setFieldStrengthTesla}
           stateIndex={cursor.stateIndex}
+          simulationClock={simulationClock}
         />
       </section>
     </main>

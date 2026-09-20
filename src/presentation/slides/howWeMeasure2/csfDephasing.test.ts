@@ -27,7 +27,10 @@ it('derives dephasing from static B0 offsets, shortening the net transverse sign
     expect(state.longitudinalRelaxationTimeMilliseconds).toBe(4300)
   }
   expect(csfCollectionAt(grid, excitation, 1000).signal).toBeCloseTo(1, 12)
-  expect(csfCollectionAt(grid, excitation, 1500).signal).toBeLessThan(csfCollectionAt(uniform, excitation, 1500).signal * 0.25)
+  const earlyCoherence = csfCollectionAt(grid, excitation, 1500).signal / csfCollectionAt(uniform, excitation, 1500).signal
+  expect(earlyCoherence).toBeGreaterThan(0.7)
+  expect(earlyCoherence).toBeLessThan(0.85)
+  expect(csfCollectionAt(grid, excitation, 2500).signal).toBeLessThan(csfCollectionAt(uniform, excitation, 2500).signal * 0.25)
   for (const time of [1200, 1500, 2500, 8000]) {
     expect(csfCollectionAt(grid, excitation, time).longitudinal).toBeCloseTo(csfCollectionAt(uniform, excitation, time).longitudinal, 12)
   }
@@ -35,14 +38,14 @@ it('derives dephasing from static B0 offsets, shortening the net transverse sign
 
 it('uses the complex vector sum rather than averaging transverse magnitudes', () => {
   const grid = createCsfGrid(1.5, true)
-  const vectors = grid.map(state => presentationMagnetizationAt(state, excitation, 1500))
+  const vectors = grid.map(state => presentationMagnetizationAt(state, excitation, 2500))
   const x = vectors.reduce((sum, m) => sum + m.x, 0) / 36
   const y = vectors.reduce((sum, m) => sum + m.y, 0) / 36
   const magnitudes = vectors.reduce((sum, m) => sum + Math.hypot(m.x, m.y), 0) / 36
-  expect(csfCollectionAt(grid, excitation, 1500).signal).toBeCloseTo(Math.hypot(x, y), 12)
+  expect(csfCollectionAt(grid, excitation, 2500).signal).toBeCloseTo(Math.hypot(x, y), 12)
   expect(Math.hypot(x, y)).toBeLessThan(magnitudes * 0.25)
   // Reordering the vectors when stacking cannot change the received signal.
-  expect(csfCollectionAt([...grid].reverse(), excitation, 1500).signal).toBeCloseTo(Math.hypot(x, y), 12)
+  expect(csfCollectionAt([...grid].reverse(), excitation, 2500).signal).toBeCloseTo(Math.hypot(x, y), 12)
 })
 
 it('retains reversible phase dispersion rather than substituting a shorter intrinsic T2', () => {

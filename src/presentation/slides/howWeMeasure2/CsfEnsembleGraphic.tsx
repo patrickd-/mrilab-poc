@@ -6,6 +6,7 @@ import { presentationMagnetizationAt, type ProtonExcitation } from '../howWeMeas
 import { CSF_GRID_SIDE, CSF_LAYOUT_MS } from './csfDephasing'
 import { createMagnetPoleMaterial } from '../../components/magnetAppearance'
 import { csfViewVector, splitCsfOrigins, type CsfPose } from './csfView'
+import { realTimeClock, type PlaybackClock } from '../../playback/simulationClock'
 
 interface Props {
   step: number
@@ -13,6 +14,7 @@ interface Props {
   excitation: ProtonExcitation
   immediate: boolean
   onSettled: () => void
+  clock?: PlaybackClock
 }
 
 /** One renderer and shared geometry for all 36 ensembles, including stacking. */
@@ -97,18 +99,19 @@ export function CsfEnsembleGraphic(props: Props) {
         const y = (2.5 - Math.floor(index / 6)) * size * 0.145
         return { x: grid ? x : 0, y: grid ? y : 0,
           radius: grid ? size * 0.064 : (index === 0 || step === 6 ? size * 0.25 : 0),
-          shell: step === 6 && index > 0 ? 0 : 0.5,
-          thickness: step === 6 ? 0.18 : 1 }
+          shell: step === 6 && index > 0 ? 0 : 0.5 }
       })
     }
     const animate = () => {
-      const now = performance.now()
-      const fraction = input.immediate ? 1 : Math.min(1, (now - transitionAt) / CSF_LAYOUT_MS)
+      const clock = input.clock ?? realTimeClock
+      const now = clock.now()
+      // Layout choreography can finish while the simulation is paused.
+      const fraction = input.immediate ? 1 : Math.min(1, (performance.now() - transitionAt) / CSF_LAYOUT_MS)
       const blend = fraction * fraction * (3 - 2 * fraction)
       current = target.map((pose, index) => {
         const start = from[index] ?? pose
         const mix = (key: keyof CsfPose) => start[key] + (pose[key] - start[key]) * blend
-        return { x: mix('x'), y: mix('y'), radius: mix('radius'), shell: mix('shell'), thickness: mix('thickness') }
+        return { x: mix('x'), y: mix('y'), radius: mix('radius'), shell: mix('shell') }
       })
       for (let index = 0; index < objects.length; index++) {
         const { group, magnet, shellMaterial, labels } = objects[index]
@@ -119,18 +122,22 @@ export function CsfEnsembleGraphic(props: Props) {
         shellMaterial.opacity = pose.shell
         // Overlapping letters become a white patch in stacked mode; the
         // red/blue halves still identify the poles of every individual magnet.
-        labels.forEach(label => { label.visible = pose.thickness > 0.5 })
+        labels.forEach(label => { label.visible = input.step !== 6 })
         const m = presentationMagnetizationAt(input.states[index], input.excitation, now)
         const view = csfViewVector(m, (input.step === 1 ? blend : 1) * Math.PI / 2)
         vector.set(view.x, view.y, view.z)
         const length = vector.length()
         if (length > 1e-8) magnet.quaternion.setFromUnitVectors(up, vector.normalize()).multiply(facing)
-        magnet.scale.set(pose.thickness, Math.max(1e-5, length), pose.thickness)
+        // Width/depth keep the original proportions of the enclosing sphere,
+        // including when the 36 magnets are brought back into one large shell.
+        magnet.scale.set(1, Math.max(1e-5, length), 1)
       }
       renderer.render(scene, camera)
+      host.dataset.simulationTimeMs = String(now)
+      host.dataset.simulationPaused = String(clock.paused)
       if (fraction === 1 && !settled) { settled = true; input.onSettled() }
       const lastPulse = input.excitation.pulseEvents.at(-1)?.timeMilliseconds
-      if (fraction < 1 || ((input.step !== 3 && input.step !== 4) && lastPulse !== undefined && now < lastPulse + 12000)) frame = requestAnimationFrame(animate)
+      if (fraction < 1 || (!clock.paused && (input.step !== 3 && input.step !== 4) && lastPulse !== undefined && now < lastPulse + 12000)) frame = requestAnimationFrame(animate)
     }
     const update = (next: Props) => {
       input = next
@@ -149,7 +156,8 @@ export function CsfEnsembleGraphic(props: Props) {
         lastStep = next.step
       }
       cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(animate)
+      if ((input.clock ?? realTimeClock).paused) animate()
+      else frame = requestAnimationFrame(animate)
     }
     const resize = () => {
       const nextWidth = Math.max(1, host.clientWidth), nextHeight = Math.max(1, host.clientHeight)
@@ -177,7 +185,7 @@ export function CsfEnsembleGraphic(props: Props) {
     }
   }, [])
 
-  useEffect(() => updateRef.current?.(props), [props.step, props.states, props.excitation, props.immediate, props.onSettled])
+  useEffect(() => updateRef.current?.(props), [props.step, props.states, props.excitation, props.immediate, props.onSettled, props.clock, props.clock?.paused])
 
   return <div className="csf-ensemble-scene" ref={hostRef} role="img"
     aria-label={props.step === 6 ? '36 CSF magnetizations in one stacked sphere' : props.step === 1 ? 'Enlarged CSF ensemble' : '6 by 6 CSF ensemble grid'}
