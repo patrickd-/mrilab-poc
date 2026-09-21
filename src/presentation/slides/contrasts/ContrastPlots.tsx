@@ -116,8 +116,13 @@ function ContrastPlot({ kind, tissues, timing, onChange, hoverTime, onHover, hig
       {ticks.map(time => <text key={time} className="voltage-trace__tick" x={timeX(time)} y="282" textAnchor="middle">{Number((time / unitScale).toPrecision(4))}</text>)}
       {curves.map(curve => <path key={curve.id} className="tissue-plot__curve" data-testid={`contrast-${curve.id}-${kind}`}
         stroke={curve.color} opacity={highlighted && highlighted !== curve.id ? 0.16 : 1} d={curve.path} />)}
+      <g data-testid={`contrast-${kind}-excitation-marker`} data-time-ms="0">
+        <PulseTag x={timeX(0)} label={kind === 'signal' && timing.tr !== null ? 'TR' : undefined}
+          title={kind === 'signal' && timing.tr !== null
+            ? `90° excitation at TR (${timing.tr} ms); signal time is relative to this pulse`
+            : '90° excitation at zero'} />
+      </g>
       {kind === 'signal' ? <>
-        <PulseTag x={timeX(0)} title="90° excitation at zero" />
         {inView(timing.te === null ? null : timing.te / 2) ? <g data-testid="contrast-refocus-marker" data-time-ms={timing.te! / 2}>
           <PulseTag x={timeX(timing.te! / 2)} tagX={refocusTagX} yellow title={`180° refocusing pulse at ${timing.te! / 2} ms`} />
         </g> : null}

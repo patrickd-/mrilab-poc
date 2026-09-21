@@ -83,6 +83,31 @@ it('edits TR and TE with exact half-TE RF timing and updates the image and curve
   expect((putImageData.mock.calls.at(-1)![0].data as Uint8ClampedArray).every((v, i) => v === baseline[i])).toBe(true)
 })
 
+it('marks the initial excitation on both graphs and labels the signal origin TR only while TR is set', () => {
+  render(<Slide {...props} />)
+  const signal = screen.getByTestId('contrast-signal-excitation-marker')
+  const recovery = screen.getByTestId('contrast-longitudinal-excitation-marker')
+  for (const marker of [signal, recovery]) {
+    expect(marker.getAttribute('data-time-ms')).toBe('0')
+    expect(marker.querySelector('.voltage-trace__pulse-line')).not.toBeNull()
+    expect(marker.querySelector('.voltage-trace__rf-symbol')).not.toBeNull()
+  }
+  const originalPosition = signal.firstElementChild!.getAttribute('transform')
+  clickTime('longitudinal', 500)
+  expect(signal.textContent).toBe('TR')
+  expect(signal.querySelector('.voltage-trace__rf-symbol')).toBeNull()
+  expect(signal.firstElementChild!.getAttribute('transform')).toBe(originalPosition)
+  expect(signal.firstElementChild!.getAttribute('aria-label')).toContain('signal time is relative to this pulse')
+  expect(recovery.querySelector('.voltage-trace__rf-symbol')).not.toBeNull()
+  expect(Number(screen.getByTestId('contrast-tr-marker').getAttribute('data-time-ms'))).toBeCloseTo(500)
+  clickTime('signal', 100)
+  expect(Number(screen.getByTestId('contrast-refocus-marker').getAttribute('data-time-ms'))).toBeCloseTo(50)
+  fireEvent.keyDown(screen.getByTestId('contrast-longitudinal-plot'), { key: 'Delete' })
+  expect(signal.textContent).toBe('')
+  expect(signal.querySelector('.voltage-trace__rf-symbol')).not.toBeNull()
+  expect(recovery.querySelector('.voltage-trace__rf-symbol')).not.toBeNull()
+})
+
 it('zooms each time axis without changing timing or image data, and refresh resets all choices', () => {
   const { rerender } = render(<Slide {...props} />)
   clickTime('signal', 100)
