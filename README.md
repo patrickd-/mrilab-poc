@@ -106,6 +106,9 @@ without a running acquisition clock.
 Click the lower graph to select **TR** (red tag), or the upper graph to select
 **TE** (yellow line). A yellow RF-wave tag follows at **TE/2**, and the six
 independent field-offset ensembles per tissue produce the refocused signal.
+This slide alone uses offsets from −20 to +20 Hz, making short-TE echoes
+visible for white/gray matter without changing their intrinsic T1/T2 values.
+The earlier race/dephasing slides keep their slower frequency differences.
 The initial axes cover 6 seconds for T1 recovery and 400 ms for transverse
 signal so clinically useful echo delays are easy to select. Scroll each axis
 independently to zoom; `+`/`-` and `0` also work on a focused graph. Clicking at

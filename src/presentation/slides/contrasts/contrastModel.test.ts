@@ -1,4 +1,6 @@
 import { expect, it } from 'vitest'
+import { PROTON_GYROMAGNETIC_RATIO } from '../../../models/HydrogenEnsemble'
+import { createRaceEnsembles } from '../howWeMeasure3/protonRace'
 import { contrastLabel, contrastPulses, contrastTissueAt, createContrastTissues, recoveryFraction, spinEchoIntensity, validContrastTiming } from './contrastModel'
 
 it('uses independent ensembles for all four tissues, with real offsets and the original tissue properties', () => {
@@ -31,12 +33,39 @@ it.each([null, 500, 3000, 12000])('matches the spin-echo image equation at the s
   }
 })
 
-it('keeps dephasing away from the echo and does not replace it with an arbitrary envelope', () => {
-  const csf = createContrastTissues(1.5)[0]
-  const noEcho = contrastTissueAt(csf, 1500, { tr: null, te: null }).signal
-  const intrinsic = Math.exp(-1500 / csf.state.transverseRelaxationTimeMilliseconds)
-  expect(noEcho).toBeLessThan(intrinsic * 0.2)
-  expect(contrastTissueAt(csf, 1500, { tr: null, te: 1500 }).signal).toBeCloseTo(intrinsic, 12)
+it.each([1.5, 3, 7])('uses ±20 Hz only for contrast ensembles, with consistent field and packet offsets at %s T', field => {
+  for (const tissue of createContrastTissues(field)) {
+    tissue.ensembles.forEach((ensemble, index) => {
+      const omega = 2 * Math.PI * [-20, -12, -4, 4, 12, 20][index] / 1000
+      expect(ensemble.angularFrequencyOffsetRadiansPerMillisecond).toBeCloseTo(omega, 12)
+      expect(ensemble.spinPackets[0].angularFrequencyOffsetRadiansPerMillisecond).toBeCloseTo(omega, 12)
+      expect(ensemble.fieldVariationTesla * PROTON_GYROMAGNETIC_RATIO / 1000).toBeCloseTo(omega, 12)
+      expect(ensemble.fieldVariationPpm).toBeCloseTo(ensemble.fieldVariationTesla / field * 1e6, 12)
+    })
+  }
+  const race = createRaceEnsembles(field)
+  expect(race[0].angularFrequencyOffsetRadiansPerMillisecond * 1000 / (2 * Math.PI)).toBeCloseTo(-0.3, 12)
+  expect(race[5].angularFrequencyOffsetRadiansPerMillisecond * 1000 / (2 * Math.PI)).toBeCloseTo(0.3, 12)
+})
+
+it('produces visible short-TE echoes for CSF and white/gray matter without restoring lost bone signal', () => {
+  for (const tissue of createContrastTissues(1.5)) {
+    const timing = { tr: null, te: 50 }
+    const noEcho = contrastTissueAt(tissue, 50, { tr: null, te: null }).signal
+    const echo = contrastTissueAt(tissue, 50, timing).signal
+    const intrinsic = spinEchoIntensity(tissue.excitation.equilibriumScale!,
+      tissue.state.longitudinalRelaxationTimeMilliseconds,
+      tissue.state.transverseRelaxationTimeMilliseconds, timing)
+    expect(echo).toBeCloseTo(intrinsic, 12)
+    if (tissue.id === 'cortical-bone') {
+      expect(echo).toBeLessThan(1e-12)
+    } else {
+      expect(noEcho).toBeLessThan(echo * 0.2)
+      expect(echo).toBeGreaterThan(0.3)
+      expect(contrastTissueAt(tissue, 25, timing).signal).toBeLessThan(echo * 0.4)
+      expect(contrastTissueAt(tissue, 70, timing).signal).toBeLessThan(echo * 0.4)
+    }
+  }
 })
 
 it('treats unset controls as disabled weighting, rejects impossible timings, and labels joint TR/TE contrast', () => {

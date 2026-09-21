@@ -1,6 +1,6 @@
 import { fidEnsembleMagnetizationStateAt, type FidEnsembleState, type RfPulseEvent } from '../../../simulation/fid'
+import { PROTON_GYROMAGNETIC_RATIO } from '../../../models/HydrogenEnsemble'
 import { createComparisonTissues, type ComparisonTissue } from '../howWeMeasure2/tissueComparison'
-import { createRaceEnsembles } from '../howWeMeasure3/protonRace'
 
 export interface ContrastTiming { tr: number | null; te: number | null }
 export const EMPTY_CONTRAST_TIMING: ContrastTiming = { tr: null, te: null }
@@ -35,19 +35,27 @@ export function contrastLabel(timing: ContrastTiming) {
 }
 
 export interface ContrastTissue extends ComparisonTissue { ensembles: readonly FidEnsembleState[] }
+const CONTRAST_ENSEMBLE_COUNT = 6
+const CONTRAST_FREQUENCY_SPREAD_HZ = 20
 
 /** Four independent sets of six CSF/bone/white/gray ensembles, not a fabricated
- * T2-star curve. Their static offsets match the race's field gradient. */
+ * T2-star curve. This slide uses a stronger ±20 Hz teaching gradient so that
+ * white/gray matter dephase before their intrinsic T2 decay hides the echo.
+ * The earlier race and dephasing slides retain their slower offsets. */
 export function createContrastTissues(fieldStrengthTesla: number): ContrastTissue[] {
-  const offsets = createRaceEnsembles(fieldStrengthTesla)
   return createComparisonTissues(fieldStrengthTesla).map(tissue => ({
     ...tissue,
-    ensembles: offsets.map(offset => ({ ...offset, ...tissue.state,
-      index: offset.index, column: offset.column, row: offset.row, gridSize: offset.gridSize,
-      angularFrequencyOffsetRadiansPerMillisecond: offset.angularFrequencyOffsetRadiansPerMillisecond,
-      fieldVariationTesla: offset.fieldVariationTesla, fieldVariationPpm: offset.fieldVariationPpm,
-      spinPackets: offset.spinPackets.map(packet => ({ ...packet })),
-    })),
+    ensembles: Array.from({ length: CONTRAST_ENSEMBLE_COUNT }, (_, index) => {
+      const frequencyHz = CONTRAST_FREQUENCY_SPREAD_HZ * (2 * index / (CONTRAST_ENSEMBLE_COUNT - 1) - 1)
+      const omega = 2 * Math.PI * frequencyHz / 1000
+      const fieldVariationTesla = omega * 1000 / PROTON_GYROMAGNETIC_RATIO
+      return { ...tissue.state, index, column: index, row: 0, gridSize: CONTRAST_ENSEMBLE_COUNT,
+        angularFrequencyOffsetRadiansPerMillisecond: omega, fieldVariationTesla,
+        fieldVariationPpm: fieldVariationTesla / fieldStrengthTesla * 1e6,
+        spinPackets: [{ offsetXMillimeters: 0, offsetYMillimeters: 0,
+          angularFrequencyOffsetRadiansPerMillisecond: omega, weight: 1 }],
+      }
+    }),
   }))
 }
 
