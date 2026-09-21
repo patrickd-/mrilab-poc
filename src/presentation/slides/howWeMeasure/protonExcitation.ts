@@ -1,5 +1,5 @@
 import { HydrogenEnsemble, PROTON_GYROMAGNETIC_RATIO, type SamplePresetId } from '../../../models/HydrogenEnsemble'
-import { createFidEnsembleStates, fidEnsembleMagnetizationStateAt, type RfPulseEvent } from '../../../simulation/fid'
+import { createFidEnsembleStates, fidEnsembleMagnetizationStateAt, type FidEnsembleState, type RfPulseEvent } from '../../../simulation/fid'
 
 export interface ProtonExcitation {
   fieldStrengthTesla: number
@@ -27,6 +27,7 @@ export function createPresentationTissueState(fieldStrengthTesla: number, sample
   const high = fieldStrengthTesla <= 3 ? 3 : 7
   const fraction = Math.max(0, Math.min(1, (fieldStrengthTesla - low) / (high - low)))
   const [state] = createFidEnsembleStates([ensemble], low, 'uniform')
+  const lower = ensemble.sampleProperties(low)
   const upper = ensemble.sampleProperties(high)
   state.longitudinalRelaxationTimeMilliseconds += fraction *
     (upper.longitudinalRelaxationTimeMilliseconds - state.longitudinalRelaxationTimeMilliseconds)
@@ -34,11 +35,14 @@ export function createPresentationTissueState(fieldStrengthTesla: number, sample
     (upper.transverseRelaxationTimeMilliseconds - state.transverseRelaxationTimeMilliseconds)
   state.equilibriumMagnetization += fraction *
     (ensemble.magneticProperties(high, 'uniform').boltzmannMagnetization - state.equilibriumMagnetization)
-  return state
+  return { ...state,
+    effectiveTransverseRelaxationTimeMilliseconds: lower.effectiveTransverseRelaxationTimeMilliseconds + fraction *
+      (upper.effectiveTransverseRelaxationTimeMilliseconds - lower.effectiveTransverseRelaxationTimeMilliseconds),
+  }
 }
 
 export function presentationMagnetizationAt(
-  state: ReturnType<typeof createPresentationCsfState>,
+  state: FidEnsembleState,
   excitation: ProtonExcitation,
   nowMilliseconds: number,
 ) {

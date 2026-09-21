@@ -40,25 +40,28 @@ export interface ContrastTissue extends ComparisonTissue {
   dephasing: ContrastDephasing
 }
 
-/** Independent tissue states share a fixed, densely sampled field distribution.
+/** Independent tissue states use their own calibrated frequency distribution.
  * All ensembles within one tissue have identical T1/T2 and ideal RF pulses;
  * only their frequency offsets and population weights differ.
  * Earlier race/dephasing slides retain their slower, sparse offsets. */
 export function createContrastTissues(fieldStrengthTesla: number): ContrastTissue[] {
-  const dephasing = createContrastDephasing()
-  return createComparisonTissues(fieldStrengthTesla).map(tissue => ({
-    ...tissue, dephasing,
-    ensembles: dephasing.samples.map((sample, index) => {
-      const omega = sample.angularFrequencyOffsetRadiansPerMillisecond
-      const fieldVariationTesla = omega * 1000 / PROTON_GYROMAGNETIC_RATIO
-      return { ...tissue.state, ...sample, index, column: index, row: 0, gridSize: dephasing.samples.length,
-        fieldVariationTesla,
-        fieldVariationPpm: fieldVariationTesla / fieldStrengthTesla * 1e6,
-        spinPackets: [{ offsetXMillimeters: 0, offsetYMillimeters: 0,
-          angularFrequencyOffsetRadiansPerMillisecond: omega, weight: 1 }],
-      }
-    }),
-  }))
+  return createComparisonTissues(fieldStrengthTesla).map(tissue => {
+    const dephasing = createContrastDephasing(tissue.state.transverseRelaxationTimeMilliseconds,
+      tissue.state.effectiveTransverseRelaxationTimeMilliseconds)
+    return {
+      ...tissue, dephasing,
+      ensembles: dephasing.samples.map((sample, index) => {
+        const omega = sample.angularFrequencyOffsetRadiansPerMillisecond
+        const fieldVariationTesla = omega * 1000 / PROTON_GYROMAGNETIC_RATIO
+        return { ...tissue.state, ...sample, index, column: index, row: 0, gridSize: dephasing.samples.length,
+          fieldVariationTesla,
+          fieldVariationPpm: fieldVariationTesla / fieldStrengthTesla * 1e6,
+          spinPackets: [{ offsetXMillimeters: 0, offsetYMillimeters: 0,
+            angularFrequencyOffsetRadiansPerMillisecond: omega, weight: 1 }],
+        }
+      }),
+    }
+  })
 }
 
 export function contrastPulses(te: number | null): RfPulseEvent[] {
@@ -74,9 +77,9 @@ export function contrastPulses(te: number | null): RfPulseEvent[] {
  *
  * Exact Bloch factorization for this slide's 90-y / optional 180-x sequence:
  * each transverse vector is exp(-t/T2) * exp(i*omega*u), with u=t before
- * refocusing and u=t-TE afterwards. Summing the weighted phasors once lets all
- * tissues reuse the same dephasing without evaluating 512 pulse histories per
- * tissue per plotted point. This is not a fitted or manufactured echo envelope. */
+ * refocusing and u=t-TE afterwards. Caching each tissue's weighted phasor sum
+ * avoids evaluating 512 pulse histories per plotted point. This is not a
+ * fitted or manufactured echo envelope. */
 export function contrastTissueAt(tissue: ContrastTissue, time: number, timing: ContrastTiming) {
   const scale = tissue.excitation.equilibriumScale ?? 1
   if (time < 0) return { signal: 0, longitudinal: scale }

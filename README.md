@@ -105,14 +105,23 @@ without a running acquisition clock.
 
 Click the lower graph to select **TR** (red tag), or the upper graph to select
 **TE** (yellow line). A yellow RF-wave tag follows at **TE/2**, and 512
-field-offset ensembles per tissue produce the refocused signal. This slide
-alone uses offsets from −20 to +20 Hz, with normalized Gaussian population
-weights (standard deviation 5 Hz). The dense sampling pushes discrete-grid
-recurrences past the maximum 12 s plot window; the smooth weights suppress
-sharp-boundary ripples without changing intrinsic T1/T2 or the signal at TE.
-The shared weighted phasor sum is cached across tissues, then combined with
-each tissue's relaxation: an exact factorization of this ideal 90°/180° Bloch
-sequence, verified against explicit ensemble-by-ensemble simulation.
+field-offset ensembles per tissue produce the refocused signal. Each tissue
+has a normalized Gaussian frequency distribution calibrated to its existing
+simulator T2* preset: the unrefocused signal reaches 1/e of its initial value
+at that time. A numerical width calibration accounts for the finite ±4-sigma
+support. These are effective decay times, not mono-exponential fits.
+
+At 1.5 T the targets are CSF 550 ms (a provisional extrapolation, not a direct
+measurement), white matter 66.2 ms, gray matter 84 ms, and cortical bone 0.4 ms.
+Gray matter and bone already have T2*=T2 in this table, so their distributions
+collapse to zero offset; no extra reversible decay or echo bump is invented.
+Targets interpolate with field strength using the same tissue table as T1/T2.
+The dense smooth populations avoid visible recurrence artifacts over the 12 s
+window without changing intrinsic T1/T2 or the signal at TE. Each tissue's
+weighted phasor sum is cached, then combined with its relaxation: an exact
+factorization of this ideal 90°/180° Bloch sequence, verified against explicit
+ensemble-by-ensemble simulation. Short-TE echoes are consequently subtler than
+in the previous shared ±20 Hz demonstration gradient.
 The earlier race/dephasing slides keep their slower frequency differences.
 The initial axes cover 6 seconds for T1 recovery and 400 ms for transverse
 signal so clinically useful echo delays are easy to select. Scroll each axis
