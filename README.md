@@ -140,8 +140,14 @@ model does not simulate a full repeated steady-state pulse train or corrections
 to longitudinal recovery caused by refocusing pulses in prior repetitions.
 At TE, the weighted complex mean of each tissue's simulated vectors matches the
 same signal equation; away from TE it retains genuine gradient dephasing.
-Plot tissues retain the simulator's 1.5 T table and colors, whereas image
-voxels use the supplied synthetic map values, which differ from that table.
+Four image classes (bone, CSF, gray matter, white matter) are identified by
+their complete original density/T1/T2 tuples and aligned in memory to the
+same tissue objects used by the graphs. This preserves the original JSON
+files and anatomy while keeping density, recovery, and echo decay consistent.
+The seven other non-background classes retain their supplied values; the
+background stays zero. See `src/presentation/mri_rendering/README.md` for the
+source-class mapping. Alignment is recomputed only when the tissue model changes,
+not on every TR/TE edit.
 These are illustrative tissue-model estimates, not measured quantitative maps.
 
 ## GitHub Pages

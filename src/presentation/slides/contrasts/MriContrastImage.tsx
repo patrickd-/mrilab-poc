@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { contrastLabel, validContrastTiming, type ContrastTiming } from './contrastModel'
-import { MRI_MAP_SIZE, MRI_TISSUE_MAPS, renderMriPixels } from './mriImage'
+import { MRI_MAP_SIZE, renderMriPixels, type TissueMaps } from './mriImage'
 
-export function MriContrastImage({ timing }: { timing: ContrastTiming }) {
+export function MriContrastImage({ timing, maps }: { timing: ContrastTiming; maps: TissueMaps }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const figureRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -14,9 +14,9 @@ export function MriContrastImage({ timing }: { timing: ContrastTiming }) {
     const context = ref.current?.getContext('2d')
     if (!context) return
     const image = context.createImageData(MRI_MAP_SIZE.width, MRI_MAP_SIZE.height)
-    image.data.set(renderMriPixels(MRI_TISSUE_MAPS, timing))
+    image.data.set(renderMriPixels(maps, timing))
     context.putImageData(image, 0, 0)
-  }, [timing])
+  }, [timing, maps])
   const label = contrastLabel(timing)
   return <figure ref={figureRef} className="contrast-image" data-tr-ms={timing.tr ?? ''} data-te-ms={timing.te ?? ''}>
     <canvas ref={ref} width={MRI_MAP_SIZE.width} height={MRI_MAP_SIZE.height} role="img"

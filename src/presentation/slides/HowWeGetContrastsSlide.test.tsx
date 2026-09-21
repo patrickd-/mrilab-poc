@@ -2,6 +2,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { howWeGetContrastsSlideModule } from './HowWeGetContrastsSlide'
+import { MRI_TISSUE_MAPS } from './contrasts/mriImage'
 
 const Slide = howWeGetContrastsSlideModule.Component
 const props = { fieldStrengthTesla: 1.5, stateIndex: 0, direction: 'forward' as const, setFieldStrengthTesla: () => {} }
@@ -20,6 +21,23 @@ function clickTime(kind: 'signal' | 'longitudinal', time: number) {
   const window = Number(graph.getAttribute('data-time-window-ms'))
   fireEvent.click(graph, { clientX: 40 + (time / window + 0.08) / 1.08 * 560, clientY: 130 })
 }
+
+it('renders the aligned bone density and decay rather than the original map values', () => {
+  const { rerender } = render(<Slide {...props} />)
+  const boneIndex = MRI_TISSUE_MAPS.density.flat().findIndex(value => value === 0.05) * 4
+  const bonePixel = () => putImageData.mock.calls.at(-1)![0].data[boneIndex]
+  expect(boneIndex).toBeGreaterThanOrEqual(0)
+  expect(bonePixel()).toBe(66) // Original rho=0.05 would have produced 13.
+  clickTime('signal', 0.1)
+  expect(bonePixel()).toBe(51) // Uses the graph's 0.4 ms T2, not the map's 5 ms.
+  clickTime('signal', 10)
+  expect(bonePixel()).toBe(0)
+  clickTime('signal', 0)
+  clickTime('longitudinal', 100)
+  expect(bonePixel()).toBe(39) // T1=110 ms at 1.5 T.
+  rerender(<Slide {...props} fieldStrengthTesla={3} />)
+  expect(bonePixel()).toBe(32) // Re-align from originals: T1=150 ms at 3 T.
+})
 
 it('draws all four tissue curves and the complete MRI instantly, without time-based progression', () => {
   vi.useFakeTimers()
