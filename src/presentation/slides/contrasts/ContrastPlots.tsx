@@ -100,7 +100,7 @@ function ContrastPlot({ kind, tissues, timing, onChange, hoverTime, onHover, hig
         else if (event.key === '0') setTimeWindow(initialWindow)
         else if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); onChange({ ...timing, [kind === 'signal' ? 'te' : 'tr']: null }) }
       }}>
-      <desc>All curves are evaluated immediately from six ensembles per tissue. Scroll to zoom this time axis.
+      <desc>All curves are evaluated immediately from 512 weighted ensembles per tissue. Scroll to zoom this time axis.
         Click to set {kind === 'signal' ? 'echo time TE; the refocusing pulse follows at TE/2.' : 'repetition time TR, selecting the available longitudinal recovery before excitation.'}
         Click at zero or press Delete to clear this timing. Unset TR means full recovery; unset TE means zero echo delay.
         Transverse curves include field-offset dephasing; longitudinal curves show the independent saturation-recovery preparation.</desc>

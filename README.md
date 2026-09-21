@@ -104,10 +104,15 @@ absent; all four tissue curves and the MRI image are evaluated immediately,
 without a running acquisition clock.
 
 Click the lower graph to select **TR** (red tag), or the upper graph to select
-**TE** (yellow line). A yellow RF-wave tag follows at **TE/2**, and the six
-independent field-offset ensembles per tissue produce the refocused signal.
-This slide alone uses offsets from −20 to +20 Hz, making short-TE echoes
-visible for white/gray matter without changing their intrinsic T1/T2 values.
+**TE** (yellow line). A yellow RF-wave tag follows at **TE/2**, and 512
+field-offset ensembles per tissue produce the refocused signal. This slide
+alone uses offsets from −20 to +20 Hz, with normalized Gaussian population
+weights (standard deviation 5 Hz). The dense sampling pushes discrete-grid
+recurrences past the maximum 12 s plot window; the smooth weights suppress
+sharp-boundary ripples without changing intrinsic T1/T2 or the signal at TE.
+The shared weighted phasor sum is cached across tissues, then combined with
+each tissue's relaxation: an exact factorization of this ideal 90°/180° Bloch
+sequence, verified against explicit ensemble-by-ensemble simulation.
 The earlier race/dephasing slides keep their slower frequency differences.
 The initial axes cover 6 seconds for T1 recovery and 400 ms for transverse
 signal so clinically useful echo delays are easy to select. Scroll each axis
@@ -133,7 +138,7 @@ The lower curves show independent saturation-recovery preparation; that
 recovered fraction initializes the upper 90°/180° acquisition. This factorized
 model does not simulate a full repeated steady-state pulse train or corrections
 to longitudinal recovery caused by refocusing pulses in prior repetitions.
-At TE, the complex mean of each tissue's six simulated vectors matches the
+At TE, the weighted complex mean of each tissue's simulated vectors matches the
 same signal equation; away from TE it retains genuine gradient dephasing.
 Plot tissues retain the simulator's 1.5 T table and colors, whereas image
 voxels use the supplied synthetic map values, which differ from that table.

@@ -25,7 +25,7 @@ it('draws all four tissue curves and the complete MRI instantly, without time-ba
   vi.useFakeTimers()
   const { container } = render(<Slide {...props} />)
   expect(screen.getByTestId('contrast-image-label').textContent).toBe('Spin Density Image')
-  expect(screen.getByTestId('contrast-signal-plot').getAttribute('data-ensemble-count')).toBe('24')
+  expect(screen.getByTestId('contrast-signal-plot').getAttribute('data-ensemble-count')).toBe('2048')
   const curves = [...container.querySelectorAll('.tissue-plot__curve')]
   expect(curves).toHaveLength(8)
   const initial = curves.map(curve => curve.getAttribute('d'))
