@@ -102,12 +102,6 @@
   transition: left var(--measurement-layout-duration) ease;
 }
 
-.rf-remote:focus-visible {
-  outline: 3px solid #f8da72;
-  outline-offset: 4px;
-  border-radius: 20px;
-}
-
 .rf-remote svg { display: block; width: 100%; overflow: visible; }
 .rf-remote:disabled { cursor: wait; }
 .rf-remote__red-button { transition: transform 90ms ease; }
@@ -204,12 +198,6 @@
 
 .flicking-hand:disabled {
   cursor: wait;
-}
-
-.flicking-hand:focus-visible {
-  outline: 3px solid #f8da72;
-  outline-offset: -8px;
-  border-radius: 40%;
 }
 
 .flicking-hand__artwork {

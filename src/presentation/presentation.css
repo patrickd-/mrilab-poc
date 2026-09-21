@@ -27,6 +27,17 @@ input {
   font: inherit;
 }
 
+.presentation,
+.presentation * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Keep controls focusable for shortcuts, without presentation focus boxes. */
+.presentation :focus {
+  outline: none;
+}
+
 .presentation {
   --bar-height: 60px;
   width: 100%;
@@ -112,11 +123,6 @@ input {
   border-color: rgb(108 232 241 / 75%);
   background: linear-gradient(180deg, rgb(35 76 86 / 92%), rgb(12 35 42 / 92%));
   transform: translateY(-1px);
-}
-
-.presentation-bar button:focus-visible {
-  outline: 2px solid #f3ca6a;
-  outline-offset: 3px;
 }
 
 .presentation-bar button:disabled {
@@ -529,11 +535,6 @@ input {
   writing-mode: vertical-lr;
   direction: rtl;
   accent-color: #57dce3;
-}
-
-.field-control__slider:focus-visible {
-  outline: 2px solid #f3ca6a;
-  outline-offset: 5px;
 }
 
 .field-control__mark {

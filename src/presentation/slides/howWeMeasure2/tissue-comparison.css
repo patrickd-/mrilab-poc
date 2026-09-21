@@ -64,7 +64,6 @@
   font: 700 clamp(18px, 1.7vw, 26px) Manrope, sans-serif;
   animation: comparison-tissues-reveal var(--comparison-layout-duration) ease both;
 }
-.tissue-specimen:focus-visible figcaption { outline: 2px solid var(--tissue-color); outline-offset: 4px; }
 
 .tissue-plots {
   position: absolute;
@@ -79,7 +78,6 @@
 .tissue-plot__identity { fill: #87e0ef; font: 700 32px Manrope, sans-serif; }
 .tissue-plot__time-unit { fill: #f0f4f5; font: 20px Manrope, sans-serif; paint-order: stroke; stroke: #080d11; stroke-width: 5; stroke-linejoin: round; }
 .tissue-plot__outgoing-voltage { fill: none; stroke: #f6cf75; stroke-width: 2.5; animation: comparison-fade-out 650ms ease both; }
-.tissue-plots:focus-visible { outline: 1px solid #87e0ef; outline-offset: 2px; }
 .tissue-plot__editable { cursor: crosshair; }
 .tissue-plot__refocus .voltage-trace__pulse-line { stroke: #f6cf75; }
 .tissue-plot__refocus .voltage-trace__tag { fill: #f6cf75; stroke: #ffe6a8; }
