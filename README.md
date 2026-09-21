@@ -84,7 +84,8 @@ zoom and pause still work. The pulse carries into stacked view; Refresh clears i
 
 The next chapter (`HowWeMeasure3Slide`) explains refocusing with six proton
 racers. They split from the large sphere into grid-sized cells along a shared
-start/finish line. Lane field offsets increase from left to right; each racer's
+checkerboard start/finish strip. Opaque lane colors run from cool to warm as
+field strength increases left to right, replacing the field arrows in this view. Each racer's
 speed uses exactly its slowed displayed precession frequency. Its unwrapped
 distance is proportional to `v*t` before a selected 180° pulse at `tau`, and
 `v*(2*tau-t)` afterward. Racers are not clamped, wrapped, or removed off-screen,

@@ -33,7 +33,7 @@ function HowWeMeasure3Slide({ fieldStrengthTesla, direction, simulationClock }: 
   }
 
   return <div className="tissue-comparison proton-race" data-csf-step="race" data-transition-started="true" data-transition-complete="true">
-    <MagneticFieldBackdrop className="tissue-comparison__field" fieldStrengthTesla={fieldStrengthTesla} nonUniform />
+    <MagneticFieldBackdrop className="tissue-comparison__field" fieldStrengthTesla={fieldStrengthTesla} nonUniform showFieldLines={false} />
     <RaceTrack />
     <CsfEnsembleGraphic step={7} states={racers} excitation={tissues[0].excitation} motion={RACE_MOTION}
       immediate={direction === 'backward'} clock={clock} onSettled={onSettled}

@@ -5,10 +5,12 @@ export function MagneticFieldBackdrop({
   fieldStrengthTesla,
   className = '',
   nonUniform = false,
+  showFieldLines = true,
 }: {
   fieldStrengthTesla: number
   className?: string
   nonUniform?: boolean
+  showFieldLines?: boolean
 }) {
   const id = useId().replace(/:/g, '')
   const fieldLineOpacity =
@@ -21,6 +23,7 @@ export function MagneticFieldBackdrop({
     >
       <div className="magnet magnet--north"><span>N</span></div>
       <div className="magnet magnet--south"><span>S</span></div>
+      {showFieldLines ? <>
       <div
         className="field-lines"
         style={{ '--field-opacity': fieldLineOpacity } as CSSProperties}
@@ -53,6 +56,7 @@ export function MagneticFieldBackdrop({
         })}
       </svg>
       </div>
+      </> : null}
     </div>
   )
 }

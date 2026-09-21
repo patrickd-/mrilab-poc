@@ -7,9 +7,5 @@
   pointer-events: none;
   animation: race-track-reveal 1400ms ease both;
 }
-.proton-race-track__ground { fill: #0b111a; fill-opacity: 0.66; }
 .proton-race-track__lane { stroke: #a4c4d2; stroke-opacity: 0.4; stroke-width: 1.5; }
-.proton-race-track__start { stroke: #e1f3f7; stroke-width: 3; }
-.proton-race-track g rect { fill: #111c25; stroke: #708d9b; stroke-width: 1; }
-.proton-race-track text { fill: #e1f3f7; font: 700 20px Manrope, sans-serif; }
 @keyframes race-track-reveal { from { opacity: 0; } to { opacity: 1; } }
