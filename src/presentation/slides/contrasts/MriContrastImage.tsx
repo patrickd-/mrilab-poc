@@ -24,7 +24,7 @@ export function MriContrastImage({ timing, maps }: { timing: ContrastTiming; map
     <figcaption>
       <strong data-testid="contrast-image-label">{label}</strong>
       <div className="contrast-image__timing"><span>TR {timing.tr === null ? '—' : `${Math.round(timing.tr)} ms`}</span><span>TE {timing.te === null ? '—' : `${Number(timing.te.toFixed(1))} ms`}</span></div>
-      <small>{validContrastTiming(timing) ? 'Synthetic tissue-model estimates' : 'The echo must precede the next excitation.'}</small>
+      {!validContrastTiming(timing) ? <small>The echo must precede the next excitation.</small> : null}
     </figcaption>
   </figure>
 }

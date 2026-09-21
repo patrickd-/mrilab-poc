@@ -103,10 +103,10 @@ it('treats unset controls as disabled weighting, rejects impossible timings, and
     expect(validContrastTiming(timing)).toBe(false)
     expect(spinEchoIntensity(1, 900, 80, timing)).toBe(0)
   }
-  expect(contrastLabel({ tr: null, te: null })).toBe('Spin Density Image')
+  expect(contrastLabel({ tr: null, te: null })).toBe('Spin/Proton Density Image')
   expect(contrastLabel({ tr: 500, te: 10 })).toBe('T₁ Weighted Image')
   expect(contrastLabel({ tr: 5000, te: 100 })).toBe('T₂ Weighted Image')
-  expect(contrastLabel({ tr: 5000, te: 10 })).toBe('Spin Density Image')
+  expect(contrastLabel({ tr: 5000, te: 10 })).toBe('Spin/Proton Density Image')
   expect(contrastLabel({ tr: 500, te: 100 })).toBe('Mixed T₁ / T₂ Weighted Image')
   expect(contrastLabel({ tr: 50, te: 100 })).toBe('Choose TE shorter than TR')
 })

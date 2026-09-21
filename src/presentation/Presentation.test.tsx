@@ -397,7 +397,7 @@ describe('MRI Intuition presentation', () => {
     expect(race?.getAttribute('data-exiting')).toBe('true')
     expect(screen.queryByRole('button', { name: 'Pause simulation' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Resume simulation' })).toBeNull()
-    expect(screen.getByTestId('contrast-image-label').textContent).toBe('Spin Density Image')
+    expect(screen.getByTestId('contrast-image-label').textContent).toBe('Spin/Proton Density Image')
     fireEvent(race!.querySelector('.magnet--south')!, Object.assign(new Event('animationend', { bubbles: true }), { animationName: 'contrast-south-exit' }))
     expect(container.querySelector('.proton-race')).toBeNull()
     expect((screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement).disabled).toBe(true)

@@ -32,7 +32,7 @@ export function contrastLabel(timing: ContrastTiming) {
   if (t1Weighted && t2Weighted) return 'Mixed T₁ / T₂ Weighted Image'
   if (t1Weighted) return 'T₁ Weighted Image'
   if (t2Weighted) return 'T₂ Weighted Image'
-  return 'Spin Density Image'
+  return 'Spin/Proton Density Image'
 }
 
 export interface ContrastTissue extends ComparisonTissue {
