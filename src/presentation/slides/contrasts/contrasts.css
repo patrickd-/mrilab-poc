@@ -16,6 +16,7 @@
 .contrast-plots .tissue-plot--longitudinal { top: 49%; }
 .contrast-plot { cursor: crosshair; outline: none; }
 .contrast-plot:focus-visible { outline: 1px solid #87e0ef; }
+.contrast-image-sample { fill: #d5f5ff; fill-opacity: 0.1; stroke: #d5f5ff; stroke-opacity: 0.85; stroke-width: 1.5; pointer-events: none; }
 .contrast-marker text { fill: #fff6f2; font: 700 18px Manrope, sans-serif; }
 .contrast-marker--yellow .voltage-trace__pulse-line { stroke: #f6cf75; }
 .contrast-marker--yellow .voltage-trace__tag { fill: #f6cf75; stroke: #ffe6a8; }

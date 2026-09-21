@@ -108,6 +108,38 @@ it('marks the initial excitation on both graphs and labels the signal origin TR 
   expect(recovery.querySelector('.voltage-trace__rf-symbol')).not.toBeNull()
 })
 
+it('highlights the image sampling column at excitation or TE, following timing and zoom changes', () => {
+  render(<Slide {...props} />)
+  const sample = () => screen.getByTestId('contrast-image-sample')
+  const sampleTime = () => Number(sample().getAttribute('data-time-ms'))
+  const sampleCenter = () => Number(sample().getAttribute('x')) + Number(sample().getAttribute('width')) / 2
+  expect(sampleTime()).toBe(0)
+  expect(screen.getByTestId('contrast-signal-plot').contains(sample())).toBe(true)
+  const initialCenter = sampleCenter()
+  clickTime('longitudinal', 500)
+  expect(sampleTime()).toBe(0)
+  expect(sampleCenter()).toBe(initialCenter)
+  clickTime('signal', 100)
+  expect(sampleTime()).toBeCloseTo(100)
+  expect(screen.getByTestId('contrast-te-marker').getAttribute('transform')).toBe(`translate(${sampleCenter()} 0)`)
+  const originalCenter = sampleCenter()
+  fireEvent.wheel(screen.getByTestId('contrast-signal-plot'), { deltaY: -100 })
+  expect(sampleTime()).toBeCloseTo(100)
+  expect(sampleCenter()).toBeGreaterThan(originalCenter)
+  // Off-screen TE must not imply a sample at the edge of the graph.
+  fireEvent.wheel(screen.getByTestId('contrast-signal-plot'), { deltaY: -300 })
+  expect(screen.queryByTestId('contrast-image-sample')).toBeNull()
+  fireEvent.keyDown(screen.getByTestId('contrast-signal-plot'), { key: '0' })
+  expect(sampleTime()).toBeCloseTo(100)
+  clickTime('longitudinal', 50)
+  expect(screen.queryByTestId('contrast-image-sample')).toBeNull()
+  clickTime('longitudinal', 500)
+  expect(sampleTime()).toBeCloseTo(100)
+  fireEvent.keyDown(screen.getByTestId('contrast-signal-plot'), { key: 'Delete' })
+  expect(sampleTime()).toBe(0)
+  expect(sampleCenter()).toBe(initialCenter)
+})
+
 it('zooms each time axis without changing timing or image data, and refresh resets all choices', () => {
   const { rerender } = render(<Slide {...props} />)
   clickTime('signal', 100)

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { PRE_RF_SAMPLE_TIME_MS } from '../howWeMeasure2/tissueComparison'
-import { contrastTissueAt, type ContrastTiming, type ContrastTissue } from './contrastModel'
+import { contrastTissueAt, validContrastTiming, type ContrastTiming, type ContrastTissue } from './contrastModel'
 
 const LEFT = 40, BOTTOM = 254, HEIGHT = 310, TOP = 70
 const WAVE = 'M-7 13 Q2 20 -7 27 M0 10 Q12 20 0 30'
@@ -80,6 +80,8 @@ function ContrastPlot({ kind, tissues, timing, onChange, hoverTime, onHover, hig
   const step = [1, 2, 5, 10].find(value => value * power >= roughStep)! * power
   const ticks = Array.from({ length: Math.floor(timeWindow / step) + 1 }, (_, index) => index * step)
   const selected = kind === 'signal' ? timing.te : timing.tr
+  const imageSampleTime = timing.te ?? 0
+  const sampledTime = kind === 'signal' ? imageSampleTime : selected
   // Keep short-TE annotations readable without shifting their actual timing lines.
   const refocusTagX = timing.te === null ? 0 : Math.max(timeX(timing.te / 2), timeX(0) + 36)
   const echoLabelX = timing.te === null ? 0 : Math.min(right - 14, Math.max(timeX(timing.te), refocusTagX + 34))
@@ -108,6 +110,10 @@ function ContrastPlot({ kind, tissues, timing, onChange, hoverTime, onHover, hig
         {[TOP, 162, BOTTOM].map(y => <line key={y} x1="34" x2={right + 6} y1={y} y2={y} />)}
         {ticks.slice(1).map(time => <line key={time} x1={timeX(time)} x2={timeX(time)} y1="54" y2={BOTTOM} />)}
       </g>
+      {kind === 'signal' && validContrastTiming(timing) && inView(imageSampleTime) ?
+        <rect className="contrast-image-sample" data-testid="contrast-image-sample" data-time-ms={imageSampleTime}
+          x={timeX(imageSampleTime) - 8} y="54" width="16" height={BOTTOM - 54} rx="3"
+          aria-label={`MRI image sampled ${imageSampleTime} ms after excitation`} /> : null}
       <path className="voltage-trace__axis" d={`M34 54 V${BOTTOM} H${right + 8} M29 63 L34 54 L39 63 M${right - 1} ${BOTTOM - 5} L${right + 8} ${BOTTOM} L${right - 1} ${BOTTOM + 5}`} />
       <text className="tissue-plot__identity" x="-18" y="42">T<tspan dy="4" fontSize="22">{kind === 'signal' ? '2' : '1'}</tspan></text>
       <text className="tissue-plot__time-unit" x={right} y="239" textAnchor="end">t ({unitScale === 1 ? 'ms' : 's'})</text>
@@ -135,8 +141,8 @@ function ContrastPlot({ kind, tissues, timing, onChange, hoverTime, onHover, hig
         </g>
         : <g data-testid="contrast-tr-marker" data-time-ms={selected}><PulseTag x={timeX(selected)} label="TR" title={`Repetition time ${selected} ms`} /></g>
         : null}
-      {inView(selected) ? tissues.map(tissue => <circle key={tissue.id} cx={timeX(selected)}
-        cy={BOTTOM - (BOTTOM - TOP) * contrastTissueAt(tissue, selected, timing)[kind]} r="4" fill={tissue.color} stroke="#080d11" strokeWidth="1" />) : null}
+      {inView(sampledTime) ? tissues.map(tissue => <circle key={tissue.id} cx={timeX(sampledTime)}
+        cy={BOTTOM - (BOTTOM - TOP) * contrastTissueAt(tissue, sampledTime, timing)[kind]} r="4" fill={tissue.color} stroke="#080d11" strokeWidth="1" />) : null}
       {inView(hoverTime) ? <line className="voltage-trace__hover" data-testid={`contrast-${kind}-hover`}
         x1={timeX(hoverTime)} x2={timeX(hoverTime)} y1="44" y2={BOTTOM} /> : null}
     </svg>
