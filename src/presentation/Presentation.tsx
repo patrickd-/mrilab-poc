@@ -16,6 +16,11 @@ interface PresentationCursor {
   stateIndex: number
 }
 
+interface OutgoingSlide extends PresentationCursor {
+  replayVersion: number
+  fieldStrengthTesla: number
+}
+
 const FIRST_CURSOR: PresentationCursor = {
   slideIndex: 0,
   stateIndex: 0,
@@ -65,6 +70,7 @@ export function Presentation() {
   const [direction, setDirection] = useState<NavigationDirection>('initial')
   const [fieldStrengthTesla, setFieldStrengthTesla] = useState(0)
   const [replayVersion, setReplayVersion] = useState(0)
+  const [outgoing, setOutgoing] = useState<OutgoingSlide | null>(null)
   const [simulationClock] = useState(() => new SimulationClock())
   const [paused, setPaused] = useState(false)
   const pauseSimulation = useCallback((pause: boolean) => {
@@ -79,13 +85,19 @@ export function Presentation() {
 
   const goForward = useCallback(() => {
     if (isLastCursor(cursorRef.current)) return
+    const current = cursorRef.current
+    const currentSlide = presentationSlides[current.slideIndex]
+    setOutgoing(currentSlide.animateExit && nextCursor(current).slideIndex !== current.slideIndex
+      ? { ...current, replayVersion, fieldStrengthTesla: currentSlide.preserveFieldStrength ? fieldStrengthTesla : DEMONSTRATION_FIELD_TESLA }
+      : null)
     pauseSimulation(false)
     setDirection('forward')
     setCursor(nextCursor)
-  }, [pauseSimulation])
+  }, [pauseSimulation, replayVersion, fieldStrengthTesla])
 
   const goBackward = useCallback(() => {
     if (isFirstCursor(cursorRef.current)) return
+    setOutgoing(null)
     pauseSimulation(false)
     setDirection('backward')
     setCursor(previousCursor)
@@ -132,6 +144,7 @@ export function Presentation() {
     if (!slide.preserveFieldStrength) setFieldStrengthTesla(DEMONSTRATION_FIELD_TESLA)
   }, [slide.preserveFieldStrength])
   const Slide = slide.Component
+  const Outgoing = outgoing ? presentationSlides[outgoing.slideIndex].Component : null
   const presentationClassName = useMemo(
     () => `presentation presentation--${direction}`,
     [direction],
@@ -157,6 +170,7 @@ export function Presentation() {
               </svg>
             </button> : null}
           <button aria-label="Replay current step" type="button" onClick={() => {
+            setOutgoing(null)
             pauseSimulation(false)
             setDirection('forward')
             setReplayVersion(version => version + 1)
@@ -186,6 +200,11 @@ export function Presentation() {
       </header>
 
       <section aria-live="polite" className="presentation-stage">
+        {Outgoing && outgoing ? <Outgoing
+          key={`${presentationSlides[outgoing.slideIndex].id}:${outgoing.replayVersion}`}
+          direction="forward" stateIndex={outgoing.stateIndex} fieldStrengthTesla={outgoing.fieldStrengthTesla}
+          setFieldStrengthTesla={setFieldStrengthTesla} simulationClock={simulationClock} exiting
+          onExitComplete={() => setOutgoing(current => current === outgoing ? null : current)} /> : null}
         <Slide
           key={`${slide.id}:${replayVersion}`}
           direction={direction}

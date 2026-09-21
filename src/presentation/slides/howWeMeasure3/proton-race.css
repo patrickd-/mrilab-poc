@@ -9,3 +9,12 @@
 }
 .proton-race-track__lane { stroke: #a4c4d2; stroke-opacity: 0.4; stroke-width: 1.5; }
 @keyframes race-track-reveal { from { opacity: 0; } to { opacity: 1; } }
+.proton-race[data-exiting='true'] { z-index: 30; pointer-events: none; }
+.proton-race[data-exiting='true'] .tissue-plots { display: none; }
+.proton-race[data-exiting='true'] .magnet--south { animation: contrast-south-exit 1000ms ease-in-out both !important; }
+.proton-race[data-exiting='true'] .magnet--north { animation: contrast-north-exit 1000ms ease-in-out both !important; }
+.proton-race[data-exiting='true'] .proton-race-track,
+.proton-race[data-exiting='true'] .csf-ensemble-scene { animation: contrast-race-exit 650ms ease both; }
+@keyframes contrast-south-exit { from { transform: translateY(-48%); } to { transform: translateY(-110%); } }
+@keyframes contrast-north-exit { from { transform: translateY(48%); } to { transform: translateY(110%); } }
+@keyframes contrast-race-exit { from { opacity: 1; } to { opacity: 0; } }

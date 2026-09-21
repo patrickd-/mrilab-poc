@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Presentation } from './Presentation'
 import { excessProtonsAt, formatProtonCount } from './physics'
 import { FID_PLAY_PLAN } from './playback/playPlan'
@@ -14,6 +14,13 @@ async function advance(user: ReturnType<typeof userEvent.setup>, count: number) 
     await user.click(next)
   }
 }
+
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    createImageData: (width: number, height: number) => ({ data: new Uint8ClampedArray(width * height * 4) }), putImageData: () => {},
+  } as unknown as CanvasRenderingContext2D)
+})
+afterEach(() => vi.restoreAllMocks())
 
 describe('MRI Intuition presentation', () => {
   it('reserves navigation keys after interacting with the B0 slider', async () => {
@@ -382,6 +389,17 @@ describe('MRI Intuition presentation', () => {
     expect(screen.getByRole('button', { name: 'Resume simulation' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Replay current step' }))
     expect(screen.getByRole('button', { name: 'Pause simulation' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement).disabled).toBe(false)
+    const race = container.querySelector('.proton-race')
+    await advance(user, 1)
+    expect(screen.getByRole('heading', { name: 'How do we get contrasts?' })).toBeTruthy()
+    expect(container.querySelector('.proton-race')).toBe(race)
+    expect(race?.getAttribute('data-exiting')).toBe('true')
+    expect(screen.queryByRole('button', { name: 'Pause simulation' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Resume simulation' })).toBeNull()
+    expect(screen.getByTestId('contrast-image-label').textContent).toBe('Spin Density Image')
+    fireEvent(race!.querySelector('.magnet--south')!, Object.assign(new Event('animationend', { bubbles: true }), { animationName: 'contrast-south-exit' }))
+    expect(container.querySelector('.proton-race')).toBeNull()
     expect((screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

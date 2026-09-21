@@ -95,6 +95,47 @@ and both plots still use actual Bloch rotations and CSF T1/T2 relaxation.
 The chapter starts a fresh acquisition and preserves graph zoom, pulse editing,
 Space/play/pause, and Refresh. Layout completes before the initial RF pulse.
 
+### Contrast exploration
+
+The next slide, **How do we get contrasts?**, keeps the outgoing race mounted
+until its exit animation completes: the south pole moves up, north pole down,
+and the spheres/track fade away. It then disposes that WebGL scene. Pause/resume is
+absent; all four tissue curves and the MRI image are evaluated immediately,
+without a running acquisition clock.
+
+Click the lower graph to select **TR** (red tag), or the upper graph to select
+**TE** (yellow line). A yellow RF-wave tag follows at **TE/2**, and the six
+independent field-offset ensembles per tissue produce the refocused signal.
+The initial axes cover 6 seconds for T1 recovery and 400 ms for transverse
+signal so clinically useful echo delays are easy to select. Scroll each axis
+independently to zoom; `+`/`-` and `0` also work on a focused graph. Clicking at
+zero or pressing Delete clears that graph's timing; Refresh clears both.
+
+The image uses the supplied 256×256 `matrix[y][x]` maps, without transposition,
+and the [standard teaching spin-echo approximation](https://www.cis.rit.edu/htbooks/mri/chap-10/chap-10.htm):
+`S = rho * (1 - exp(-TR/T1)) * exp(-TE/T2)`. Unset TR disables recovery weighting
+(full equilibrium); unset TE disables decay weighting (zero echo delay).
+Actual zero/negative repetition times are not simulated. TE must be shorter
+than a finite TR; invalid combinations display an explanatory label and a
+black image. Intensities share one fixed linear [0,1] grayscale window, not
+individually normalized image gains.
+
+Short TR with short TE is labelled T1-weighted, long TR with long TE is
+T2-weighted, and long/unset TR with short/unset TE is spin-density weighted.
+Short TR with long TE is labelled mixed T1/T2. The descriptive categories use
+2000 ms TR / 50 ms TE teaching thresholds, not universal clinical boundaries.
+The pixel signal varies continuously across these label thresholds.
+
+The lower curves show independent saturation-recovery preparation; that
+recovered fraction initializes the upper 90°/180° acquisition. This factorized
+model does not simulate a full repeated steady-state pulse train or corrections
+to longitudinal recovery caused by refocusing pulses in prior repetitions.
+At TE, the complex mean of each tissue's six simulated vectors matches the
+same signal equation; away from TE it retains genuine gradient dephasing.
+Plot tissues retain the simulator's 1.5 T table and colors, whereas image
+voxels use the supplied synthetic map values, which differ from that table.
+These are illustrative tissue-model estimates, not measured quantitative maps.
+
 ## GitHub Pages
 
 Pushes to `main` run the GitHub Pages workflow in

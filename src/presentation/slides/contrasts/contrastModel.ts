@@ -1,0 +1,76 @@
+import { fidEnsembleMagnetizationStateAt, type FidEnsembleState, type RfPulseEvent } from '../../../simulation/fid'
+import { createComparisonTissues, type ComparisonTissue } from '../howWeMeasure2/tissueComparison'
+import { createRaceEnsembles } from '../howWeMeasure3/protonRace'
+
+export interface ContrastTiming { tr: number | null; te: number | null }
+export const EMPTY_CONTRAST_TIMING: ContrastTiming = { tr: null, te: null }
+
+export function validContrastTiming({ tr, te }: ContrastTiming) {
+  return (tr === null || Number.isFinite(tr) && tr > 0) &&
+    (te === null || Number.isFinite(te) && te > 0) && (tr === null || te === null || te < tr)
+}
+
+/** Teaching spin-echo approximation, fixed receive gain:
+ * S = rho (1-exp(-TR/T1)) exp(-TE/T2).
+ * An unset control disables its weighting (TR -> infinity, TE -> zero).
+ * https://www.cis.rit.edu/htbooks/mri/chap-10/chap-10.htm */
+export function recoveryFraction(t1: number, tr: number | null) {
+  return tr === null ? 1 : t1 > 0 ? -Math.expm1(-tr / t1) : 1
+}
+
+export function spinEchoIntensity(density: number, t1: number, t2: number, timing: ContrastTiming) {
+  if (density <= 0 || !validContrastTiming(timing)) return 0
+  const decay = timing.te === null ? 1 : t2 > 0 ? Math.exp(-timing.te / t2) : 0
+  return density * recoveryFraction(t1, timing.tr) * decay
+}
+
+export function contrastLabel(timing: ContrastTiming) {
+  if (!validContrastTiming(timing)) return 'Choose TE shorter than TR'
+  const t1Weighted = timing.tr !== null && timing.tr < 2000
+  const t2Weighted = timing.te !== null && timing.te >= 50
+  if (t1Weighted && t2Weighted) return 'Mixed T₁ / T₂ Weighted Image'
+  if (t1Weighted) return 'T₁ Weighted Image'
+  if (t2Weighted) return 'T₂ Weighted Image'
+  return 'Spin Density Image'
+}
+
+export interface ContrastTissue extends ComparisonTissue { ensembles: readonly FidEnsembleState[] }
+
+/** Four independent sets of six CSF/bone/white/gray ensembles, not a fabricated
+ * T2-star curve. Their static offsets match the race's field gradient. */
+export function createContrastTissues(fieldStrengthTesla: number): ContrastTissue[] {
+  const offsets = createRaceEnsembles(fieldStrengthTesla)
+  return createComparisonTissues(fieldStrengthTesla).map(tissue => ({
+    ...tissue,
+    ensembles: offsets.map(offset => ({ ...offset, ...tissue.state,
+      index: offset.index, column: offset.column, row: offset.row, gridSize: offset.gridSize,
+      angularFrequencyOffsetRadiansPerMillisecond: offset.angularFrequencyOffsetRadiansPerMillisecond,
+      fieldVariationTesla: offset.fieldVariationTesla, fieldVariationPpm: offset.fieldVariationPpm,
+      spinPackets: offset.spinPackets.map(packet => ({ ...packet })),
+    })),
+  }))
+}
+
+export function contrastPulses(te: number | null): RfPulseEvent[] {
+  return [{ timeMilliseconds: 0, kind: '90-y' }, ...(te === null ? [] : [{
+    timeMilliseconds: te / 2, kind: '180-x' as const,
+  }])]
+}
+
+/** The lower graph is the recovery available before the next excitation.
+ * The upper graph applies that preparation to a fresh 90/180 acquisition.
+ * This factorized preparation is the same idealization as the image equation;
+ * it is not a full multi-cycle steady-state sequence. */
+export function contrastTissueAt(tissue: ContrastTissue, time: number, timing: ContrastTiming) {
+  const scale = tissue.excitation.equilibriumScale ?? 1
+  const pulses = contrastPulses(timing.te)
+  const preparation = recoveryFraction(tissue.state.longitudinalRelaxationTimeMilliseconds, timing.tr)
+  let x = 0, y = 0, z = 0
+  for (const ensemble of tissue.ensembles) {
+    const signal = fidEnsembleMagnetizationStateAt(ensemble, time, pulses)
+    const recovery = fidEnsembleMagnetizationStateAt(ensemble, time, [pulses[0]])
+    x += signal.xFraction; y += signal.yFraction; z += recovery.zFraction
+  }
+  return { signal: Math.hypot(x, y) / tissue.ensembles.length * scale * preparation,
+    longitudinal: z / tissue.ensembles.length * scale }
+}

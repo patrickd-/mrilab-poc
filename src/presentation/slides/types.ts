@@ -9,6 +9,8 @@ export interface SlideStateProps {
   setFieldStrengthTesla: (value: number) => void
   stateIndex: number
   simulationClock?: PlaybackClock
+  exiting?: boolean
+  onExitComplete?: () => void
 }
 
 export interface PresentationSlideModule {
@@ -21,4 +23,5 @@ export interface PresentationSlideModule {
   preserveFieldStrength?: boolean
   /** First state that exposes the shared simulation pause/play control. */
   pauseFromState?: number
+  animateExit?: boolean
 }
