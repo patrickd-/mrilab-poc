@@ -82,6 +82,18 @@ includes negative magnetization after inversion. The dim intrinsic T2 curve
 remains as a reference. Late pulses extend the timeline to include their echo;
 zoom and pause still work. The pulse carries into stacked view; Refresh clears it.
 
+The next chapter (`HowWeMeasure3Slide`) explains refocusing with six proton
+racers. They split from the large sphere into grid-sized cells along a shared
+start/finish line. Lane field offsets increase from left to right; each racer's
+speed uses exactly its slowed displayed precession frequency. Its unwrapped
+distance is proportional to `v*t` before a selected 180° pulse at `tau`, and
+`v*(2*tau-t)` afterward. Racers are not clamped, wrapped, or removed off-screen,
+so even a late pulse brings all six back to the line at `2*tau`, then past it.
+Only the running direction is reversed as a teaching metaphor: the magnets
+and both plots still use actual Bloch rotations and CSF T1/T2 relaxation.
+The chapter starts a fresh acquisition and preserves graph zoom, pulse editing,
+Space/play/pause, and Refresh. Layout completes before the initial RF pulse.
+
 ## GitHub Pages
 
 Pushes to `main` run the GitHub Pages workflow in

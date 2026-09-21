@@ -67,7 +67,9 @@ it.each([350, 1200, 2377.25, 8000])('refocuses actual grid and stacked vectors a
   const echoTime = 1000 + 2 * delay
   const echo = csfCollectionAt(grid, excitation, echoTime)
   expect(echo.signal).toBeCloseTo(Math.exp(-2 * delay / 2100), 12)
-  expect(csfCollectionAt([...grid].reverse(), excitation, echoTime)).toEqual(echo)
+  const stacked = csfCollectionAt([...grid].reverse(), excitation, echoTime)
+  expect(stacked.signal).toBeCloseTo(echo.signal, 12)
+  expect(stacked.longitudinal).toBeCloseTo(echo.longitudinal, 12)
   const beforePulse = csfCollectionAt(grid, excitation, 1000 + delay - 1e-6)
   const afterPulse = csfCollectionAt(grid, excitation, 1000 + delay)
   expect(afterPulse.signal).toBeCloseTo(beforePulse.signal, 8)

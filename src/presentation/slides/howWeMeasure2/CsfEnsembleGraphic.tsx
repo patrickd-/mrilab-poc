@@ -3,10 +3,16 @@ import * as THREE from 'three'
 import { SAMPLE_COLORS } from '../../../models/sampleColors'
 import type { FidEnsembleState } from '../../../simulation/fid'
 import { presentationMagnetizationAt, type ProtonExcitation } from '../howWeMeasure/protonExcitation'
-import { CSF_GRID_SIDE, CSF_LAYOUT_MS } from './csfDephasing'
+import { CSF_LAYOUT_MS } from './csfDephasing'
 import { createMagnetPoleMaterial } from '../../components/magnetAppearance'
 import { csfViewVector, splitCsfOrigins, type CsfPose } from './csfView'
 import { realTimeClock, type PlaybackClock } from '../../playback/simulationClock'
+
+export interface CsfEnsembleMotion {
+  label: string
+  poseAt: (index: number, width: number, height: number) => CsfPose
+  offsetAt: (state: FidEnsembleState, excitation: ProtonExcitation, time: number, width: number, height: number) => { x: number; y: number }
+}
 
 interface Props {
   step: number
@@ -16,9 +22,11 @@ interface Props {
   onSettled: () => void
   clock?: PlaybackClock
   endsAt?: number
+  /** Optional layout/motion for another teaching view, using the same magnets. */
+  motion?: CsfEnsembleMotion
 }
 
-/** One renderer and shared geometry for all 36 ensembles, including stacking. */
+/** One renderer and shared geometry for every ensemble, including stacking. */
 export function CsfEnsembleGraphic(props: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const updateRef = useRef<((props: Props) => void) | null>(null)
@@ -59,7 +67,7 @@ export function CsfEnsembleGraphic(props: Props) {
       textures.push(map)
       return new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, toneMapped: false })
     })
-    const objects = Array.from({ length: CSF_GRID_SIDE ** 2 }, () => {
+    const objects = Array.from({ length: latest.current.states.length }, () => {
       const group = new THREE.Group()
       const shellMaterial = new THREE.MeshPhongMaterial({
         color: SAMPLE_COLORS['cerebrospinal-fluid'], emissive: '#07151b',
@@ -95,6 +103,7 @@ export function CsfEnsembleGraphic(props: Props) {
     const poses = (step: number): CsfPose[] => {
       const size = Math.min(width, height)
       return objects.map((_, index) => {
+        if (input.motion) return input.motion.poseAt(index, width, height)
         const grid = step >= 2 && step <= 5
         const x = ((index % 6) - 2.5) * size * 0.145
         const y = (2.5 - Math.floor(index / 6)) * size * 0.145
@@ -117,7 +126,8 @@ export function CsfEnsembleGraphic(props: Props) {
       for (let index = 0; index < objects.length; index++) {
         const { group, magnet, shellMaterial, labels } = objects[index]
         const pose = current[index]
-        group.position.set(pose.x, pose.y, 0)
+        const offset = input.motion?.offsetAt(input.states[index], input.excitation, now, width, height)
+        group.position.set(pose.x + (offset?.x ?? 0), pose.y + (offset?.y ?? 0), 0)
         group.scale.setScalar(Math.max(0.0001, pose.radius))
         group.visible = pose.radius > 0.1
         shellMaterial.opacity = pose.shell
@@ -136,6 +146,7 @@ export function CsfEnsembleGraphic(props: Props) {
       renderer.render(scene, camera)
       host.dataset.simulationTimeMs = String(now)
       host.dataset.simulationPaused = String(clock.paused)
+      if (input.motion) host.dataset.ensemblePositions = JSON.stringify(objects.map(({ group }) => [group.position.x, group.position.y]))
       if (fraction === 1 && !settled) { settled = true; input.onSettled() }
       const lastPulse = input.excitation.pulseEvents.at(-1)?.timeMilliseconds
       if (fraction < 1 || (!clock.paused && (input.step !== 3 && input.step !== 4) && lastPulse !== undefined && now < (input.endsAt ?? lastPulse + 12000))) frame = requestAnimationFrame(animate)
@@ -144,6 +155,9 @@ export function CsfEnsembleGraphic(props: Props) {
       input = next
       if (lastStep !== next.step) {
         from = current.length ? current : poses(next.step === 1 ? 1 : next.step === 6 ? 5 : next.step - 1)
+        if (lastStep === -1 && next.motion) {
+          from = splitCsfOrigins({ x: 0, y: 0, radius: Math.min(width, height) * 0.25, shell: 0.5 }, objects.length)
+        }
         if (lastStep === -1 && next.step === 1 && !next.immediate) {
           from[0] = { ...from[0], x: -width * 0.25, y: height * (0.5 - (0.27 - 0.08) / 0.84),
             radius: Math.max(100, Math.min(145, window.innerWidth * 0.09)) * 0.365 }
@@ -186,10 +200,10 @@ export function CsfEnsembleGraphic(props: Props) {
     }
   }, [])
 
-  useEffect(() => updateRef.current?.(props), [props.step, props.states, props.excitation, props.immediate, props.onSettled, props.clock, props.clock?.paused, props.endsAt])
+  useEffect(() => updateRef.current?.(props), [props.step, props.states, props.excitation, props.immediate, props.onSettled, props.clock, props.clock?.paused, props.endsAt, props.motion])
 
   return <div className="csf-ensemble-scene" ref={hostRef} role="img"
-    aria-label={props.step === 6 ? '36 CSF magnetizations in one stacked sphere' : props.step === 1 ? 'Enlarged CSF ensemble' : '6 by 6 CSF ensemble grid'}
-    data-view="top-down" data-magnet-count={props.step === 1 ? 1 : 36} data-rf-pulse-count={props.excitation.pulseEvents.length}
+    aria-label={props.motion?.label ?? (props.step === 6 ? '36 CSF magnetizations in one stacked sphere' : props.step === 1 ? 'Enlarged CSF ensemble' : '6 by 6 CSF ensemble grid')}
+    data-view="top-down" data-magnet-count={props.step === 1 ? 1 : props.states.length} data-rf-pulse-count={props.excitation.pulseEvents.length}
     data-hidden={props.step === 3 || props.step === 4} />
 }

@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Presentation } from './Presentation'
 import { excessProtonsAt, formatProtonCount } from './physics'
 import { FID_PLAY_PLAN } from './playback/playPlan'
+import { presentationSlides } from './slides'
 
 async function advance(user: ReturnType<typeof userEvent.setup>, count: number) {
   const next = screen.getByRole('button', { name: 'Next step' })
@@ -96,14 +97,15 @@ describe('MRI Intuition presentation', () => {
       fireEvent.change(screen.getByRole('slider'), { target: { value: String(field) } })
       expect(fieldValue()).toBe(String(field))
       for (let i = 0; i < 2; i++) fireEvent.keyDown(window, { key: 'ArrowRight' })
-      for (let i = 0; i < 15; i++) {
+      const laterStates = presentationSlides.slice(2).reduce((total, slide) => total + slide.stateCount, 0)
+      for (let i = 0; i < laterStates; i++) {
         expect(screen.queryByRole('slider')).toBeNull()
         expect(fieldValue()).toBe('1.5')
         fireEvent.click(screen.getByRole('button', { name: 'Replay current step' }))
         expect(fieldValue()).toBe('1.5')
         fireEvent.keyDown(window, { key: 'ArrowRight' })
       }
-      for (let i = 0; i < 15; i++) fireEvent.keyDown(window, { key: 'ArrowLeft' })
+      for (let i = 0; i < laterStates; i++) fireEvent.keyDown(window, { key: 'ArrowLeft' })
       expect((screen.getByRole('slider') as HTMLInputElement).value).toBe('1.5')
       fireEvent.change(screen.getByRole('slider'), { target: { value: '3' } })
       expect(fieldValue()).toBe('3')
@@ -371,6 +373,15 @@ describe('MRI Intuition presentation', () => {
     expect(screen.getByRole('img', { name: '6 by 6 CSF ensemble grid' })).toBeTruthy()
     await advance(user, 4)
     expect(screen.getByRole('img', { name: '36 CSF magnetizations in one stacked sphere' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement).disabled).toBe(false)
+    await advance(user, 1)
+    expect(container.querySelector('main')?.getAttribute('data-slide')).toBe('how-we-measure-3')
+    expect(screen.getByRole('img', { name: /Six proton racers/ }).getAttribute('data-magnet-count')).toBe('6')
+    expect(screen.getByRole('button', { name: 'Pause simulation' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(screen.getByRole('button', { name: 'Resume simulation' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Replay current step' }))
+    expect(screen.getByRole('button', { name: 'Pause simulation' })).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Next step' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })
